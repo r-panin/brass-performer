@@ -1,6 +1,8 @@
 import json
-from random import shuffle
+from random import shuffle, choice
 from pathlib import Path
+from models.city import City
+from models.link import Link
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
@@ -12,13 +14,15 @@ class Board():
         self.build_jokers()
         self.place_merchants()
         self.era = 'canal'
+        self.build_map()
 
     def __repr__(self):
         return f'''Board with {self.n_players} players\n
 Total cards: {len(self.deck)}\n
 Jokers: {self.joker_deck}\n
 Merchants: {self.merchants}\n
-Current era: {self.era}'''
+Current era: {self.era}\n
+Random city: {choice(self.cities)}'''
 
     def build_deck(self):
         self.deck = list()
@@ -54,7 +58,20 @@ Current era: {self.era}'''
         self.joker_deck = [{"city": "any"} for _ in range(4)] + [{"industry": "any"} for _ in range(4)]
 
     def build_map(self):
-        pass
+        self.cities = list()
+        with self.CITIES_LIST.open() as text:
+            cities = json.loads(text.read())
+            for city in cities:
+                name = city['name']
+                print(type(name))
+                links = [Link(name, other_city['name']) for other_city in city['links'] if self.era in other_city['transport']]
+                if city['name'] in self.merchants.keys():
+                    merchant = True
+                    slots = []
+                else:
+                    merchant = False
+                    slots = city['slots']
+                self.cities.append(City(name, links, slots, merchant))
 
 
 if __name__ == '__main__':

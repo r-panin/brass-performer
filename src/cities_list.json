@@ -703,91 +703,93 @@
         ]
     },
     {
-        "name":"Coventry",
-        "links":[
+        "name": "Coventry",
+        "links": [
             {
-                "name":"Nuneaton",
-                "transport":[
+                "name": "Nuneaton",
+                "transport": [
                     "rail"
                 ]
             },
             {
-                "name":"Birmingham",
-                "transport":[
+                "name": "Birmingham",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "slots":[
+        "slots": [
             [
                 "pottery"
             ],
             [
-                "box","coal"
+                "box",
+                "coal"
             ],
             [
-                "box","iron"
+                "box",
+                "iron"
             ]
         ]
     },
     {
-        "name":"farm_brewery_south",
-        "links":[
+        "name": "farm_brewery_south",
+        "links": [
             {
-                "name":"Kidderminster",
-                "transport":[
+                "name": "Kidderminster",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Worcester",
-                "transport":[
+                "name": "Worcester",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "slots":[
+        "slots": [
             [
                 "brewery"
             ]
         ]
     },
     {
-        "name":"Kidderminster",
-        "links":[
+        "name": "Kidderminster",
+        "links": [
             {
-                "name":"Coalsbrookdale",
-                "transport":[
+                "name": "Coalsbrookdale",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Dudley",
-                "transport":[
+                "name": "Dudley",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Worcester",
-                "transport":[
+                "name": "Worcester",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"farm_brewery_south",
-                "transport":[
+                "name": "farm_brewery_south",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "slots":[
+        "slots": [
             [
                 "cotton",
                 "coal"
@@ -798,38 +800,38 @@
         ]
     },
     {
-        "name":"Worcester",
-        "links":[
+        "name": "Worcester",
+        "links": [
             {
-                "name":"farm_brewery_south",
-                "transport":[
+                "name": "farm_brewery_south",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Kidderminster",
-                "transport":[
+                "name": "Kidderminster",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Birmingham",
-                "transport":[
+                "name": "Birmingham",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Gloucester",
-                "transport":[
+                "name": "Gloucester",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "slots":[
+        "slots": [
             [
                 "cotton"
             ],
@@ -839,32 +841,33 @@
         ]
     },
     {
-        "name":"Redditch",
-        "links":[
+        "name": "Redditch",
+        "links": [
             {
-                "name":"Birmingham",
-                "transport":[
+                "name": "Birmingham",
+                "transport": [
                     "rail"
                 ]
             },
             {
-                "name":"Oxford",
-                "transport":[
+                "name": "Oxford",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Gloucester",
-                "transport":[
+                "name": "Gloucester",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "slots":[
+        "slots": [
             [
-                "box","coal"
+                "box",
+                "coal"
             ],
             [
                 "iron"
@@ -872,42 +875,42 @@
         ]
     },
     {
-        "name":"Gloucester",
-        "links":[
+        "name": "Gloucester",
+        "links": [
             {
-                "name":"Worcester",
-                "transport":[
+                "name": "Worcester",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Redditch",
-                "transport":[
+                "name": "Redditch",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
         ],
-        "merchant":true
+        "merchant": true
     },
     {
-        "name":"Oxford",
-        "links":[
+        "name": "Oxford",
+        "links": [
             {
-                "name":"Birmingham",
-                "transport":[
+                "name": "Birmingham",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             },
             {
-                "name":"Redditch",
-                "transport":[
+                "name": "Redditch",
+                "transport": [
                     "canal",
                     "rail"
                 ]
             }
-        ]        
+        ]
     }
 ]
