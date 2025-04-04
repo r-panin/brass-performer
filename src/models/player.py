@@ -6,7 +6,7 @@ from models.board import Board
 
 class Player():
     BUILDING_TABLE = Path(__file__).parent.with_name('building_table.json')
-    def __init__(self, color, start_position, board:Board):
+    def __init__(self, color:str, start_position:int, board:Board):
         self.color = color
         self.move_order = start_position
         self.income = 0

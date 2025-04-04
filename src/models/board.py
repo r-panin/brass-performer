@@ -4,18 +4,21 @@ from pathlib import Path
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
+    CITIES_LIST = Path(__file__).parent.with_name('cities_list.json')
 
     def __init__(self, n_players=4):
         self.n_players = n_players
         self.build_deck()
         self.build_jokers()
         self.place_merchants()
+        self.era = 'canal'
 
     def __repr__(self):
         return f'''Board with {self.n_players} players\n
 Total cards: {len(self.deck)}\n
 Jokers: {self.joker_deck}\n
-Merchants: {self.merchants}'''
+Merchants: {self.merchants}\n
+Current era: {self.era}'''
 
     def build_deck(self):
         self.deck = list()
@@ -49,6 +52,10 @@ Merchants: {self.merchants}'''
 
     def build_jokers(self):
         self.joker_deck = [{"city": "any"} for _ in range(4)] + [{"industry": "any"} for _ in range(4)]
+
+    def build_map(self):
+        pass
+
 
 if __name__ == '__main__':
     b = Board()

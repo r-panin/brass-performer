@@ -1,0 +1,913 @@
+[
+    {
+        "name": "Stoke-on-Trent",
+        "slots": [
+            [
+                "box"
+            ],
+            [
+                "box",
+                "cotton"
+            ],
+            [
+                "pottery",
+                "iron"
+            ]
+        ],
+        "links": [
+            {
+                "name": "Warrington",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            },
+            {
+                "name": "Leek",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            },
+            {
+                "name": "Stone",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Leek",
+        "slots": [
+            [
+                "cotton",
+                "box"
+            ],
+            [
+                "cotton",
+                "coal"
+            ]
+        ],
+        "links": [
+            {
+                "name": "Stoke-on-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Belper",
+                "transport": [
+                    "rail"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Belper",
+        "slots": [
+            [
+                "cotton",
+                "box"
+            ],
+            [
+                "coal"
+            ],
+            [
+                "pottery"
+            ]
+        ],
+        "links": [
+            {
+                "name": "Leek",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Derby",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Derby",
+        "slots": [
+            [
+                "cotton",
+                "brewery"
+            ],
+            [
+                "cotton",
+                "box"
+            ],
+            [
+                "iron"
+            ]
+        ],
+        "links": [
+            {
+                "name": "Belper",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            },
+            {
+                "name": "Nottingham",
+                "transport": [
+                    "rail",
+                    "canal"
+                ]
+            },
+            {
+                "name": "Uttoxeter",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Burton-upon-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Nottingham",
+        "merchant": true,
+        "links": [
+            {
+                "name": "Derby",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Warrington",
+        "links": [
+            {
+                "name": "Stoke-on-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "merchant": true
+    },
+    {
+        "name": "Uttoxeter",
+        "links": [
+            {
+                "name": "Derby",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Stone",
+                "transport": [
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box",
+                "brewery"
+            ],
+            [
+                "cotton",
+                "brewery"
+            ]
+        ]
+    },
+    {
+        "name": "Stone",
+        "links": [
+            {
+                "name": "Stoke-on-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Uttoxeter",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Burton-upon-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Stafford",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "cotton",
+                "brewery"
+            ],
+            [
+                "box",
+                "coal"
+            ]
+        ]
+    },
+    {
+        "name": "Stafford",
+        "links": [
+            {
+                "name": "Stone",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Cannock",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box",
+                "brewery"
+            ],
+            [
+                "pottery"
+            ]
+        ]
+    },
+    {
+        "name": "Burton-upon-Trent",
+        "links": [
+            {
+                "name": "Derby",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Stone",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Cannock",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Walsall",
+                "transport": [
+                    "canal"
+                ]
+            },
+            {
+                "name": "Tamworth",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box",
+                "coal"
+            ],
+            [
+                "brewery"
+            ]
+        ]
+    },
+    {
+        "name": "farm_brewery_north",
+        "links": [
+            {
+                "name": "Cannock",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "brewery"
+            ]
+        ]
+    },
+    {
+        "name": "Cannock",
+        "links": [
+            {
+                "name": "farm_brewery_north",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Stafford",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Burton-upon-Trent",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Walsall",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Wolverhampton",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box",
+                "coal"
+            ],
+            [
+                "coal"
+            ]
+        ]
+    },
+    {
+        "name": "Tamworth",
+        "links": [
+            {
+                "name": "Burton-upon-Trent",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Walsall",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Nuneaton",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Birmingham",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "cotton",
+                "coal"
+            ],
+            [
+                "cotton",
+                "coal"
+            ]
+        ]
+    },
+    {
+        "name": "Shrewsbury",
+        "merchant": true,
+        "links": [
+            {
+                "name": "Coalsbrookdale",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Coalsbrookdale",
+        "links": [
+            {
+                "name": "Shrewsbury",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Wolverhampton",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Kidderminster",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "iron",
+                "brewery"
+            ],
+            [
+                "iron"
+            ],
+            [
+                "coal"
+            ]
+        ]
+    },
+    {
+        "name": "Wolverhampton",
+        "links": [
+            {
+                "name": "Coalsbrookdale",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Cannock",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Walsall",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Dudley",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box"
+            ],
+            [
+                "box",
+                "coal"
+            ]
+        ]
+    },
+    {
+        "name": "Walsall",
+        "links": [
+            {
+                "name": "Birmingham",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Wolverhampton",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Cannock",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Burton-upon-Trent",
+                "transport": [
+                    "canal"
+                ]
+            },
+            {
+                "name": "Tamworth",
+                "transport": [
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "iron",
+                "box"
+            ],
+            [
+                "box",
+                "brewery"
+            ]
+        ]
+    },
+    {
+        "name": "Dudley",
+        "links": [
+            {
+                "name": "Wolverhampton",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Birmingham",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Kidderminster",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "coal"
+            ],
+            [
+                "iron"
+            ]
+        ]
+    },
+    {
+        "name": "Birmingham",
+        "links": [
+            {
+                "name": "Dudley",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Walsall",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Tamworth",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Nuneaton",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Coventry",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Oxford",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Redditch",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Worcester",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "cotton",
+                "box"
+            ],
+            [
+                "box"
+            ],
+            [
+                "box"
+            ],
+            [
+                "iron"
+            ]
+        ]
+    },
+    {
+        "name": "Nuneaton",
+        "links": [
+            {
+                "name": "Tamworth",
+                "transport": [
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name": "Birmingham",
+                "transport": [
+                    "rail"
+                ]
+            },
+            {
+                "name": "Coventry",
+                "transport": [
+                    "rail"
+                ]
+            }
+        ],
+        "slots": [
+            [
+                "box",
+                "brewery"
+            ],
+            [
+                "coal",
+                "cotton"
+            ]
+        ]
+    },
+    {
+        "name":"Coventry",
+        "links":[
+            {
+                "name":"Nuneaton",
+                "transport":[
+                    "rail"
+                ]
+            },
+            {
+                "name":"Birmingham",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots":[
+            [
+                "pottery"
+            ],
+            [
+                "box","coal"
+            ],
+            [
+                "box","iron"
+            ]
+        ]
+    },
+    {
+        "name":"farm_brewery_south",
+        "links":[
+            {
+                "name":"Kidderminster",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Worcester",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots":[
+            [
+                "brewery"
+            ]
+        ]
+    },
+    {
+        "name":"Kidderminster",
+        "links":[
+            {
+                "name":"Coalsbrookdale",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Dudley",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Worcester",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"farm_brewery_south",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots":[
+            [
+                "cotton",
+                "coal"
+            ],
+            [
+                "cotton"
+            ]
+        ]
+    },
+    {
+        "name":"Worcester",
+        "links":[
+            {
+                "name":"farm_brewery_south",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Kidderminster",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Birmingham",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Gloucester",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots":[
+            [
+                "cotton"
+            ],
+            [
+                "cotton"
+            ]
+        ]
+    },
+    {
+        "name":"Redditch",
+        "links":[
+            {
+                "name":"Birmingham",
+                "transport":[
+                    "rail"
+                ]
+            },
+            {
+                "name":"Oxford",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Gloucester",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "slots":[
+            [
+                "box","coal"
+            ],
+            [
+                "iron"
+            ]
+        ]
+    },
+    {
+        "name":"Gloucester",
+        "links":[
+            {
+                "name":"Worcester",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Redditch",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ],
+        "merchant":true
+    },
+    {
+        "name":"Oxford",
+        "links":[
+            {
+                "name":"Birmingham",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            },
+            {
+                "name":"Redditch",
+                "transport":[
+                    "canal",
+                    "rail"
+                ]
+            }
+        ]        
+    }
+]
