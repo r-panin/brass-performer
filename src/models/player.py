@@ -10,6 +10,7 @@ class Player():
         self.move_order = start_position
         self.income = 0
         self.vp = 0
+        self.bank = 17
 
         self.hand = list()
         self.build_first_hand()
