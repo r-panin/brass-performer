@@ -1,16 +1,19 @@
 import json
 from pathlib import Path
 from models.building import Building
+from models.board import Board
 
 
 class Player():
     BUILDING_TABLE = Path(__file__).parent.with_name('building_table.json')
-    def __init__(self, color, start_position, deck):
+    def __init__(self, color, start_position, board:Board):
         self.color = color
         self.move_order = start_position
         self.income = 0
         self.vp = 0
         self.bank = 17
+
+        self.board = board
 
         self.hand = list()
         self.build_first_hand()
@@ -19,15 +22,14 @@ class Player():
         self.build_roster()
 
     def __repr__(self):
-        return f'Player color: {self.color}, current turn order: {self.move_order}'
+        return f'Player color: {self.color}, current turn order: {self.move_order}, hand: {self.hand}'
 
     def build_first_hand(self):
         for _ in range(8):
             self.draw()
 
     def draw(self):
-        pass
-        # self.hand.append(card)
+        self.hand.append(self.board.deck.pop())
 
     def build_roster(self):
         with self.BUILDING_TABLE.open() as text:
