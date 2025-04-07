@@ -1,6 +1,6 @@
 from models.board import Board
 from models.player import Player
-from random import randint, choice
+from random import randint
 
 class Game():
     PLAYER_COLORS = ['purple', 'yellow', 'red', 'white']
@@ -18,9 +18,5 @@ class Game():
         for player in self.players():
             actions = player.determine_possible_actions()
             for _ in range(2):
-                action = choice(actions)
-                if action.targetable:
-                    target = player.determine_possible_targets(action)
-                    player.play_action(target)
-                else:
-                    player.play_action()
+                player.choose_action()
+                player.play_action()

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from models.building import Building
 from models.board import Board
-from models.link import Link
+from models.city import City
 
 
 class Player():
@@ -65,16 +65,28 @@ class Player():
             if 'any' in card.values():
                 return True
 
-    def play_action(self, action:function, card:dict):
+    def play_action(self, action, card:dict):
         action(card)
 
-    def build_action(self, building:Building):
-        pass
+    def build_action(self, building:Building, city:City):
+        possible_slots = []
+        for slot in city.slots:
+            if building.industry in slot.industires and len(slot) == 1:
+                selected_slot = slot
+                break
+            elif building.industry in slot.industries:
+                possible_slots.append(slot)
+        if not selected_slot and len(possible_slots) > 0:
+            selected_slot = self.select_building_slot
+        selected_slot.claim(building, self.color)
 
-    def sell_action(self, card:dict):
-        pass
+    def sell_action(self, buildings:list):
+        for building in buildings:
+            if self.board.merchant_available(building):
+                self.fetch_beer(building)
+                building.flipped = True
 
-    def loan_action(self, card:dict):
+    def loan_action(self):
         self.bank += 30
 
         self.income -= 3
@@ -98,9 +110,14 @@ class Player():
     def scout_action(self):
         self.hand.append(self.board.city_jokers.pop(), self.board.industry_jokers.pop())
 
-    def network_action(self, link:Link):
-        link.claimed_by = self.color
-        
+    def network_action(self, city_a:City, city_b:City):
+        for link in city_a.links:
+            if link.city_b == city_b.name:
+                link.claimed_by = self.color
+                break
+        for link in city_b.links:
+            if link.city_b == city_a.name:
+                link.claimed_by = self.color
 
     def pass_action(self):
         pass
@@ -121,6 +138,9 @@ class Player():
         pass
 
     def fetch_coal(self, location:str):
+        pass
+
+    def fetch_beer(self, location:str):
         pass
 
 if __name__ == '__main__':

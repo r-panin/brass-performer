@@ -4,6 +4,7 @@ from pathlib import Path
 from models.city import City
 from models.link import Link
 from models.market import Market
+from models.building_slot import BuildingSlot
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
@@ -72,7 +73,7 @@ Random city: {choice(self.cities)}'''
                     slots = []
                 else:
                     merchant = False
-                    slots = city['slots']
+                    slots = [BuildingSlot(slot) for slot in city['slots']]
                 self.cities.append(City(name, links, slots, merchant))
 
 
