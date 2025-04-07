@@ -1,6 +1,6 @@
 [
     {
-        "b_type":"pottery",
+        "industry":"pottery",
         "level":1,
         "count":1,
         "income":5,
@@ -15,7 +15,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"pottery",
+        "industry":"pottery",
         "level":2,
         "count":1,
         "income":1,
@@ -29,7 +29,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"pottery",
+        "industry":"pottery",
         "level":3,
         "count":1,
         "income":5,
@@ -44,7 +44,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"pottery",
+        "industry":"pottery",
         "level":4,
         "count":1,
         "income":1,
@@ -58,7 +58,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"pottery",
+        "industry":"pottery",
         "level":5,
         "count":1,
         "income":5,
@@ -73,7 +73,7 @@
         "era_exclusion": "rail"
     },
     {
-        "b_type":"cotton",
+        "industry":"cotton",
         "level":1,
         "count":3,
         "income":5,
@@ -88,7 +88,7 @@
         "era_exclusion":"canal"
     },
     {
-        "b_type":"cotton",
+        "industry":"cotton",
         "level":2,
         "count":2,
         "income":4,
@@ -102,7 +102,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"cotton",
+        "industry":"cotton",
         "level":3,
         "count":3,
         "income":3,
@@ -116,7 +116,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"cotton",
+        "industry":"cotton",
         "level":4,
         "count":3,
         "income":2,
@@ -130,7 +130,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":1,
         "count":1,
         "income":5,
@@ -145,7 +145,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":2,
         "count":2,
         "income":1,
@@ -159,7 +159,7 @@
         "sell_cost":1
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":3,
         "count":1,
         "conn_vp":0,
@@ -173,7 +173,7 @@
         "vp":4
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":4,
         "conn_vp":1,
         "cost":{
@@ -187,7 +187,7 @@
         "vp":3
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":5,
         "conn_vp":2,
         "cost":{
@@ -201,7 +201,7 @@
         "vp":8
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":6,
         "conn_vp":1,
         "cost":{
@@ -215,7 +215,7 @@
         "vp":7
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":7,
         "conn_vp":0,
         "cost":{
@@ -229,7 +229,7 @@
         "vp":9
     },
     {
-        "b_type":"box",
+        "industry":"box",
         "level":8,
         "conn_vp":1,
         "cost":{
@@ -243,7 +243,7 @@
         "vp":11
     },
     {
-        "b_type":"brewery",
+        "industry":"brewery",
         "level":1,
         "conn_vp":2,
         "cost":{
@@ -257,7 +257,7 @@
         "vp":4
     },
     {
-        "b_type":"brewery",
+        "industry":"brewery",
         "level":2,
         "conn_vp":2,
         "cost":{
@@ -270,7 +270,7 @@
         "vp":5
     },
     {
-        "b_type":"brewery",
+        "industry":"brewery",
         "level":3,
         "conn_vp":2,
         "cost":{
@@ -283,7 +283,7 @@
         "vp":7
     },
     {
-        "b_type":"brewery",
+        "industry":"brewery",
         "level":4,
         "conn_vp":2,
         "cost":{
@@ -297,7 +297,7 @@
         "vp":10
     },
     {
-        "b_type":"coal",
+        "industry":"coal",
         "level":1,
         "conn_vp":2,
         "cost":{
@@ -312,7 +312,7 @@
         "resource_count":2
     },
     {
-        "b_type":"coal",
+        "industry":"coal",
         "level":2,
         "conn_vp":1,
         "cost":{
@@ -326,7 +326,7 @@
         "vp":2
     },
     {
-        "b_type":"coal",
+        "industry":"coal",
         "level":3,
         "conn_vp":1,
         "cost":{
@@ -340,7 +340,7 @@
         "vp":3
     },
     {
-        "b_type":"coal",
+        "industry":"coal",
         "level":4,
         "conn_vp":1,
         "cost":{
@@ -354,7 +354,7 @@
         "vp":4
     },
     {
-        "b_type":"iron",
+        "industry":"iron",
         "level":1,
         "conn_vp":1,
         "cost":{
@@ -369,7 +369,7 @@
         "vp":3
     },
     {
-        "b_type":"iron",
+        "industry":"iron",
         "level":2,
         "conn_vp":1,
         "cost":{
@@ -383,7 +383,7 @@
         "vp":5
     },
     {
-        "b_type":"iron",
+        "industry":"iron",
         "level":3,
         "conn_vp":1,
         "cost":{
@@ -397,7 +397,7 @@
         "vp":7
     },
     {
-        "b_type":"iron",
+        "industry":"iron",
         "level":4,
         "conn_vp":1,
         "cost":{

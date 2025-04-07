@@ -1,8 +1,8 @@
 class Building():
     SELLABLE_TYPES = ('box', 'cotton', 'pottery')
 
-    def __init__(self, b_type:str, level:int):
-        self.b_type = b_type
+    def __init__(self, industry:str, level:int):
+        self.industry = industry
         self.level = level
 
         self.flipped = False
@@ -10,11 +10,11 @@ class Building():
         self.sellable = self.get_sellable()
 
     def __repr__(self):
-        return f'Building type: {self.b_type}, level: {str(self.level)}'
+        return f'Building type: {self.industry}, level: {str(self.level)}'
 
     @classmethod
     def from_json(cls, b_json: dict):
-        building = cls(b_json['b_type'], b_json['level'])
+        building = cls(b_json['industry'], b_json['level'])
         building.income = b_json['income']
         building.vp = b_json['vp']
         building.conn_vp = b_json['conn_vp']
@@ -38,7 +38,7 @@ class Building():
 
 
     def get_sellable(self):
-        if self.b_type in self.SELLABLE_TYPES:
+        if self.industry in self.SELLABLE_TYPES:
             return True
         return False
     

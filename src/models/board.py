@@ -3,6 +3,7 @@ from random import shuffle, choice
 from pathlib import Path
 from models.city import City
 from models.link import Link
+from models.market import Market
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
@@ -15,11 +16,11 @@ class Board():
         self.place_merchants()
         self.era = 'canal'
         self.build_map()
+        self.market = Market()
 
     def __repr__(self):
         return f'''Board with {self.n_players} players\n
 Total cards: {len(self.deck)}\n
-Jokers: {self.joker_deck}\n
 Merchants: {self.merchants}\n
 Current era: {self.era}\n
 Random city: {choice(self.cities)}'''
@@ -55,7 +56,8 @@ Random city: {choice(self.cities)}'''
         self.merchants['Shrewsbury'] = [goods_list.pop()]
 
     def build_jokers(self):
-        self.joker_deck = [{"city": "any"} for _ in range(4)] + [{"industry": "any"} for _ in range(4)]
+        self.city_jokers = [{"city": "any"} for _ in range(4)]
+        self.industry_jokers = [{"industry": "any"} for _ in range(4)]
 
     def build_map(self):
         self.cities = list()

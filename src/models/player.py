@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from models.building import Building
 from models.board import Board
+from models.link import Link
 
 
 class Player():
@@ -10,6 +11,7 @@ class Player():
         self.color = color
         self.move_order = start_position
         self.income = 0
+        self.income_points = 0
         self.vp = 0
         self.bank = 17
 
@@ -20,6 +22,8 @@ class Player():
 
         self.building_roster = list()
         self.build_roster()
+
+        self.network = set()
 
     def __repr__(self):
         return f'Player color: {self.color}, current turn order: {self.move_order}, hand: {self.hand}'
@@ -37,6 +41,87 @@ class Player():
             for building in table:
                 for _ in range(building['count']):
                     self.building_roster.append(Building.from_json(building))
+
+    def determine_possible_actions(self):
+        possible_actions = []
+        if len(self.hand) == 0:
+            return possible_actions
+        
+        possible_actions.append(self.pass_action) # always true
+
+        if len(self.hand) >= 3 and not self.is_joker_in_hand():
+            possible_actions.append(self.scout_action)
+
+        if self.income_points >= 3:
+            possible_actions.append(self.loan_action)
+
+        return possible_actions
+    
+    def determine_player_network(self):
+        pass
+
+    def is_joker_in_hand(self):
+        for card in self.hand:
+            if 'any' in card.values():
+                return True
+
+    def play_action(self, action:function, card:dict):
+        action(card)
+
+    def build_action(self, building:Building):
+        pass
+
+    def sell_action(self, card:dict):
+        pass
+
+    def loan_action(self, card:dict):
+        self.bank += 30
+
+        self.income -= 3
+
+        if self.income <= 0:
+            self.income_points = self.income
+        elif self.income <= 10:
+            self.income_points = self.income * 2
+        elif self.income <= 20:
+            self.income_points = 20 + self.income * 3
+        elif self.income <= 30:
+            self.income_points = 50 + self.income * 4
+
+    def develop_action(self, building:Building, building2:Building=None):
+        self.fetch_iron()
+        self.building_roster.remove(building)
+        if building2:
+            self.fetch_iron()
+            self.building_roster.remove(building2)
+
+    def scout_action(self):
+        self.hand.append(self.board.city_jokers.pop(), self.board.industry_jokers.pop())
+
+    def network_action(self, link:Link):
+        link.claimed_by = self.color
+        
+
+    def pass_action(self):
+        pass
+
+    def calculate_income(self):
+        if self.income_points <= 0:
+            self.income = self.income_points
+        elif self.income_points <= 20:
+            self.income = -(self.income_points // -2)
+        elif self.income_points <= 50:
+            self.income = 10 + -((self.income_points - 20) // -3)
+        elif self.income_points <= 90:
+            self.income = 20 + -((self.income_points - 50) // -4)
+        else:
+            self.income = 30
+
+    def fetch_iron(self):
+        pass
+
+    def fetch_coal(self, location:str):
+        pass
 
 if __name__ == '__main__':
     p = Player('purple', 1)
