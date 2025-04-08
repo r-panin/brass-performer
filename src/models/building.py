@@ -4,6 +4,8 @@ class Building():
     def __init__(self, industry:str, level:int):
         self.industry = industry
         self.level = level
+        self.owner = None
+        self.location = None
 
         self.flipped = False
 

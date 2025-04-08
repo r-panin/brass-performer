@@ -12,12 +12,13 @@ class Board():
 
     def __init__(self, n_players=4):
         self.n_players = n_players
+        self.era = 'canal'
+        self.market = Market()
+        self.cities = list()
         self.build_deck()
         self.build_jokers()
         self.place_merchants()
-        self.era = 'canal'
         self.build_map()
-        self.market = Market()
 
     def __repr__(self):
         return f'''Board with {self.n_players} players\n
@@ -61,21 +62,62 @@ Random city: {choice(self.cities)}'''
         self.industry_jokers = [{"industry": "any"} for _ in range(4)]
 
     def build_map(self):
-        self.cities = list()
         with self.CITIES_LIST.open() as text:
             cities = json.loads(text.read())
             for city in cities:
                 name = city['name']
-                print(type(name))
-                links = [Link(name, other_city['name']) for other_city in city['links'] if self.era in other_city['transport']]
+                links = [Link(city, other_city) for other_city in city['links'] if self.era in other_city['transport']]
                 if city['name'] in self.merchants.keys():
                     merchant = True
                     slots = []
                 else:
                     merchant = False
                     slots = [BuildingSlot(slot) for slot in city['slots']]
-                self.cities.append(City(name, links, slots, merchant))
+                self.cities.append(City(name, slots, links, merchant))
+            
+    def determine_player_network(self, player_color:str):
+        network = set()
+        for city in self.cities:
+            claims = [link.claimed_by for link in city.links] + [slot.claimed_by for slot in city.slots]
+            if player_color in claims:
+                network.add(city)
+        return network
+    
+    def get_iron_sources(self):
+        iron_buildings = set()
+        for city in self.cities:
+            iron_buildings.union(self.check_city_for_iron(city))
+        return iron_buildings
+    
+    def check_city_for_iron(self, city:City):
+        iron_buildings = set()
+        for slot in city.slots:
+            if hasattr(slot, 'building'):
+                if slot.building.industry == 'iron' and slot.building.resource_count > 0:
+                    iron_buildings.add(slot.building)
+        return iron_buildings
 
+
+    def get_coal_sources(self, location:City, _checked_cities=set(), _coal_buildings = list()):
+        if _checked_cities == self.cities:
+            return _coal_buildings
+        primary_source = self.check_city_for_coal(location)
+        _checked_cities.add(location)
+        if len(primary_source) > 0:
+            _coal_buildings.append(primary_source)
+        for link in location.links:
+            next_city = link.city_b
+            self.get_coal_sources(self, next_city, _checked_cities)
+            
+            
+    def check_city_for_coal(self, city:City):
+        coal_buildings = set()
+        for slot in city.slots:
+            if hasattr(slot, 'building'):
+                if slot.building.industry == 'coal' and slot.building.resource_count > 0:
+                    coal_buildings.add(slot.building)
+        return coal_buildings
+            
 
 if __name__ == '__main__':
     b = Board()

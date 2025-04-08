@@ -3,13 +3,14 @@ from models.building import Building
 class BuildingSlot():
     def __init__(self, industries:list):
         self.industries = industries
+        self.claimed_by = None
         
-    def claim(self, building:Building, player_color:str):
+    def build(self, building:Building, player):
         self.building = building
-        self.claimed_by = player_color
+        self.claimed_by = player
 
     def __repr__(self):
-        if not hasattr(self, 'claimed_by'):
+        if not self.claimed_by:
             return f'Empty {self.industries}'
         else:
             return f'{self.building} owned by {self.claimed_by}'
