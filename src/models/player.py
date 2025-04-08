@@ -26,7 +26,7 @@ class Player():
         self.money_spent = 0
 
     def __repr__(self):
-        return f'Player color: {self.color}, hand: {self.hand}'
+        return f'Player color: {self.color}, hand: {self.hand}, bank: {self.bank}, income: {self.income}, vps: {self.vp}'
 
     def build_first_hand(self):
         for _ in range(8):
@@ -66,20 +66,25 @@ class Player():
     def build_action(self, building:Building, city:City):
         cost = 0
         cost += building.cost['money']
-        cost += self.board.fetch_iron(building.cost['iron'])
-        cost += self.board.fetch_coal(building.cost['coal'], city)
+        #cost += self.board.fetch_iron(building.cost['iron'])
+        #cost += self.board.fetch_coal(building.cost['coal'], city)
+        slot = self.find_building_slots(building.industry, city)[0]
+        building.location = city
+        slot.build(building, self)
+        self.building_roster.remove(building)
+        return cost
+    
+    def find_building_slots(self, industry:str, city:City):
         possible_slots = []
         for slot in city.slots:
-            if building.industry in slot.industires and len(slot) == 1:
-                selected_slot = slot
-                break
-            elif building.industry in slot.industries:
+            print(slot)
+            if industry in slot.industries and len(slot.industries) == 1:
+                possible_slots = list()
                 possible_slots.append(slot)
-        if not selected_slot and len(possible_slots) > 0:
-            selected_slot = self.select_building_slot
-        building.location = city
-        selected_slot.claim(building, self)
-        return cost
+                break
+            elif industry in slot.industries:
+                possible_slots.append(slot)
+        return possible_slots
 
     def sell_action(self, buildings:list):
         for building in buildings:
@@ -148,6 +153,13 @@ class Player():
 
     def gain_income(self):
         self.bank += self.income
+
+    def select_building(self, industry):
+        out = None
+        for building in self.building_roster:
+            if (building.industry == industry) and (not out or building.level < out.level):
+                out = building
+        return out
 
 if __name__ == '__main__':
     p = Player('purple', 1)

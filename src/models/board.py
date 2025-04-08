@@ -66,7 +66,7 @@ Random city: {choice(self.cities)}'''
             cities = json.loads(text.read())
             for city in cities:
                 name = city['name']
-                links = [Link(city, other_city) for other_city in city['links'] if self.era in other_city['transport']]
+                links = [Link(city['name'], other_city['name']) for other_city in city['links'] if self.era in other_city['transport']]
                 if city['name'] in self.merchants.keys():
                     merchant = True
                     slots = []
@@ -76,40 +76,27 @@ Random city: {choice(self.cities)}'''
                 self.cities.append(City(name, slots, links, merchant))
             
     def determine_player_network(self, player_color:str):
-        network = set()
+        network = list()
         for city in self.cities:
             claims = [link.claimed_by for link in city.links] + [slot.claimed_by for slot in city.slots]
             if player_color in claims:
-                network.add(city)
+                network.append(city)
         return network
     
     def get_iron_sources(self):
-        iron_buildings = set()
+        iron_buildings = list()
         for city in self.cities:
-            iron_buildings.union(self.check_city_for_iron(city))
+            iron_buildings += self.check_city_for_iron(city)
         return iron_buildings
     
     def check_city_for_iron(self, city:City):
-        iron_buildings = set()
+        iron_buildings = list()
         for slot in city.slots:
             if hasattr(slot, 'building'):
                 if slot.building.industry == 'iron' and slot.building.resource_count > 0:
-                    iron_buildings.add(slot.building)
+                    iron_buildings.append(slot.building)
         return iron_buildings
 
-
-    def get_coal_sources(self, location:City, _checked_cities=set(), _coal_buildings = list()):
-        if _checked_cities == self.cities:
-            return _coal_buildings
-        primary_source = self.check_city_for_coal(location)
-        _checked_cities.add(location)
-        if len(primary_source) > 0:
-            _coal_buildings.append(primary_source)
-        for link in location.links:
-            next_city = link.city_b
-            self.get_coal_sources(self, next_city, _checked_cities)
-            
-            
     def check_city_for_coal(self, city:City):
         coal_buildings = set()
         for slot in city.slots:
@@ -117,6 +104,12 @@ Random city: {choice(self.cities)}'''
                 if slot.building.industry == 'coal' and slot.building.resource_count > 0:
                     coal_buildings.add(slot.building)
         return coal_buildings
+    
+    def lookup_city(self, name):
+        for city in self.cities:
+            if city.name == name:
+                return city
+        return None
             
 
 if __name__ == '__main__':

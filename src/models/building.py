@@ -12,7 +12,7 @@ class Building():
         self.sellable = self.get_sellable()
 
     def __repr__(self):
-        return f'Building type: {self.industry}, level: {str(self.level)}'
+        return f'Building type: {self.industry}, level: {str(self.level)}, owner: {self.owner.color}, location: {self.location.name}'
 
     @classmethod
     def from_json(cls, b_json: dict):

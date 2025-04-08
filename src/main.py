@@ -10,7 +10,12 @@ board = Board(n_players)
 players = [Player(PLAYER_COLORS.pop(randint(0,len(PLAYER_COLORS)-1)), board) for _ in range(n_players)]
 
 print(board)
-print(players)
 
-#print(board.get_coal_sources(choice(board.cities)))
+builder = choice(players)
+building = builder.select_building('iron')
+city = board.lookup_city('Birmingham')
+builder.build_action(building, city)
+builder.build_action(builder.select_building('iron'), board.lookup_city('Dudley'))
+
+print(board.get_iron_sources())
 
