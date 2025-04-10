@@ -7,12 +7,14 @@ from models.city import City
 
 class Player():
     BUILDING_TABLE = Path(__file__).parent.with_name('building_table.json')
-    def __init__(self, color:str, board:Board):
+    def __init__(self, color:str, board:Board, control_type='random'):
         self.color = color
         self.income = 0
         self.income_points = 0
         self.vp = 0
         self.bank = 17
+        
+        self.control_type = control_type
 
         self.board = board
 
@@ -64,15 +66,31 @@ class Player():
                 return True
 
     def build_action(self, building:Building, city:City):
-        cost = 0
-        cost += building.cost['money']
-        #cost += self.board.fetch_iron(building.cost['iron'])
-        #cost += self.board.fetch_coal(building.cost['coal'], city)
-        slot = self.find_building_slots(building.industry, city)[0]
+        cost = self.calculate_building_cost(building, city)
+        self.select_resources(self.control_type)
+        slot = self.select_building_slot(self.control_type, building.industry, city)[0]
+        self.pay_cost(cost)
         building.location = city
         slot.build(building, self)
         self.building_roster.remove(building)
         return cost
+    
+    def calcualte_building_cost(self, building:Building, city:City):
+        cost += building.cost['money']
+        cost += self.find_coal(building.cost['coal'], city)
+        cost += self.find_iron(building.cost['iron'])
+        return cost
+    
+    def get_iron_cost(self, amount):
+        self.find
+    
+    def find_player_iron(self):
+        player_sources = self.board.get_iron_sources()
+        player_iron = 0
+        for source in player_sources:
+            player_iron += source.resource_count
+        return player_iron
+        
     
     def find_building_slots(self, industry:str, city:City):
         possible_slots = []
@@ -110,8 +128,6 @@ class Player():
         return 0
 
     def develop_action(self, building:Building, building2:Building=None):
-        cost = 0
-        cost += self.fetch_iron()
         self.building_roster.remove(building)
         if building2:
             cost += self.fetch_iron()
@@ -152,7 +168,11 @@ class Player():
             self.income = 30
 
     def gain_income(self):
+        self.calculate_income()
         self.bank += self.income
+
+    def pay_cost(self, cost):
+        self.bank -= cost
 
     def select_building(self, industry):
         out = None
