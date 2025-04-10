@@ -47,4 +47,8 @@ class Building():
     def check_flip(self):
         if not self.sellable and self.resources == 0:
             self.flipped = True
+
+    def use_resource(self):
+        self.resource_count -= 1
+        self.check_flip()
         

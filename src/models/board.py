@@ -5,6 +5,8 @@ from models.city import City
 from models.link import Link
 from models.market import Market
 from models.building_slot import BuildingSlot
+from models.building import Building
+from collections import deque
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
@@ -78,9 +80,10 @@ Random city: {choice(self.cities)}'''
     def determine_player_network(self, player_color:str):
         network = list()
         for city in self.cities:
-            claims = [link.claimed_by for link in city.links] + [slot.claimed_by for slot in city.slots]
-            if player_color in claims:
-                network.append(city)
+            if city not in network:
+                claims = [link.claimed_by for link in city.links] + [slot.claimed_by for slot in city.slots]
+                if player_color in claims:
+                    network.append(city)
         return network
     
     def get_iron_sources(self):
@@ -105,6 +108,28 @@ Random city: {choice(self.cities)}'''
                     coal_buildings.add(slot.building)
         return coal_buildings
     
+    def get_coal_sources(self, city:City):
+        visited = dict()
+        result = list()
+        queue = deque()
+
+        queue.append((city, 0))
+        visited[id(city)] = True
+
+        while queue:
+            current_city, distance = queue.popleft()
+            current_coal_buidlings = self.check_city_for_coal(current_city)
+            if current_coal_buidlings:
+                result.append((current_city, distance))
+
+            for link in current_city.links:
+                neighbor = self.lookup_city(link.dest)
+                if id(neighbor) not in visited:
+                    visited[id(neighbor)] = True
+                    queue.append((neighbor, distance + 1))
+        
+        return result
+
     def lookup_city(self, name):
         for city in self.cities:
             if city.name == name:

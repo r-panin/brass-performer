@@ -13,4 +13,4 @@ class BuildingSlot():
         if not self.claimed_by:
             return f'Empty {self.industries}'
         else:
-            return f'{self.building} owned by {self.claimed_by}'
+            return f'{self.building} owned by {self.claimed_by.color}'
