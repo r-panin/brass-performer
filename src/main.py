@@ -19,3 +19,6 @@ builder.build_action(building, city)
 
 print(board.get_coal_sources(board.lookup_city('Belper')))
 
+for link in board.links:
+    print(link)
+

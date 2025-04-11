@@ -17,6 +17,7 @@ class Board():
         self.era = 'canal'
         self.market = Market()
         self.cities = list()
+        self.links = list()
         self.build_deck()
         self.build_jokers()
         self.place_merchants()
@@ -64,24 +65,54 @@ Random city: {choice(self.cities)}'''
         self.industry_jokers = [{"industry": "any"} for _ in range(4)]
 
     def build_map(self):
+        self.add_tri_link()
         with self.CITIES_LIST.open() as text:
             cities = json.loads(text.read())
             for city in cities:
                 name = city['name']
-                links = [Link(city['name'], other_city['name']) for other_city in city['links'] if self.era in other_city['transport']]
+                links = [Link(city['name'], other_city['name']) for other_city in city['links'] if self.era in other_city['transport']
+                         and not self.has_link(city['name'], other_city['name'])]
+                self.links += links
+                
                 if city['name'] in self.merchants.keys():
                     merchant = True
                     slots = []
                 else:
                     merchant = False
                     slots = [BuildingSlot(slot) for slot in city['slots']]
-                self.cities.append(City(name, slots, links, merchant))
+                self.cities.append(City(name, slots, merchant))
+    
+    def has_link(self, city1, city2):
+        """Проверяет, есть ли связь между city1 и city2 (включая тройные связи)."""
+        for link in self.links:
+            if (link.city_a == city1 and link.city_b == city2) or \
+            (link.city_a == city2 and link.city_b == city1):
+                return True
+            
+            if hasattr(link, 'city_c'):
+                if link.city_c in (city1, city2) and \
+                (link.city_a == city1 or link.city_b == city1 or 
+                    link.city_a == city2 or link.city_b == city2):
+                    return True
+        return False
+
+    def add_tri_link(self):
+        self.links.append(Link('Kidderminster', 'Worcester', 'farm_brewery_south'))
+
+    def get_connected_cities(self, city:City):
+        connected = []
+        for link in self.links:
+            if link.city_a == city.name:
+                connected.append(link.city_b)
+            elif link.city_b == city.name:
+                connected.append(link.city_a)
+        return connected
             
     def determine_player_network(self, player_color:str):
-        network = list()
+        network = [self.lookup_city(city) for link in self.links if link.claimed_by == player_color for city in (link.city_a, link.city_b)]
         for city in self.cities:
             if city not in network:
-                claims = [link.claimed_by for link in city.links] + [slot.claimed_by for slot in city.slots]
+                claims = [slot.claimed_by for slot in city.slots]
                 if player_color in claims:
                     network.append(city)
         return network
@@ -122,8 +153,8 @@ Random city: {choice(self.cities)}'''
             if current_coal_buidlings:
                 result.append((current_city, distance))
 
-            for link in current_city.links:
-                neighbor = self.lookup_city(link.dest)
+            for conn_name in self.get_connected_cities(current_city):
+                neighbor = self.lookup_city(conn_name)
                 if id(neighbor) not in visited:
                     visited[id(neighbor)] = True
                     queue.append((neighbor, distance + 1))

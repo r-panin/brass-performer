@@ -3,6 +3,7 @@ from pathlib import Path
 from models.building import Building
 from models.board import Board
 from models.city import City
+from models.link import Link
 from random import choice
 
 
@@ -168,17 +169,10 @@ class Player():
         self.hand.append(self.board.city_jokers.pop(), self.board.industry_jokers.pop())
         return 0
 
-    def network_action(self, city_a:City, city_b:City):
+    def network_action(self, link:Link):
         if self.board.era == 'canal':
             self.pay_cost(3)
-            for link in city_a.links:
-                if link.dest == city_b.name:
-                    link.claimed_by = self
-                    break
-            for link in city_b.links:
-                if link.dest == city_a.name:
-                    link.claimed_by = self
-            return 
+            link.claim(self.color)
         elif self.board.era == 'rail':
             #fuck this
             pass
