@@ -48,29 +48,15 @@ class Player():
         for buidling in self.building_roster:
             buidling.owner = self
 
-    def determine_possible_actions(self):
-        possible_actions = []
-        possible_actions.append(self.pass_action) # always true
-        if len(self.hand) == 0:
-            return possible_actions
-
-        if len(self.hand) >= 3 and not self.is_joker_in_hand():
-            possible_actions.append(self.scout_action)
-
-        if self.income_points >= 3:
-            possible_actions.append(self.loan_action)
-
-        return possible_actions
-    
     def is_joker_in_hand(self):
         for card in self.hand:
             if 'any' in card.values():
                 return True
 
     def build_action(self, building:Building, city:City):
-        cost = self.calculate_building_cost(building, city)
-        self.select_iron(building.cost['iron'])
-        #self.select_coal(building.cost['coal'])
+        cost = building.cost['money']
+        cost += self.acquire_iron(building.cost['iron'])
+        cost += self.acquire_coal(building.cost['coal'], city)
         slot = self.select_building_slot(building.industry, city)
         self.pay_cost(cost)
         building.location = city
@@ -78,47 +64,68 @@ class Player():
         self.building_roster.remove(building)
         return cost
     
-    def select_building_slot(self, industry:str, city:City, method='random'):
-        permitted_slots = [slot for slot in city.slots if industry in slot.industries]
-        for slot in permitted_slots:
-            if len(slot.industries) == 1:
-                return slot
-        if method == 'random':
-            return choice(permitted_slots)
-    
-    def select_iron(self, amount, method='random'):
-        iron_sources = self.find_player_iron()
-        if method == 'random':
-            for _ in range(amount):
-                choice(iron_sources).use_resource()
-    
-    def calculate_building_cost(self, building:Building, city:City):
-        cost = building.cost['money']
-        if building.cost['coal'] > 0:
-            cost += self.get_coal_cost(building.cost['coal'], city)
-        if building.cost['iron'] > 0:
-            cost += self.get_iron_cost(building.cost['iron'])
-        return cost
-    
-    def get_iron_cost(self, amount):
-        player_iron = self.find_player_iron()
-        total_iron = 0
-        for source in player_iron:
-            total_iron += source.resource_count
-        if amount < total_iron:
-            cost = 0
-        else:
-            market_iron = amount - total_iron
-            cost = self.board.market.buy_iron(market_iron)
-        return cost
-    
-    def find_player_iron(self):
+    def acquire_iron(self, amount):
         player_sources = self.board.get_iron_sources()
-        player_iron = 0
+        player_iron_count = 0
         for source in player_sources:
-            player_iron += source.resource_count
-        return player_iron
-    
+            player_iron_count += source.resource_count
+        if player_sources:
+            self.select_source(player_sources, player_iron_count)
+        if player_iron_count >= amount:
+            return 0
+        else:
+           market_iron = amount - player_iron_count
+           cost = self.board.market.execute_trade(market_iron, 'iron', True)
+           return cost
+
+    def acquire_coal(self, amount, city):
+        source_groups = self.board.get_coal_sources(city)
+        player_coal_count = 0
+        for group in source_groups:
+            for source in group:
+                player_coal_count += source.resource_count
+            if source:
+                self.select_source(player_sources, player_coal_count)
+            if player_coal_count >= amount:
+                return 0
+        elif self.board.market_available(city):
+           market_coal = amount - player_coal_count
+           cost = self.board.market.execute_trade(market_coal, 'coal', True)
+           return cost
+        else:
+            return None
+        
+    def acquire_beer(self, amount, city):
+        sources = self.board.get_beer_sources(city)
+        beer_count = 0
+        for source in sources:
+            beer_count += source.resource_count
+        if beer_count < amount:
+            return None
+        self.select_source(sources, amount)
+        return 0
+        
+    def select_source(self, sources:list, amount, method='own-first'):
+        if method == 'own-first':
+            own_sources = [source for source in sources if source.owner == self].sort(key=lambda a: a.resource_count)
+            foreign_sources = [source for source in sources if source not in own_sources].sort(key=lambda a: a.resource_count)
+            while amount:
+                if not own_sources or foreign_sources:
+                    return None
+                if own_sources:
+                    best_source = own_sources[0]
+                elif foreign_sources:
+                    best_source = foreign_sources[-1]
+                best_source.use_resource()
+                if best_source.resource_count < 1:
+                    if best_source.owner == self:
+                        own_sources.remove(best_source)
+                    else:
+                        foreign_sources.remove(best_source)
+                amount -= 1
+            return 0
+                 
+
     def find_building_slots(self, industry:str, city:City):
         possible_slots = []
         for slot in city.slots:
@@ -130,14 +137,22 @@ class Player():
             elif industry in slot.industries:
                 possible_slots.append(slot)
         return possible_slots
-
+    
+    def select_building_slot(self, industry:str, city:City, method='random'):
+        permitted_slots = [slot for slot in city.slots if industry in slot.industries]
+        for slot in permitted_slots:
+            if len(slot.industries) == 1:
+                return slot
+        if method == 'random':
+            return choice(permitted_slots)
+    
     def sell_action(self, buildings:list):
         for building in buildings:
             if self.board.merchant_available(building):
-                self.fetch_beer(building)
+                self.select_beer(building)
                 building.flipped = True
                 self.income_points += building.income
-        return 0
+        return
 
     def loan_action(self):
         self.bank += 30
@@ -152,22 +167,17 @@ class Player():
             self.income_points = 20 + self.income * 3
         elif self.income <= 30:
             self.income_points = 50 + self.income * 4
-        return 0
+        return
 
     def develop_action(self, building:Building, building2:Building=None):
         for building in building,building2:
-            player_iron = self.find_player_iron()
-            if not player_iron:
-                cost = self.get_iron_cost(1)
-                self.pay_cost(cost)
-            else:
-                self.select_iron(player_iron, 1)
-            self.building_roster.remove(building)
+            # get iron
+            continue
         return
 
     def scout_action(self):
         self.hand.append(self.board.city_jokers.pop(), self.board.industry_jokers.pop())
-        return 0
+        return
 
     def network_action(self, link:Link):
         if self.board.era == 'canal':
@@ -199,7 +209,7 @@ class Player():
     def pay_cost(self, cost):
         self.bank -= cost
 
-    def select_building(self, industry):
+    def get_buildable_building(self, industry):
         out = None
         for building in self.building_roster:
             if (building.industry == industry) and (not out or building.level < out.level):

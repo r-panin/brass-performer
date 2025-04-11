@@ -6,7 +6,7 @@ from models.link import Link
 from models.market import Market
 from models.building_slot import BuildingSlot
 from models.building import Building
-from collections import deque
+from collections import deque, defaultdict
 
 class Board():
     CARD_LIST = Path(__file__).parent.with_name('card_list.json')
@@ -26,7 +26,6 @@ class Board():
     def __repr__(self):
         return f'''Board with {self.n_players} players\n
 Total cards: {len(self.deck)}\n
-Merchants: {self.merchants}\n
 Current era: {self.era}\n
 Random city: {choice(self.cities)}'''
 
@@ -57,8 +56,9 @@ Random city: {choice(self.cities)}'''
             merchant_list.append('Nottingham')
         shuffle(goods_list)
         shuffle(merchant_list)
-        self.merchants = {merchant: [goods_list.pop(), goods_list.pop()] for merchant in merchant_list if merchant != 'Shrewsbury'}
-        self.merchants['Shrewsbury'] = [goods_list.pop()]
+        merchants = {merchant: [goods_list.pop(), goods_list.pop()] for merchant in merchant_list if merchant != 'Shrewsbury'}
+        merchants['Shrewsbury'] = [goods_list.pop()]
+        return merchants
 
     def build_jokers(self):
         self.city_jokers = [{"city": "any"} for _ in range(4)]
@@ -66,6 +66,7 @@ Random city: {choice(self.cities)}'''
 
     def build_map(self):
         self.add_tri_link()
+        merchants = self.place_merchants()
         with self.CITIES_LIST.open() as text:
             cities = json.loads(text.read())
             for city in cities:
@@ -74,13 +75,14 @@ Random city: {choice(self.cities)}'''
                          and not self.has_link(city['name'], other_city['name'])]
                 self.links += links
                 
-                if city['name'] in self.merchants.keys():
+                if name in merchants.keys():
                     merchant = True
                     slots = []
+                    self.cities.append(City(name, slots, merchant, merchants[name]))
                 else:
                     merchant = False
                     slots = [BuildingSlot(slot) for slot in city['slots']]
-                self.cities.append(City(name, slots, merchant))
+                    self.cities.append(City(name, slots, merchant))
     
     def has_link(self, city1, city2):
         """Проверяет, есть ли связь между city1 и city2 (включая тройные связи)."""
@@ -102,10 +104,11 @@ Random city: {choice(self.cities)}'''
     def get_connected_cities(self, city:City):
         connected = []
         for link in self.links:
-            if link.city_a == city.name:
-                connected.append(link.city_b)
-            elif link.city_b == city.name:
-                connected.append(link.city_a)
+            if link.claimed_by:
+                if link.city_a == city.name:
+                    connected.append(link.city_b)
+                elif link.city_b == city.name:
+                    connected.append(link.city_a)
         return connected
             
     def determine_player_network(self, player_color:str):
@@ -120,25 +123,17 @@ Random city: {choice(self.cities)}'''
     def get_iron_sources(self):
         iron_buildings = list()
         for city in self.cities:
-            iron_buildings += self.check_city_for_iron(city)
+            iron_buildings += self.check_city_for_resource(city, 'iron')
         return iron_buildings
     
-    def check_city_for_iron(self, city:City):
-        iron_buildings = list()
+    def check_city_for_resource(self, city:City, resource_type):
+        resource_buildings = list()
         for slot in city.slots:
             if hasattr(slot, 'building'):
-                if slot.building.industry == 'iron' and slot.building.resource_count > 0:
-                    iron_buildings.append(slot.building)
-        return iron_buildings
+                if slot.building.industry == resource_type and slot.building.resource_count > 0:
+                    resource_buildings.append(slot.building)
+        return resource_buildings
 
-    def check_city_for_coal(self, city:City):
-        coal_buildings = set()
-        for slot in city.slots:
-            if hasattr(slot, 'building'):
-                if slot.building.industry == 'coal' and slot.building.resource_count > 0:
-                    coal_buildings.add(slot.building)
-        return coal_buildings
-    
     def get_coal_sources(self, city:City):
         visited = dict()
         result = list()
@@ -149,7 +144,7 @@ Random city: {choice(self.cities)}'''
 
         while queue:
             current_city, distance = queue.popleft()
-            current_coal_buidlings = self.check_city_for_coal(current_city)
+            current_coal_buidlings = self.check_city_for_resource(current_city, 'coal')
             if current_coal_buidlings:
                 result.append((current_city, distance))
 
@@ -158,14 +153,47 @@ Random city: {choice(self.cities)}'''
                 if id(neighbor) not in visited:
                     visited[id(neighbor)] = True
                     queue.append((neighbor, distance + 1))
-        
-        return result
+        grouped = defaultdict(list)
+        for source, distance in result:
+            grouped[distance].append(source)
+        output = [grouped[distance] for distance in sorted(grouped)]
+        return output
+    
+    def get_beer_sources(self, player, city:City, merchant:City, industry:str):
+        own_sources = list()
+        foreign_sources = [merchant for merchant in self.merchants if industry in merchant.merchant_goods]
+        for city in self.cities:
+            local_sources = self.check_city_for_resource(city, 'beer')
+            for source in local_sources:
+                if source.owner == player:
+                    own_sources.append(source)
+                else:
+                    foreign_sources.append(source)
+        valid_foreign_sources = [source for source in foreign_sources if self.are_cities_connected(city, source)]
+        sources = own_sources + valid_foreign_sources 
+        return sources
 
     def lookup_city(self, name):
         for city in self.cities:
             if city.name == name:
                 return city
         return None
+    
+    def are_cities_connected(self, start_city:City, target_city:City):
+        visited = dict()
+        queue = deque([start_city])
+        visited[id(start_city)] = True
+
+        while queue:
+            current_city = queue.popleft()
+            neighbors = self.get_connected_cities(current_city)
+            for neighbor in neighbors:
+                if neighbor == target_city:
+                    return True
+                if neighbor not in visited:
+                    visited[id(neighbor)] = True
+                    queue.append(neighbor)
+        return False
             
 
 if __name__ == '__main__':
