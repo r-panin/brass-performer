@@ -1,11 +1,11 @@
 import json
 from random import shuffle, choice
 from pathlib import Path
-from models.city import City
-from models.link import Link
-from models.market import Market
-from models.building_slot import BuildingSlot
-from models.building import Building
+from src.models.city import City
+from src.models.link import Link
+from src.models.market import Market
+from src.models.building_slot import BuildingSlot
+from src.models.building import Building
 from collections import deque, defaultdict
 
 class Board():

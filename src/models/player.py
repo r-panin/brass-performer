@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
-from models.building import Building
-from models.board import Board
-from models.city import City
-from models.link import Link
+from src.models.building import Building
+from src.models.board import Board
+from src.models.city import City
+from src.models.link import Link
 from random import choice
 
 
@@ -81,10 +81,13 @@ class Player():
     def acquire_coal(self, amount, city):
         source_groups = self.board.get_coal_sources(city)
         player_coal_count = 0
-        for group in source_groups:
-            for source in group:
-                player_coal_count += source.resource_count
-            if source:
+        if source_groups:
+            for group in source_groups:
+                player_sources = list()
+                for source in group:
+                    player_coal_count += source.resource_count
+                    if source:
+                        player_sources.append(source)
                 self.select_source(player_sources, player_coal_count)
             if player_coal_count >= amount:
                 return 0

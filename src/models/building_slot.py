@@ -1,4 +1,4 @@
-from models.building import Building
+from src.models.building import Building
 
 class BuildingSlot():
     def __init__(self, industries:list):
