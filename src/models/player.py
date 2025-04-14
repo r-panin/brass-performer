@@ -39,6 +39,9 @@ class Player():
     def draw(self):
         self.hand.append(self.board.deck.pop())
 
+    def discard(self):
+        self.hand.pop()
+
     def build_roster(self):
         with self.BUILDING_TABLE.open() as text:
             table = json.loads(text.read())
