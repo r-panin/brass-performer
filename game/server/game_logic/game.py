@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus
 from typing import List
 import random
 from pathlib import Path
@@ -6,6 +6,7 @@ import json
 from uuid import uuid4
 import math
 import logging
+import copy
 
 class Game:
     RES_PATH = Path(r'game\server\res')
@@ -21,7 +22,8 @@ class Game:
     IRON_MAX_COST = 6
     COAL_MAX_COUNT = 14
     IRON_MAX_COUNT = 10
-    logging.basicConfig(level=logging.DEBUG)
+    TOTAL_MERCHANT_TOKENS = 9
+    logging.basicConfig(level=logging.INFO)
     def __repr__(self) -> str:
         # Основная информация об игре
         game_info = f"Game(id={self.id[:8]}..., players={len(self.state.players)}, era={self.state.era.value})"
@@ -102,28 +104,26 @@ class Game:
         
         return game_info + players_info + cities_info + links_info + merchants_info
 
-    def __init__(self, player_count: int):
+    def __init__(self):
         self.id = str(uuid4())
-        self.state = self._create_initial_state(player_count)
+        self.status = GameStatus.CREATED
+        self.available_colors = copy.deepcopy(list(PlayerColor))
+        random.shuffle(self.available_colors)
 
-    def _create_initial_state(self, player_count: int) -> BoardState:
-        players = []
-        avalable_colors = list(PlayerColor)
+    def start(self, player_count:int, players_colors: List[PlayerColor]):
+        self.state = self._create_initial_state(player_count, players_colors)
 
-        for _ in range(player_count):
-            color = random.choice(avalable_colors)
-            players.append(self._create_player(color))
-            avalable_colors.remove(color)
+    def _create_initial_state(self, player_count: int, player_colors: List[PlayerColor]) -> BoardState:
+        
         self.deck = self._build_initial_deck(player_count)
 
-        for player in players:
-            hand = [self.draw_card() for _ in range(8)]
-            player.hand = hand
+        players = [self._create_player(color) for color in player_colors]
 
         cities = self._create_cities(player_count)
 
         market = self._create_starting_market()
 
+        self.status = GameStatus.ONGOING
         return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> List[Building]:
@@ -148,7 +148,7 @@ class Game:
 
     def _create_player(self, color:PlayerColor) -> Player:
         return Player(
-            hand=[],
+            hand=[self.draw_card() for _ in range(8)],
             available_buildings=self._build_initial_building_roster(color),
             color=color,
             bank=17,
@@ -241,8 +241,9 @@ class Game:
         '''
         Размещаем коммивояжеров
         '''
-        merchants = [city for city in out if city.is_merchant and city.merchant_min_players <= player_count]
-        print(merchants)
+        all_merchants = [city for city in out if city.is_merchant]
+        playable_merchants = [city for city in all_merchants if city.merchant_min_players <= player_count]
+        empty_merchants = [city for city in all_merchants if city.merchant_min_players > player_count]
         tokens = []
         with open(self.MERCHANTS_TOKENS_PATH) as merchantsfile:
             tokens_data = json.load(merchantsfile)
@@ -250,7 +251,7 @@ class Game:
             if token_data['player_count'] <= player_count:
                 tokens.append(MerchantType(token_data['type']))
         random.shuffle(tokens)
-        for city in merchants:
+        for city in playable_merchants:
             city.merchant_slots = []
             if city.name != self.SPECIAL_MERCHANT:
                 for _ in range(2):
@@ -267,6 +268,13 @@ class Game:
                     city=city.name,
                     merchant_type=token
                 )]
+        for city in empty_merchants:
+            city.merchant_slots = []
+            for _ in range(2):
+                city.merchant_slots.append(MerchantSlot(
+                    city=city.name,
+                    merchant_type=MerchantType.EMPTY
+                ))
         return out
     
     def _create_starting_market(self) -> Market:

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from enum import StrEnum
-from typing import Literal, List, Optional
+from typing import Literal, List, Union
 from .game_state import Card, ResourceSelection
 
 class ActionType(StrEnum):
@@ -45,3 +45,12 @@ class NetworkAction(BaseAction):
 class PassAction(BaseAction):
     action_type: Literal[ActionType.PASS] = ActionType.PASS
 
+Action = Union[
+    BuildAction, 
+    SellAction, 
+    LoanAction, 
+    ScoutAction, 
+    DevelopAction, 
+    NetworkAction, 
+    PassAction
+]

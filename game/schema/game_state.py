@@ -3,6 +3,11 @@ from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Set, Any
 from uuid import uuid4
 
+class GameStatus(StrEnum):
+    CREATED = 'created'
+    ONGOING = 'ongoing'
+    COMPLETE = 'complete'
+
 class IndustryType(StrEnum):
     COAL = "coal"
     IRON = "iron"
@@ -109,11 +114,27 @@ class Player(BaseModel):
     income_points: int
     victory_points: int
 
+class PlayerExposed(BaseModel):
+    hand_size: int
+    available_buildings: list[Building]
+    color: PlayerColor
+    bank: int
+    income: int
+    income_points: int
+    victory_points: int
+
 class BoardState(BaseModel):
     cities: List[City]
     players: List[Player]
     market: Market
     deck: List[Card]
+    era: LinkType
+
+class BoardStateExposed(BaseModel):
+    cities: List[City]
+    players: List[Player]
+    market: Market
+    deck_size: int
     era: LinkType
 
 class ResourceType(StrEnum):
@@ -133,3 +154,4 @@ class ResourceSource(BaseModel):
 class ResourceSelection(BaseModel):
     resources_used: List[ResourceSource]
     additional_cost: int
+    
