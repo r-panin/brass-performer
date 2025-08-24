@@ -1,0 +1,38 @@
+[
+    {
+        "type": "empty",
+        "player_count": 2
+    },
+    {
+        "type": "empty",
+        "player_count": 2
+    },
+    {
+        "type":"empty",
+        "player_count": 3
+    },
+    {
+        "type":"box",
+        "player_count": 4
+    },
+    {
+        "type":"box",
+        "player_count": 2
+    },
+    {
+        "type":"cotton",
+        "player_count":2
+    },
+    {
+        "type":"cotton",
+        "player_count":4
+    },
+    {
+        "type":"pottery",
+        "player_count":3
+    },
+    {
+        "type":"any",
+        "player_count":2
+    }
+]
