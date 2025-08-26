@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState
 from typing import List
 import random
 from pathlib import Path
@@ -112,6 +112,7 @@ class Game:
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state = self._create_initial_state(player_count, players_colors)
+        self.exposed_state = self.state.hide_state()
 
     def _create_initial_state(self, player_count: int, player_colors: List[PlayerColor]) -> BoardState:
         
@@ -288,6 +289,17 @@ class Game:
         coal_cost = self.COAL_MAX_COST - math.ceil(market.coal_count / 2)
         iron_cost = self.IRON_MAX_COST - math.ceil(market.iron_count / 2)
         return Market(coal_cost=coal_cost, iron_cost=iron_cost, coal_count=market.coal_count, iron_count=market.iron_count)
+    
+    def _get_player_by_color(self, color:PlayerColor) -> Player:
+        out = [player for player in self.state.players if player.color == color]
+        return out[0]
+    
+    def get_player_state(self, color:PlayerColor) -> PlayerState:
+        return PlayerState(
+            common_state=self.state.hide_state(),
+            your_color=color,
+            your_hand=self._get_player_by_color(color).hand
+        )
 
 if __name__ == '__main__':
     game = Game(4)

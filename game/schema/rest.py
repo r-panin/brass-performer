@@ -16,3 +16,4 @@ class GameResponseDetail(GameResponse):
 class PlayerInfo(BaseModel):
     token: str
     color: PlayerColor
+    

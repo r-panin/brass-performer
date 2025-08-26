@@ -87,19 +87,16 @@ async def join_game(game_id: str, game_manager:GameManager=Depends(get_game_mana
 @router.post("/games/{game_id}/start", response_model=GameResponseDetail, status_code=status.HTTP_200_OK)
 async def start_game(game_id:str, game_manager:GameManager=Depends(get_game_manager)):
     game = game_manager.start_game(game_id)
+    if not game:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to start game"
+        )
     colors = [player.color for player in game.state.players]
-    state = game.state
-    exposed_state = BoardStateExposed(
-        cities=state.cities,
-        players=state.players,
-        market=state.market,
-        deck_size=len(state.deck),
-        era=state.era
-    )
     return GameResponseDetail(
         id=game_id,
         status=game.status,
         players=colors,
-        state=exposed_state
+        state=game.state.hide_state()
     )
    

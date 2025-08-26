@@ -14,7 +14,7 @@ class ActionType(StrEnum):
 
 class BaseAction(BaseModel):
     action_type: ActionType
-    card_used: Card
+    card_id: str 
 
 class BuildAction(BaseAction):
     action_type: Literal[ActionType.BUILD] = ActionType.BUILD

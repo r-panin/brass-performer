@@ -64,7 +64,7 @@ class Link(BaseModel):
     id: str = Field(default_factory=lambda: (str(uuid4())))
     type: LinkType
     cities: Set[str]
-    owner: str = None
+    owner: Optional[str] = None
 
 class City(BaseModel):
     name: str
@@ -105,15 +105,6 @@ class Card(BaseModel):
                 raise ValueError('Card must have either "city" or "industry" field')
             return data
 
-class Player(BaseModel):
-    hand: list[Card]
-    available_buildings: list[Building]
-    color: PlayerColor
-    bank: int
-    income: int
-    income_points: int
-    victory_points: int
-
 class PlayerExposed(BaseModel):
     hand_size: int
     available_buildings: list[Building]
@@ -123,6 +114,29 @@ class PlayerExposed(BaseModel):
     income_points: int
     victory_points: int
 
+class Player(BaseModel):
+    hand: list[Card]
+    available_buildings: list[Building]
+    color: PlayerColor
+    bank: int
+    income: int
+    income_points: int
+    victory_points: int
+
+    def hide_hand(self) -> PlayerExposed:
+        data = self.model_dump()
+        data["hand_size"] = len(self.hand)
+        del data["hand"]
+        return PlayerExposed(**data)
+
+
+class BoardStateExposed(BaseModel):
+    cities: List[City]
+    players: List[PlayerExposed]
+    market: Market
+    deck_size: int
+    era: LinkType
+
 class BoardState(BaseModel):
     cities: List[City]
     players: List[Player]
@@ -130,12 +144,12 @@ class BoardState(BaseModel):
     deck: List[Card]
     era: LinkType
 
-class BoardStateExposed(BaseModel):
-    cities: List[City]
-    players: List[Player]
-    market: Market
-    deck_size: int
-    era: LinkType
+    def hide_state(self) -> BoardStateExposed:
+        data = self.model_dump()
+        data["players"] = [player.hide_hand() for player in self.players]
+        data["deck_size"] = len(self.deck)
+        del data["deck"]
+        return BoardStateExposed(**data)
 
 class ResourceType(StrEnum):
     COAL = "coal"
@@ -145,7 +159,7 @@ class ResourceType(StrEnum):
 class ResourceSourceType(StrEnum):
     PLAYER = "player"
     MARKET = "market"
-    MERCHANT = "merchant"
+    MERCHANT = "merchant" # Beer
 
 class ResourceSource(BaseModel):
     source_type: ResourceSourceType
@@ -154,4 +168,8 @@ class ResourceSource(BaseModel):
 class ResourceSelection(BaseModel):
     resources_used: List[ResourceSource]
     additional_cost: int
-    
+
+class PlayerState(BaseModel):
+    common_state: BoardStateExposed
+    your_hand: List[Card]
+    your_color: PlayerColor

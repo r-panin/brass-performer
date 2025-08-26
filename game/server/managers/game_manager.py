@@ -1,6 +1,6 @@
 from typing import Dict, List
 from ..game_logic.game import Game
-from ...schema import PlayerInfo
+from ...schema import PlayerInfo, GameStatus
 import logging
 from uuid import uuid4
 import random
@@ -12,7 +12,7 @@ class GameManager:
         logging.basicConfig(level=logging.DEBUG)
         self.games: Dict[str, Game] = {}
         self.players: Dict[str, PlayerInfo] = {}
-        self.game_players: Dict[str, List[str]] = {} # {game_id: [player_token_1, player_token_2]}
+        self.game_players: Dict[str, List[str]] = {} # {game_id: [PlayerInfo1, PlayerInfo2]}
     
     def create_game(self) -> str:
         game = Game()
@@ -34,6 +34,8 @@ class GameManager:
         return self.games.get(game_id).status
 
     def start_game(self, game_id: str):
+        if len(self.game_players[game_id]) < self.MIN_PLAYERS:
+            return None
         game = self.games.get(game_id)
         player_count = len(self.game_players[game_id])
         colors = self.list_game_player_colors(game_id)
@@ -64,6 +66,17 @@ class GameManager:
     def list_game_player_colors(self, game_id:str):
         players = self.list_game_players(game_id)
         return [player.color for player in players]
+
+    def get_player(self, player_token):
+        return self.players[player_token]
+    
+    def validate_token(self, game_id, player_token):
+        game = self.get_game(game_id)
+        if not game or game.status != GameStatus.ONGOING:
+            return False
+        if not player_token in self.game_players[game_id]:
+            return False
+        return True
 
 if __name__ == '__main__':
     manager = GameManager()
