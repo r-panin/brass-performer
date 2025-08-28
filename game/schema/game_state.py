@@ -136,6 +136,8 @@ class BoardStateExposed(BaseModel):
     market: Market
     deck_size: int
     era: LinkType
+    current_turn: PlayerColor
+    actions_left: int = Field(ge=0, le=2)
 
 class BoardState(BaseModel):
     cities: List[City]
@@ -143,6 +145,8 @@ class BoardState(BaseModel):
     market: Market
     deck: List[Card]
     era: LinkType
+    current_turn: PlayerColor
+    actions_left: int = Field(ge=0, le=2)
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()

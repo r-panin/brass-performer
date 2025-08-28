@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 from enum import StrEnum
 from typing import Literal, List, Union
 from .game_state import Card, ResourceSelection

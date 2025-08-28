@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action
 from typing import List
 import random
 from pathlib import Path
@@ -125,7 +125,12 @@ class Game:
         market = self._create_starting_market()
 
         self.status = GameStatus.ONGOING
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL)
+        
+        current_turn = random.choice(players).color
+
+        actions_left = 2
+
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> List[Building]:
         out = []
@@ -300,6 +305,9 @@ class Game:
             your_color=color,
             your_hand=self._get_player_by_color(color).hand
         )
+    
+    def play_action(self, action:Action):
+        print(action)
 
 if __name__ == '__main__':
     game = Game(4)
