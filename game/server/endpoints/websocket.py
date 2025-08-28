@@ -22,7 +22,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
         await websocket.send_json({"error": "Game not found"})
         connection_manager.disconnect()
 
-    await websocket.send_json(game.get_player_state(color).model_dump())
+    await websocket.send_json(game.get_player_state(color).model_dump()) # sending initial state
     
     try:
         while True:

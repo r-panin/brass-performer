@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Set, Any
+from typing import List, Optional, Dict, Any
 from uuid import uuid4
 
 class GameStatus(StrEnum):
@@ -63,7 +63,7 @@ class LinkType(StrEnum):
 class Link(BaseModel):
     id: str = Field(default_factory=lambda: (str(uuid4())))
     type: LinkType
-    cities: Set[str]
+    cities: List[str]
     owner: Optional[str] = None
 
 class City(BaseModel):

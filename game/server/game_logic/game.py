@@ -15,7 +15,7 @@ class Game:
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
     MERCHANTS_TOKENS_PATH = Path(RES_PATH /'merchant_tokens.json')
     SPECIAL_CITY_GROUPS = {
-        "worcester_group": {"Worcester", "Kidderminster", "farm_brewery_south"}
+        "worcester_group": ["Worcester", "Kidderminster", "farm_brewery_south"]
     }
     SPECIAL_MERCHANT = 'Shrewsbury'
     COAL_MAX_COST = 8
@@ -234,7 +234,7 @@ class Game:
                         if link_key not in links_dict:
                             link = Link(
                                 type=LinkType(transport_type),
-                                cities=(city_name, linked_city_name)
+                                cities=[city_name, linked_city_name]
                             )
                             links_dict[link_key] = link
                         city.links.append(links_dict[link_key])
