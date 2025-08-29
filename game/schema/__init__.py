@@ -1,3 +1,3 @@
-from .actions import BuildAction, SellAction, NetworkAction, LoanAction, ScoutAction, DevelopAction, PassAction, Action
-from .game_state import Building, BuildingSlot, Link, City, Market, Card, Player, BoardState, ResourceSelection, PlayerColor, LinkType, IndustryType, MerchantType, MerchantSlot, GameStatus, BoardStateExposed, PlayerState
+from .actions import BuildAction, SellAction, NetworkAction, LoanAction, ScoutAction, DevelopAction, PassAction, Action, ActionType
+from .game_state import Building, BuildingSlot, Link, City, Market, Card, Player, BoardState, ResourceSelection, PlayerColor, LinkType, IndustryType, MerchantType, MerchantSlot, GameStatus, BoardStateExposed, PlayerState, ValidationResult
 from .rest import GameResponse, GameResponseDetail, PlayerInfo

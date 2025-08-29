@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, ActionType, Action, ResourceSelection, ValidationResult
 from typing import List
 import random
 from pathlib import Path
@@ -128,7 +128,11 @@ class Game:
         
         current_turn = random.choice(players).color
 
-        actions_left = 2
+        actions_left = 1
+
+        #burn initial cards
+        for _ in self.state.players:
+            self.draw_card()
 
         return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left)
     
@@ -306,8 +310,48 @@ class Game:
             your_hand=self._get_player_by_color(color).hand
         )
     
-    def play_action(self, action:Action):
-        print(action)
+    def play_action(self, action:Action, color:PlayerColor):
+        player = [player for player in self.state.players if player.color == color][0]
+        if self.validate_action(action, player).is_valid:
+            #TODO
+            pass
+        
+    def validate_action(self, action:Action, player:Player) -> ValidationResult: 
+        if not action.card_id in [card.id for card in player.hand]:
+            return ValidationResult(is_valid=False, message="Card not in player's hand")
+        match type(action):
+            case ActionType.PASS:
+                return ValidationResult(is_valid=True) # always possible if there's a card
+            case ActionType.SCOUT:
+                # You'll need to discard 2 extra cards and can't have jokers
+                if len(player.hand) > 2 and not "wild" in [card.value for card in player.hand]:
+                    return ValidationResult(is_valid=True)
+                return ValidationResult(is_valid=False, message="Not enough cards or already has a wildcard")
+            case ActionType.LOAN:
+                # Can't have your income go below -10
+                if player.income < -7:
+                    return ValidationResult(is_valid=False, message="Income can't go below 10")
+                return ValidationResult(is_valid=True)
+            case ActionType.DEVELOP:
+                resource_validation = self.validate_resource_selection(action.resource_selection, player)
+                if not resource_validation.is_valid:
+                    return resource_validation
+                for building_id in action.buildings:
+                    building_validation = self.validate_building(building_id, player, action_type=ActionType.DEVELOP)
+                    if not building_validation.is_valid:
+                        return building_validation
+                    
+    def validate_resource_selection(self, resource_selection:ResourceSelection, player:Player) -> ValidationResult:
+        #TODO
+        pass
+
+    def validate_building(self, building_id:str, player:Player, action_type:ActionType) -> ValidationResult:
+        #TODO
+        pass
+
+    def validate_network(self):
+        #TODO
+        pass
 
 if __name__ == '__main__':
     game = Game(4)

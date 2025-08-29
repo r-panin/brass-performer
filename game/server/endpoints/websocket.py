@@ -2,7 +2,6 @@ from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 from ..dependancies import get_connection_manager, get_game_manager, get_action_parser
 from ..managers import ConnectionManager, GameManager
 from ...schema import PlayerColor
-import json
 from pydantic import ValidationError
 
 router = APIRouter()
@@ -38,7 +37,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
             # Применяем действие к игровому состоянию
             try:
                 # Здесь будет метод для применения действия
-                game.play_action(action)
+                game.play_action(action, color)
                 
                 # Отправляем обновленное состояние всем игрокам
                 await connection_manager.broadcast(game_id, message=message_generator)

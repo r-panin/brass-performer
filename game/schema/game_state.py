@@ -168,6 +168,7 @@ class ResourceSourceType(StrEnum):
 class ResourceSource(BaseModel):
     source_type: ResourceSourceType
     building_slot_id: Optional[str]
+    merchant: Optional[City]
 
 class ResourceSelection(BaseModel):
     resources_used: List[ResourceSource]
@@ -177,3 +178,7 @@ class PlayerState(BaseModel):
     common_state: BoardStateExposed
     your_hand: List[Card]
     your_color: PlayerColor
+
+class ValidationResult(BaseModel):
+    is_valid: bool
+    message: Optional[str]
