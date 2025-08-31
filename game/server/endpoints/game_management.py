@@ -92,7 +92,7 @@ async def start_game(game_id:str, game_manager:GameManager=Depends(get_game_mana
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unable to start game"
         )
-    colors = [player.color for player in game.state.players]
+    colors = [color for color in game.state.players]
     return GameResponseDetail(
         id=game_id,
         status=game.status,

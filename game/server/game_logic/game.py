@@ -1,5 +1,5 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, ActionType, Action, ResourceSelection, ValidationResult
-from typing import List
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action, ExecutionResult
+from typing import List, Dict
 import random
 from pathlib import Path
 import json
@@ -7,6 +7,7 @@ from uuid import uuid4
 import math
 import logging
 import copy
+from .validation_service import Actionvalidation_service
 
 class Game:
     RES_PATH = Path(r'game\server\res')
@@ -109,6 +110,7 @@ class Game:
         self.status = GameStatus.CREATED
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
+        self.validation_service = Actionvalidation_service(self.state)
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state = self._create_initial_state(player_count, players_colors)
@@ -118,7 +120,7 @@ class Game:
         
         self.deck = self._build_initial_deck(player_count)
 
-        players = [self._create_player(color) for color in player_colors]
+        players = {color: self._create_player(color) for color in player_colors}
 
         cities = self._create_cities(player_count)
 
@@ -126,39 +128,43 @@ class Game:
 
         self.status = GameStatus.ONGOING
         
-        current_turn = random.choice(players).color
+        current_turn = random.choice(list(players.keys()))
 
         actions_left = 1
 
-        #burn initial cards
-        for _ in self.state.players:
-            self.draw_card()
+        discard = []
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left)
+        #burn initial cards
+        for _ in players:
+            self.deck.pop()
+
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard)
     
-    def _build_initial_building_roster(self, player_color:PlayerColor) -> List[Building]:
-        out = []
+    def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
+        out = {}
         with open(self.BUILDING_ROSTER_PATH) as openfile:
-            building_json = json.load(openfile)
+            building_json:List[dict] = json.load(openfile)
         for building in building_json:
-            out.append(Building(
+            building = Building(
                 industry_type=building['industry'],
                 level=building['level'],
                 city=str(),
                 owner=player_color,
                 flipped=False,
                 cost=building['cost'],
-                resource_count=building.get('resource_count'),
+                resource_count=building.get('resource_count', 0),
                 victory_points=building['vp'],
                 sell_cost=building.get('sell_cost'),
                 is_developable=building.get('developable', True),
-                link_victory_points=building['conn_vp']
-            ))
+                link_victory_points=building['conn_vp'],
+                era_exclusion=building.get('era_exclusion')
+            )
+            out[building.id] = building
         return out
 
     def _create_player(self, color:PlayerColor) -> Player:
         return Player(
-            hand=[self.draw_card() for _ in range(8)],
+            hand={card.id: card for card in [self.deck.pop() for _ in range(8)]},
             available_buildings=self._build_initial_building_roster(color),
             color=color,
             bank=17,
@@ -181,35 +187,30 @@ class Game:
         random.shuffle(out)
         return out
     
-    def draw_card(self):
-        return(self.deck.pop())
-    
-    def _create_cities(self, player_count:int) -> List[City]:
+    def _create_cities(self, player_count:int) -> Dict[str, City]:
         '''
         Базовая генерация городов без связей
         '''
-        out:List[City] = []
+        out:Dict[str, City] = {}
         links_dict:dict[tuple, Link] = {}
-        cities_dict = {}
         with open(self.CITIES_LIST_PATH) as cityfile:
             cities_data:dict = json.load(cityfile)
         for city_data in cities_data:
             city_name = city_data['name']
             logging.debug(f'creating city {city_name}')
             logging.debug(f'merchant player count: {city_data["player_count"]}') if 'player_count' in city_data.keys() else logging.debug('not a merchant')
-            city = (City(
-                name=city_name,
-                slots=[BuildingSlot(
+            slots=[BuildingSlot(
                     city=city_name,
                     industry_type_options=[IndustryType(industry) for industry in slot]
-                ) for slot in city_data['slots']] if 'slots' in city_data.keys() else [],
+                ) for slot in city_data['slots']] if 'slots' in city_data.keys() else []
+            city = (City(
+                name=city_name,
+                slots={slot.id: slot for slot in slots},
                 is_merchant=city_data.get('merchant', False),
-                links=[],
+                links={},
                 merchant_min_players=city_data.get('player_count')
             ))
-
-            cities_dict[city_name] = city
-            out.append(city)
+            out[city_name] = city
 
         '''
         Создаем линки
@@ -219,7 +220,7 @@ class Game:
             added_link_keys = set()
             city_name = city_data['name']
             logging.debug(f'Processing links for city {city_name}')
-            city = cities_dict[city_name]
+            city = out[city_name]
             for link_data in city_data['links']:
                 if 'group' in link_data:
                     group_name = link_data['group']
@@ -233,7 +234,8 @@ class Game:
                                     cities=group_cities
                                 )
                                 links_dict[link_key] = link
-                            city.links.append(links_dict[link_key])
+                            link = links_dict[link_key]
+                            city.links[link.id] = link
                             added_link_keys.add(link_key)
                 else:
                     linked_city_name = link_data['name']
@@ -246,12 +248,14 @@ class Game:
                                 cities=[city_name, linked_city_name]
                             )
                             links_dict[link_key] = link
-                        city.links.append(links_dict[link_key])
+                        link = links_dict[link_key]
+                        city.links[link.id] = (link)
+                        added_link_keys.add(link_key)
         
         '''
         Размещаем коммивояжеров
         '''
-        all_merchants = [city for city in out if city.is_merchant]
+        all_merchants = [city for city in out.values() if city.is_merchant] 
         playable_merchants = [city for city in all_merchants if city.merchant_min_players <= player_count]
         empty_merchants = [city for city in all_merchants if city.merchant_min_players > player_count]
         tokens = []
@@ -262,29 +266,29 @@ class Game:
                 tokens.append(MerchantType(token_data['type']))
         random.shuffle(tokens)
         for city in playable_merchants:
-            city.merchant_slots = []
+            city.merchant_slots = {}
             if city.name != self.SPECIAL_MERCHANT:
                 for _ in range(2):
                     token = tokens.pop()
-                    logging.debug(f'Placed token {token} in city {city.name}')
-                    city.merchant_slots.append(MerchantSlot(
+                    slot = MerchantSlot(
                         city=city.name,
                         merchant_type=token
-                    ))
+                    )
+                    logging.debug(f'Placed token {token} in city {city.name}')
+                    city.merchant_slots[slot.id] = slot
             else:
                 token = tokens.pop()
-                logging.debug(f'Placed token {token} in city {city.name}')
-                city.merchant_slots = [MerchantSlot(
+                slot = MerchantSlot(
                     city=city.name,
                     merchant_type=token
-                )]
+                )
+                logging.debug(f'Placed token {token} in city {city.name}')
+                city.merchant_slots[slot.id] = slot
         for city in empty_merchants:
-            city.merchant_slots = []
+            city.merchant_slots = {}
             for _ in range(2):
-                city.merchant_slots.append(MerchantSlot(
-                    city=city.name,
-                    merchant_type=MerchantType.EMPTY
-                ))
+                slot = MerchantSlot(city=city.name, merchant_type=MerchantType.EMPTY)
+                city.merchant_slots[slot.id] = slot
         return out
     
     def _create_starting_market(self) -> Market:
@@ -299,59 +303,21 @@ class Game:
         iron_cost = self.IRON_MAX_COST - math.ceil(market.iron_count / 2)
         return Market(coal_cost=coal_cost, iron_cost=iron_cost, coal_count=market.coal_count, iron_count=market.iron_count)
     
-    def _get_player_by_color(self, color:PlayerColor) -> Player:
-        out = [player for player in self.state.players if player.color == color]
-        return out[0]
-    
     def get_player_state(self, color:PlayerColor) -> PlayerState:
         return PlayerState(
             common_state=self.state.hide_state(),
             your_color=color,
-            your_hand=self._get_player_by_color(color).hand
+            your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
     
-    def play_action(self, action:Action, color:PlayerColor):
-        player = [player for player in self.state.players if player.color == color][0]
-        if self.validate_action(action, player).is_valid:
-            #TODO
-            pass
+    def play_action(self, action:Action, color:PlayerColor) -> ExecutionResult:
+        player = self.state.players[color]
+        validation_result = self.validation_service.validate_action(action, player)
+        if not validation_result.is_valid:
+            return ExecutionResult(executed=False, message=validation_result.message)
+        pass
         
-    def validate_action(self, action:Action, player:Player) -> ValidationResult: 
-        if not action.card_id in [card.id for card in player.hand]:
-            return ValidationResult(is_valid=False, message="Card not in player's hand")
-        match type(action):
-            case ActionType.PASS:
-                return ValidationResult(is_valid=True) # always possible if there's a card
-            case ActionType.SCOUT:
-                # You'll need to discard 2 extra cards and can't have jokers
-                if len(player.hand) > 2 and not "wild" in [card.value for card in player.hand]:
-                    return ValidationResult(is_valid=True)
-                return ValidationResult(is_valid=False, message="Not enough cards or already has a wildcard")
-            case ActionType.LOAN:
-                # Can't have your income go below -10
-                if player.income < -7:
-                    return ValidationResult(is_valid=False, message="Income can't go below 10")
-                return ValidationResult(is_valid=True)
-            case ActionType.DEVELOP:
-                resource_validation = self.validate_resource_selection(action.resource_selection, player)
-                if not resource_validation.is_valid:
-                    return resource_validation
-                for building_id in action.buildings:
-                    building_validation = self.validate_building(building_id, player, action_type=ActionType.DEVELOP)
-                    if not building_validation.is_valid:
-                        return building_validation
-                    
-    def validate_resource_selection(self, resource_selection:ResourceSelection, player:Player) -> ValidationResult:
-        #TODO
-        pass
-
-    def validate_building(self, building_id:str, player:Player, action_type:ActionType) -> ValidationResult:
-        #TODO
-        pass
-
-    def validate_network(self):
-        #TODO
-        pass
+        
 
 if __name__ == '__main__':
     game = Game(4)
