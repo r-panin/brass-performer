@@ -19,10 +19,6 @@ class Game:
         "worcester_group": ["Worcester", "Kidderminster", "farm_brewery_south"]
     }
     SPECIAL_MERCHANT = 'Shrewsbury'
-    COAL_MAX_COST = 8
-    IRON_MAX_COST = 6
-    COAL_MAX_COUNT = 14
-    IRON_MAX_COUNT = 10
     TOTAL_MERCHANT_TOKENS = 9
     logging.basicConfig(level=logging.INFO)
     def __repr__(self) -> str:
@@ -295,13 +291,8 @@ class Game:
         coal_count = 13
         iron_count = 8
         market = Market(coal_count=coal_count, iron_count=iron_count, coal_cost=0, iron_cost=0)
-        market = self.calculate_market_costs(market)
+        market.update_market_costs()
         return market
-    
-    def calculate_market_costs(self, market: Market) -> Market:
-        coal_cost = self.COAL_MAX_COST - math.ceil(market.coal_count / 2)
-        iron_cost = self.IRON_MAX_COST - math.ceil(market.iron_count / 2)
-        return Market(coal_cost=coal_cost, iron_cost=iron_cost, coal_count=market.coal_count, iron_count=market.iron_count)
     
     def get_player_state(self, color:PlayerColor) -> PlayerState:
         return PlayerState(
