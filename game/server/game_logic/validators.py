@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, Action, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, BuildAction, SellAction, LoanAction
+from ...schema import BoardState, Action, ResourceSelection, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, BuildAction, SellAction, LoanAction
 from typing import Dict, List
 from collections import defaultdict
 
@@ -110,22 +110,36 @@ class DevelopValidator(BaseValidator):
     def validate(self, action:DevelopAction, game_state:BoardState, player:Player):
         if action.buildings > 2:
             return ValidationResult(False, "Cannot develop over 2 buildings in one action")
+
         for building in action.buildings:
             if building not in player.available_buildings:
                 return ValidationResult(False, f"Building ID {building} not in player's roster")
+
             building_validation = self._validate_lowest_level_building(building, player)
             if not building_validation.is_valid:
                 building_validation
-        for resource in action.resources_used:
-            if resource.resource_type != ResourceType.IRON:
-                return ValidationResult(False, "Must only use iron to develop")
-        preference_validation = self._validate_iron_preference(game_state, action.resources_used)
-        if not preference_validation.is_valid:
-            return preference_validation
-        if sum(resource.amount for resource in action.resources_used) != len(action.buildings):
-            return ValidationResult(False, "Must use amount of iron equal to the number of buildings developed")
-        market_resources = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET]
-        market_amount = sum(resource.amount for resource in market_resources)
-        if game_state.market.calculate_iron_cost() > player.bank:
-            return ValidationResult(False, "Not enough money in the bank")
+            
+        if not action.is_auto_resource_selection():
+
+            for resource in action.resources_used:
+                if resource.resource_type != ResourceType.IRON:
+                    return ValidationResult(False, "Must only use iron to develop")
+
+            preference_validation = self._validate_iron_preference(game_state, action.resources_used)
+            if not preference_validation.is_valid:
+                return preference_validation
+
+            if sum(resource.amount for resource in action.resources_used) != len(action.buildings):
+                return ValidationResult(False, "Must use amount of iron equal to the number of buildings developed")
+
+            market_resources = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET]
+            market_amount = sum(resource.amount for resource in market_resources)
+            if game_state.market.calculate_iron_cost(market_amount) > player.bank:
+                return ValidationResult(False, "Not enough money in the bank")
+
         return True
+    
+class NetworkValidator(BaseValidator):
+    @validate_card_in_hand
+    def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
+        

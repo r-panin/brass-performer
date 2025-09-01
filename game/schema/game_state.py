@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Any, Callable, Union, Generator
+from typing import List, Optional, Dict, Any, Callable, Union, Generator, Literal
 from uuid import uuid4
 from collections import deque
 import math
@@ -103,8 +103,6 @@ class Market(BaseModel):
         resource_type: ResourceType, 
         amount: int
     ) -> int:
-        """Общий метод для расчета стоимости ресурса без изменения состояния"""
-        # Определяем параметры в зависимости от типа ресурса
         if resource_type == ResourceType.COAL:
             current_count = self.coal_count
             max_cost = self.COAL_MAX_COST
@@ -118,11 +116,9 @@ class Market(BaseModel):
         temp_count = current_count
         
         for _ in range(amount):
-            # Если ресурса нет, используем максимальную цену и не уменьшаем количество
             if temp_count <= 0:
                 current_cost = max_cost
             else:
-                # Рассчитываем текущую стоимость за единицу
                 current_cost = max_cost - math.ceil(temp_count / 2)
                 temp_count -= 1
                 
@@ -131,11 +127,9 @@ class Market(BaseModel):
         return total_cost
     
     def calculate_coal_cost(self, amount: int) -> int:
-        """Рассчитать стоимость указанного количества угля"""
         return self._calculate_resource_cost(ResourceType.COAL, amount)
     
     def calculate_iron_cost(self, amount: int) -> int:
-        """Рассчитать стоимость указанного количества железа"""
         return self._calculate_resource_cost(ResourceType.IRON, amount)
     
     def purchase_resource(
@@ -143,17 +137,12 @@ class Market(BaseModel):
         resource_type: ResourceType, 
         amount: int
     ) -> int:
-        """Купить указанное количество ресурса и обновить состояние рынка"""
         total_cost = self._calculate_resource_cost(resource_type, amount)
         
-        if resource_type == "coal":
-            # Уменьшаем количество только если оно больше 0
-            if self.coal_count > 0:
-                self.coal_count = max(0, self.coal_count - amount)
-        else:
-            # Уменьшаем количество только если оно больше 0
-            if self.iron_count > 0:
-                self.iron_count = max(0, self.iron_count - amount)
+        if resource_type == ResourceType.COAL:
+            self.coal_count = max(0, self.coal_count - amount)
+        elif resource_type == ResourceType.IRON:
+            self.iron_count = max(0, self.iron_count - amount)
             
         self.update_market_costs()
         return total_cost
@@ -340,3 +329,10 @@ class ValidationResult(BaseModel):
 class ExecutionResult(BaseModel):
     executed: bool
     message: Optional[str]
+
+class ResourceStrategy(StrEnum):
+    OWN_FIRST = 'own_first'
+
+class AutoResourceSelection(BaseModel):
+    mode: Literal["auto"]
+    strategy = ResourceStrategy

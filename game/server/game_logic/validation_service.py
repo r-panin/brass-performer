@@ -10,8 +10,12 @@ class ActionValidationService():
             ActionType.LOAN: LoanValidator(),
             ActionType.DEVELOP: DevelopValidator(),
             ActionType.NETWORK: NetworkValidator(),
+            ActionType.NETWORK_DOUBLE: NetworkDoubleValidator(),
+            ActionType.NETWORK_END: NetworkEndValidator(),
             ActionType.BUILD: BuildValidator(),
-            ActionType.SELL: SellValidator()
+            ActionType.SELL: SellValidator(),
+            ActionType.SELL_STEP: SellStepValidator(),
+            ActionType.SELL_END: SellEndValidator()
         }
 
     def validate_action(self, action: Action, board_state:BoardState, player: Player) -> ValidationResult:
