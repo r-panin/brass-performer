@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action, ExecutionResult
+from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action, ExecutionResult, CardType
 from typing import List, Dict
 import random
 from pathlib import Path
@@ -130,11 +130,13 @@ class Game:
 
         discard = []
 
+        wild_deck = self._build_wild_deck()
+
         #burn initial cards
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard, wild_deck=wild_deck)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}
@@ -182,7 +184,10 @@ class Game:
                     out.append(card)
         random.shuffle(out)
         return out
-    
+
+    def _build_wild_deck(self) -> List[Card]:
+        return [Card(card_type=t, value='wild') for t in [CardType.INDUSTRY]*4 + [CardType.CITY]*4] 
+        
     def _create_cities(self, player_count:int) -> Dict[str, City]:
         '''
         Базовая генерация городов без связей

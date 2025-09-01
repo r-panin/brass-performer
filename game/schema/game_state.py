@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Any, Callable, Union, Generator, Literal
+from typing import List, Optional, Dict, Any, Callable, Union, Iterator, Literal
 from uuid import uuid4
 from collections import deque
 import math
@@ -62,6 +62,10 @@ class Building(BaseModel):
     is_developable: bool
     link_victory_points: int
     era_exclusion: Optional[LinkType]
+    type_hash = self._calculate_type_hash()
+
+    def _calculate_type_hash(self):
+
 
 class BuildingSlot(BaseModel):
     id: str = Field(default_factory=lambda: (str(uuid4())))
@@ -206,6 +210,8 @@ class BoardStateExposed(BaseModel):
     era: LinkType
     current_turn: PlayerColor
     actions_left: int = Field(ge=0, le=2)
+    discard: List[Card]
+    wild_deck: List[Card]
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
@@ -216,6 +222,7 @@ class BoardState(BaseModel):
     current_turn: PlayerColor
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
+    wild_deck: List[Card]
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
@@ -224,13 +231,22 @@ class BoardState(BaseModel):
         del data["deck"]
         return BoardStateExposed(**data)
 
-    def iter_placed_buildings(self) -> Generator[Building]:
+    def iter_placed_buildings(self) -> Iterator[Building]:
         for city in self.cities.values():
             for slot in city.slots.values():
                 if slot.building_placed:
                     yield slot.building_placed
+    
+    def iter_links(self) -> Iterator[Link]:
+        seen_links = set()  # Множество для отслеживания обработанных ссылок по их id
+        for city in self.cities.values():
+            for link in city.links.values():
+                link_id = id(link)  # Уникальный идентификатор объекта
+                if link_id not in seen_links:
+                    seen_links.add(link_id)
+                    yield link
 
-    def get_player_iron_sources(self) -> Generator[Building]:
+    def get_player_iron_sources(self) -> Iterator[Building]:
         for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.IRON and building.resource_count > 0:
                 yield building

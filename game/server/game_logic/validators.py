@@ -120,7 +120,6 @@ class DevelopValidator(BaseValidator):
                 building_validation
             
         if not action.is_auto_resource_selection():
-
             for resource in action.resources_used:
                 if resource.resource_type != ResourceType.IRON:
                     return ValidationResult(False, "Must only use iron to develop")
