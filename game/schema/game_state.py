@@ -62,9 +62,6 @@ class Building(BaseModel):
     is_developable: bool
     link_victory_points: int
     era_exclusion: Optional[LinkType]
-    type_hash = self._calculate_type_hash()
-
-    def _calculate_type_hash(self):
 
 
 class BuildingSlot(BaseModel):
