@@ -141,4 +141,4 @@ class DevelopValidator(BaseValidator):
 class NetworkValidator(BaseValidator):
     @validate_card_in_hand
     def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
-        
+        if action.link_id not in game_state.

@@ -4,10 +4,12 @@ import random
 from pathlib import Path
 import json
 from uuid import uuid4
-import math
 import logging
 import copy
-from .validation_service import Actionvalidation_service
+from .validation_service import ActionValidationService
+
+
+
 
 class Game:
     RES_PATH = Path(r'game\server\res')
@@ -106,7 +108,7 @@ class Game:
         self.status = GameStatus.CREATED
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
-        self.validation_service = Actionvalidation_service(self.state)
+        self.validation_service = ActionValidationService(self.state)
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state = self._create_initial_state(player_count, players_colors)

@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from .managers import ConnectionManager
 from .managers import GameManager
-from ..schema.actions import Action
 from fastapi.middleware.cors import CORSMiddleware
 from .endpoints.game_management import router as game_router
 from .endpoints.websocket import router as websocket_router
