@@ -1,413 +1,637 @@
 [
     {
-        "industry":"pottery",
-        "level":1,
-        "count":1,
-        "income":5,
-        "vp":10,
-        "conn_vp":1,
-        "developable":false,
-        "cost":{
-            "money":17,
-            "coal":0,
-            "iron":1
+        "id": 1,
+        "industry": "pottery",
+        "level": 1,
+        "income": 5,
+        "vp": 10,
+        "conn_vp": 1,
+        "developable": false,
+        "cost": {
+            "money": 17,
+            "coal": 0,
+            "iron": 1
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"pottery",
-        "level":2,
-        "count":1,
-        "income":1,
-        "vp":1,
-        "conn_vp":1,
-        "cost":{
-            "money":0,
-            "coal":1,
-            "iron":0
+        "id": 2,
+        "industry": "pottery",
+        "level": 2,
+        "income": 1,
+        "vp": 1,
+        "conn_vp": 1,
+        "cost": {
+            "money": 0,
+            "coal": 1,
+            "iron": 0
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"pottery",
-        "level":3,
-        "count":1,
-        "income":5,
-        "vp":11,
-        "conn_vp":1,
-        "developable":false,
-        "cost":{
-            "money":22,
-            "coal":2,
-            "iron":0
+        "id": 3,
+        "industry": "pottery",
+        "level": 3,
+        "income": 5,
+        "vp": 11,
+        "conn_vp": 1,
+        "developable": false,
+        "cost": {
+            "money": 22,
+            "coal": 2,
+            "iron": 0
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"pottery",
-        "level":4,
-        "count":1,
-        "income":1,
-        "vp":1,
-        "conn_vp":1,
-        "cost":{
-            "money":0,
-            "coal":1,
-            "iron":0
+        "id": 4,
+        "industry": "pottery",
+        "level": 4,
+        "income": 1,
+        "vp": 1,
+        "conn_vp": 1,
+        "cost": {
+            "money": 0,
+            "coal": 1,
+            "iron": 0
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"pottery",
-        "level":5,
-        "count":1,
-        "income":5,
-        "vp":20,
-        "conn_vp":1,
-        "cost":{
-            "money":24,
-            "coal":2,
-            "iron":0
+        "id": 5,
+        "industry": "pottery",
+        "level": 5,
+        "income": 5,
+        "vp": 20,
+        "conn_vp": 1,
+        "cost": {
+            "money": 24,
+            "coal": 2,
+            "iron": 0
         },
-        "sell_cost":2,
+        "sell_cost": 2,
         "era_exclusion": "rail"
     },
     {
-        "industry":"cotton",
-        "level":1,
-        "count":3,
-        "income":5,
-        "vp":5,
-        "conn_vp":1,
-        "cost":{
-            "money":12,
-            "coal":0,
-            "iron":0
+        "id": 6,
+        "industry": "cotton",
+        "level": 1,
+        "income": 5,
+        "vp": 5,
+        "conn_vp": 1,
+        "cost": {
+            "money": 12,
+            "coal": 0,
+            "iron": 0
         },
-        "sell_cost":1,
-        "era_exclusion":"canal"
+        "sell_cost": 1,
+        "era_exclusion": "canal"
     },
     {
-        "industry":"cotton",
-        "level":2,
-        "count":2,
-        "income":4,
-        "vp":5,
-        "conn_vp":2,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":14
+        "id": 7,
+        "industry": "cotton",
+        "level": 1,
+        "income": 5,
+        "vp": 5,
+        "conn_vp": 1,
+        "cost": {
+            "money": 12,
+            "coal": 0,
+            "iron": 0
         },
-        "sell_cost":1
+        "sell_cost": 1,
+        "era_exclusion": "canal"
     },
     {
-        "industry":"cotton",
-        "level":3,
-        "count":3,
-        "income":3,
-        "vp":9,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":1,
-            "money":16
+        "id": 8,
+        "industry": "cotton",
+        "level": 1,
+        "income": 5,
+        "vp": 5,
+        "conn_vp": 1,
+        "cost": {
+            "money": 12,
+            "coal": 0,
+            "iron": 0
         },
-        "sell_cost":1
+        "sell_cost": 1,
+        "era_exclusion": "canal"
     },
     {
-        "industry":"cotton",
-        "level":4,
-        "count":3,
-        "income":2,
-        "vp":12,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":1,
-            "money":18
+        "id": 9,
+        "industry": "cotton",
+        "level": 2,
+        "income": 4,
+        "vp": 5,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 14
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":1,
-        "count":1,
-        "income":5,
-        "vp":3,
-        "conn_vp":2,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":8
+        "id": 10,
+        "industry": "cotton",
+        "level": 2,
+        "income": 4,
+        "vp": 5,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 14
         },
-        "era_exclusion":"canal",
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":2,
-        "count":2,
-        "income":1,
-        "vp":5,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":10
+        "id": 11,
+        "industry": "cotton",
+        "level": 3,
+        "income": 3,
+        "vp": 9,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 16
         },
-        "sell_cost":1
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":3,
-        "count":1,
-        "conn_vp":0,
-        "cost":{
-            "coal":2,
-            "iron":0,
-            "money":12
+        "id": 12,
+        "industry": "cotton",
+        "level": 3,
+        "income": 3,
+        "vp": 9,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 16
         },
-        "income":4,
-        "sell_cost":0,
-        "vp":4
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":4,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":8
+        "id": 13,
+        "industry": "cotton",
+        "level": 3,
+        "income": 3,
+        "vp": 9,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 16
         },
-        "count":1,
-        "income":6,
-        "sell_cost":1,
-        "vp":3
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":5,
-        "conn_vp":2,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":16
+        "id": 14,
+        "industry": "cotton",
+        "level": 4,
+        "income": 2,
+        "vp": 12,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 18
         },
-        "count":2,
-        "income":2,
-        "sell_cost":2,
-        "vp":8
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":6,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":0,
-            "money":20
+        "id": 15,
+        "industry": "cotton",
+        "level": 4,
+        "income": 2,
+        "vp": 12,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 18
         },
-        "count":1,
-        "income":6,
-        "sell_cost":1,
-        "vp":7
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":7,
-        "conn_vp":0,
-        "cost":{
-            "coal":1,
-            "iron":1,
-            "money":16
+        "id": 16,
+        "industry": "cotton",
+        "level": 4,
+        "income": 2,
+        "vp": 12,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 18
         },
-        "count":1,
-        "income":4,
-        "sell_cost":0,
-        "vp":9
+        "sell_cost": 1
     },
     {
-        "industry":"box",
-        "level":8,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":2,
-            "money":20
+        "id": 17,
+        "industry": "box",
+        "level": 1,
+        "income": 5,
+        "vp": 3,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 8
         },
-        "count":2,
-        "income":1,
-        "sell_cost":1,
-        "vp":11
+        "era_exclusion": "canal",
+        "sell_cost": 1
     },
     {
-        "industry":"brewery",
-        "level":1,
-        "conn_vp":2,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":5
+        "id": 18,
+        "industry": "box",
+        "level": 2,
+        "income": 1,
+        "vp": 5,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 10
         },
-        "count":2,
-        "era_exclusion":"canal",
-        "income":4,
-        "vp":4
+        "sell_cost": 1
     },
     {
-        "industry":"brewery",
-        "level":2,
-        "conn_vp":2,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":7
+        "id": 19,
+        "industry": "box",
+        "level": 2,
+        "income": 1,
+        "vp": 5,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 10
         },
-        "count":2,
-        "income":5,
-        "vp":5
+        "sell_cost": 1
     },
     {
-        "industry":"brewery",
-        "level":3,
-        "conn_vp":2,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":9
+        "id": 20,
+        "industry": "box",
+        "level": 3,
+        "conn_vp": 0,
+        "cost": {
+            "coal": 2,
+            "iron": 0,
+            "money": 12
         },
-        "count":2,
-        "income":5,
-        "vp":7
+        "income": 4,
+        "sell_cost": 0,
+        "vp": 4
     },
     {
-        "industry":"brewery",
-        "level":4,
-        "conn_vp":2,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":9
+        "id": 21,
+        "industry": "box",
+        "level": 4,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 8
         },
-        "count":1,
-        "income":5,
-        "era_exclusion":"rail",
-        "vp":10
+        "income": 6,
+        "sell_cost": 1,
+        "vp": 3
     },
     {
-        "industry":"coal",
-        "level":1,
-        "conn_vp":2,
-        "cost":{
-            "coal":0,
-            "iron":0,
-            "money":5
+        "id": 22,
+        "industry": "box",
+        "level": 5,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 16
         },
-        "count":1,
-        "era_exclusion":"canal",
-        "income":4,
-        "vp":1,
-        "resource_count":2
+        "income": 2,
+        "sell_cost": 2,
+        "vp": 8
     },
     {
-        "industry":"coal",
-        "level":2,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":0,
-            "money":7
+        "id": 23,
+        "industry": "box",
+        "level": 5,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 16
         },
-        "count":2,
-        "income":7,
-        "resource_count":3,
-        "vp":2
+        "income": 2,
+        "sell_cost": 2,
+        "vp": 8
     },
     {
-        "industry":"coal",
-        "level":3,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":8
+        "id": 24,
+        "industry": "box",
+        "level": 6,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 0,
+            "money": 20
         },
-        "count":2,
-        "income":6,
-        "resource_count":4,
-        "vp":3
+        "income": 6,
+        "sell_cost": 1,
+        "vp": 7
     },
     {
-        "industry":"coal",
-        "level":4,
-        "conn_vp":1,
-        "cost":{
-            "coal":0,
-            "iron":1,
-            "money":10
+        "id": 25,
+        "industry": "box",
+        "level": 7,
+        "conn_vp": 0,
+        "cost": {
+            "coal": 1,
+            "iron": 1,
+            "money": 16
         },
-        "count":2,
-        "income":5,
-        "resource_count":5,
-        "vp":4
+        "income": 4,
+        "sell_cost": 0,
+        "vp": 9
     },
     {
-        "industry":"iron",
-        "level":1,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":5
+        "id": 26,
+        "industry": "box",
+        "level": 8,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 2,
+            "money": 20
         },
-        "count":1,
-        "era_exclusion":"canal",
-        "income":3,
-        "resource_count":4,
-        "vp":3
+        "income": 1,
+        "sell_cost": 1,
+        "vp": 11
     },
     {
-        "industry":"iron",
-        "level":2,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":7
+        "id": 27,
+        "industry": "box",
+        "level": 8,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 2,
+            "money": 20
         },
-        "count":1,
-        "income":3,
-        "resource_count":4,
-        "vp":5
+        "income": 1,
+        "sell_cost": 1,
+        "vp": 11
     },
     {
-        "industry":"iron",
-        "level":3,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":9
+        "id": 28,
+        "industry": "brewery",
+        "level": 1,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 5
         },
-        "count":1,
-        "income":2,
-        "resource_count":5,
-        "vp":7
+        "era_exclusion": "canal",
+        "income": 4,
+        "vp": 4
     },
     {
-        "industry":"iron",
-        "level":4,
-        "conn_vp":1,
-        "cost":{
-            "coal":1,
-            "iron":0,
-            "money":12
+        "id": 29,
+        "industry": "brewery",
+        "level": 1,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 5
         },
-        "count":1,
-        "income":1,
-        "resource_count":6,
-        "vp":9
+        "era_exclusion": "canal",
+        "income": 4,
+        "vp": 4
+    },
+    {
+        "id": 30,
+        "industry": "brewery",
+        "level": 2,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 7
+        },
+        "income": 5,
+        "vp": 5
+    },
+    {
+        "id": 31,
+        "industry": "brewery",
+        "level": 2,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 7
+        },
+        "income": 5,
+        "vp": 5
+    },
+    {
+        "id": 32,
+        "industry": "brewery",
+        "level": 3,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 9
+        },
+        "income": 5,
+        "vp": 7
+    },
+    {
+        "id": 33,
+        "industry": "brewery",
+        "level": 3,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 9
+        },
+        "income": 5,
+        "vp": 7
+    },
+    {
+        "id": 34,
+        "industry": "brewery",
+        "level": 4,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 9
+        },
+        "income": 5,
+        "era_exclusion": "rail",
+        "vp": 10
+    },
+    {
+        "id": 35,
+        "industry": "coal",
+        "level": 1,
+        "conn_vp": 2,
+        "cost": {
+            "coal": 0,
+            "iron": 0,
+            "money": 5
+        },
+        "era_exclusion": "canal",
+        "income": 4,
+        "vp": 1,
+        "resource_count": 2
+    },
+    {
+        "id": 36,
+        "industry": "coal",
+        "level": 2,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 0,
+            "money": 7
+        },
+        "income": 7,
+        "resource_count": 3,
+        "vp": 2
+    },
+    {
+        "id": 37,
+        "industry": "coal",
+        "level": 2,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 0,
+            "money": 7
+        },
+        "income": 7,
+        "resource_count": 3,
+        "vp": 2
+    },
+    {
+        "id": 38,
+        "industry": "coal",
+        "level": 3,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 8
+        },
+        "income": 6,
+        "resource_count": 4,
+        "vp": 3
+    },
+    {
+        "id": 39,
+        "industry": "coal",
+        "level": 3,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 8
+        },
+        "income": 6,
+        "resource_count": 4,
+        "vp": 3
+    },
+    {
+        "id": 40,
+        "industry": "coal",
+        "level": 4,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 10
+        },
+        "income": 5,
+        "resource_count": 5,
+        "vp": 4
+    },
+    {
+        "id": 41,
+        "industry": "coal",
+        "level": 4,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 0,
+            "iron": 1,
+            "money": 10
+        },
+        "income": 5,
+        "resource_count": 5,
+        "vp": 4
+    },
+    {
+        "id": 42,
+        "industry": "iron",
+        "level": 1,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 5
+        },
+        "era_exclusion": "canal",
+        "income": 3,
+        "resource_count": 4,
+        "vp": 3
+    },
+    {
+        "id": 43,
+        "industry": "iron",
+        "level": 2,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 7
+        },
+        "income": 3,
+        "resource_count": 4,
+        "vp": 5
+    },
+    {
+        "id": 44,
+        "industry": "iron",
+        "level": 3,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 9
+        },
+        "income": 2,
+        "resource_count": 5,
+        "vp": 7
+    },
+    {
+        "id": 45,
+        "industry": "iron",
+        "level": 4,
+        "conn_vp": 1,
+        "cost": {
+            "coal": 1,
+            "iron": 0,
+            "money": 12
+        },
+        "income": 1,
+        "resource_count": 6,
+        "vp": 9
     }
 ]

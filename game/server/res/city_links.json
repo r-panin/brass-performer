@@ -1,0 +1,197 @@
+[
+    {
+        "id": 1,
+        "cities": ["Stoke-on-Trent", "Warrington"],
+        "transport": ["rail", "canal"]
+    },
+    {
+        "id": 2,
+        "cities": ["Stoke-on-Trent", "Leek"],
+        "transport": ["rail", "canal"]
+    },
+    {
+        "id": 3,
+        "cities": ["Stoke-on-Trent", "Stone"],
+        "transport": ["rail", "canal"]
+    },
+    {
+        "id": 4,
+        "cities": ["Leek", "Belper"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 5,
+        "cities": ["Belper", "Derby"],
+        "transport": ["rail", "canal"]
+    },
+    {
+        "id": 6,
+        "cities": ["Derby", "Nottingham"],
+        "transport": ["rail", "canal"]
+    },
+    {
+        "id": 7,
+        "cities": ["Derby", "Uttoxeter"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 8,
+        "cities": ["Derby", "Burton-upon-Trent"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 9,
+        "cities": ["Stone", "Uttoxeter"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 10,
+        "cities": ["Stone", "Burton-upon-Trent"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 11,
+        "cities": ["Stone", "Stafford"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 12,
+        "cities": ["Stafford", "Cannock"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 13,
+        "cities": ["Burton-upon-Trent", "Cannock"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 14,
+        "cities": ["Burton-upon-Trent", "Walsall"],
+        "transport": ["canal"]
+    },
+    {
+        "id": 15,
+        "cities": ["Burton-upon-Trent", "Tamworth"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 16,
+        "cities": ["farm_brewery_north", "Cannock"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 17,
+        "cities": ["Cannock", "Walsall"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 18,
+        "cities": ["Cannock", "Wolverhampton"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 19,
+        "cities": ["Tamworth", "Walsall"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 20,
+        "cities": ["Tamworth", "Nuneaton"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 21,
+        "cities": ["Tamworth", "Birmingham"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 22,
+        "cities": ["Shrewsbury", "Coalsbrookdale"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 23,
+        "cities": ["Coalsbrookdale", "Wolverhampton"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 24,
+        "cities": ["Coalsbrookdale", "Kidderminster"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 25,
+        "cities": ["Wolverhampton", "Walsall"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 26,
+        "cities": ["Wolverhampton", "Dudley"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 27,
+        "cities": ["Walsall", "Birmingham"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 28,
+        "cities": ["Dudley", "Birmingham"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 29,
+        "cities": ["Dudley", "Kidderminster"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 30,
+        "cities": ["Birmingham", "Nuneaton"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 31,
+        "cities": ["Birmingham", "Coventry"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 32,
+        "cities": ["Birmingham", "Oxford"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 33,
+        "cities": ["Birmingham", "Redditch"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 34,
+        "cities": ["Birmingham", "Worcester"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 35,
+        "cities": ["Nuneaton", "Coventry"],
+        "transport": ["rail"]
+    },
+    {
+        "id": 36,
+        "cities": ["Worcester", "Gloucester"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 37,
+        "cities": ["Redditch", "Oxford"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 38,
+        "cities": ["Redditch", "Gloucester"],
+        "transport": ["canal", "rail"]
+    },
+    {
+        "id": 39,
+        "cities": ["Worcester", "Kidderminster", "farm_brewery_south"],
+        "transport": ["canal", "rail"]
+    }
+]

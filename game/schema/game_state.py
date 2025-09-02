@@ -1,9 +1,25 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Any, Callable, Union, Iterator, Literal
-from uuid import uuid4
+from typing import List, Optional, Dict, Callable, Union, Iterator, Literal, ClassVar, Set
 from collections import deque
 import math
+import json
+import hashlib
+
+class GameEntity(BaseModel):
+    _excluded_from_hash: ClassVar[Set[str]] = {'type_hash', 'id'}
+    type_hash: str = Field(default=None, description='Auto-generated property hash, used for equivalence layer')
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.type_hash = self._generate_hash()
+
+    def _generate_hash(self) -> str:
+        exclude_fields = self._excluded_from_hash
+        model_dict = self.model_dump(exclude=exclude_fields)
+
+        serialized = json.dumps(model_dict, sort_keys=True, default=str)
+        return hashlib.md5(serialized.encode()).hexdigest()
 
 class GameStatus(StrEnum):
     CREATED = 'created'
@@ -31,8 +47,8 @@ class MerchantType(StrEnum):
     COTTON = "cotton"
     EMPTY = "empty"
 
-class MerchantSlot(BaseModel):
-    id: str = Field(default_factory=lambda: (str(uuid4())))
+class MerchantSlot(GameEntity):
+    id: int
     city: str
     merchant_type: MerchantType
     beer_available: bool = True 
@@ -47,8 +63,8 @@ class ResourceType(StrEnum):
     BEER = "beer"
     MONEY = "money"
 
-class Building(BaseModel):
-    id: str = Field(default_factory=lambda: (str(uuid4())))
+class Building(GameEntity):
+    id: int
     industry_type: IndustryType
     level: int
     city: str
@@ -64,24 +80,23 @@ class Building(BaseModel):
     era_exclusion: Optional[LinkType]
 
 
-class BuildingSlot(BaseModel):
-    id: str = Field(default_factory=lambda: (str(uuid4())))
+class BuildingSlot(GameEntity):
+    id: int
     city: str
     industry_type_options: List[IndustryType]
     building_placed: Optional[Building] = None
 
-class Link(BaseModel):
-    id: str = Field(default_factory=lambda: (str(uuid4())))
-    type: LinkType
+class Link(GameEntity):
+    id:int
+    type: List[LinkType]
     cities: List[str]
     owner: Optional[str] = None
 
-class City(BaseModel):
+class City(GameEntity):
     name: str
-    slots: Dict[str, BuildingSlot] = []
-    links: Dict[str, Link]
+    slots: Dict[int, BuildingSlot] = []
     is_merchant: bool
-    merchant_slots: Optional[Dict[str, MerchantSlot]] = None
+    merchant_slots: Optional[Dict[int, MerchantSlot]] = None
     merchant_min_players: Optional[int] = None
 
 class Market(BaseModel):
@@ -90,10 +105,10 @@ class Market(BaseModel):
     coal_cost: int
     iron_cost: int
     
-    COAL_MAX_COST = 8
-    IRON_MAX_COST = 6
-    COAL_MAX_COUNT = 14
-    IRON_MAX_COUNT = 10
+    COAL_MAX_COST:ClassVar[int] = 8
+    IRON_MAX_COST:ClassVar[int] = 6
+    COAL_MAX_COUNT:ClassVar[int] = 14
+    IRON_MAX_COUNT:ClassVar[int] = 10
     
     def update_market_costs(self):
         self.coal_cost = self.COAL_MAX_COST - math.ceil(self.coal_count / 2)
@@ -153,30 +168,16 @@ class CardType(StrEnum):
     INDUSTRY = "industry"
     CITY = "city"
 
-class Card(BaseModel):
-    id: str = Field(default_factory=lambda: (str(uuid4())))
+class Card(GameEntity):
+    id: int
     card_type: CardType
     value: str
     def __repr__(self) -> str:
         return f'Card value: {self.value}'
 
-    @model_validator(mode="before")
-    @classmethod
-    def set_type_and_value(cls, data:Any) -> Any:
-        if isinstance(data, dict):
-            if "city" in data:
-                data["card_type"] = CardType.CITY
-                data["value"] = data["city"]
-            elif "industry" in data:
-                data["card_type"] = CardType.INDUSTRY
-                data["value"] = data["industry"]
-            else:
-                raise ValueError('Card must have either "city" or "industry" field')
-            return data
-
 class PlayerExposed(BaseModel):
     hand_size: int
-    available_buildings: Dict[str, Building]
+    available_buildings: Dict[int, Building]
     color: PlayerColor
     bank: int
     income: int
@@ -184,8 +185,8 @@ class PlayerExposed(BaseModel):
     victory_points: int
 
 class Player(BaseModel):
-    hand: Dict[str, Card]
-    available_buildings: Dict[str, Building]
+    hand: Dict[int, Card]
+    available_buildings: Dict[int, Building]
     color: PlayerColor
     bank: int
     income: int
@@ -212,6 +213,7 @@ class BoardStateExposed(BaseModel):
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
+    links: Dict[int, Link]
     players: Dict[PlayerColor, Player]
     market: Market
     deck: List[Card]
@@ -234,15 +236,6 @@ class BoardState(BaseModel):
                 if slot.building_placed:
                     yield slot.building_placed
     
-    def iter_links(self) -> Iterator[Link]:
-        seen_links = set()  # Множество для отслеживания обработанных ссылок по их id
-        for city in self.cities.values():
-            for link in city.links.values():
-                link_id = id(link)  # Уникальный идентификатор объекта
-                if link_id not in seen_links:
-                    seen_links.add(link_id)
-                    yield link
-
     def get_player_iron_sources(self) -> Iterator[Building]:
         for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.IRON and building.resource_count > 0:
@@ -260,49 +253,78 @@ class BoardState(BaseModel):
     def market_access_exists(self, city_name: str):
         return self.find_paths(self, city_name, target_condition=lambda city: self.cities[city].is_merchant)
 
-    def find_paths(self, start:str, target_condition: Optional[Callable[[str], bool]] = None, end:Optional[str]=None, find_all:bool = False) -> Union[bool, Dict[str, int]]:
+    def find_connected_cities(self, city_name:str) -> Set:
+        out = set()
+        for link in self.links.values():
+            if city_name in link.cities:
+                out.add(set(link.cities))
+        return out
+
+    def find_paths(
+        self,
+        start: str,
+        target_condition: Optional[Callable[[str], bool]] = None,
+        end: Optional[str] = None,
+        find_all: bool = False
+    ) -> Union[bool, Dict[str, int]]:
         if start not in self.cities:
-            if find_all:
-                return {}
-            return False
-        
+            return {} if find_all else False
+
+        # Определяем условие поиска
         if end is not None:
             target_check = lambda city: city == end
         elif target_condition is not None:
             target_check = target_condition
         else:
             raise ValueError("Must have either target city or condition")
-        
+
         if not find_all and target_check(start):
-            return True
-        
+            return True if not find_all else {start: 0}
+
+        # Строим граф связей с учетом многогородских связей
+        graph = {}
+        for link in self.links.values():
+            if link.owner is None:
+                continue
+            
+            # Для связи с N городами создаем полный граф между всеми городами
+            cities_in_link = link.cities
+            for i in range(len(cities_in_link)):
+                city1 = cities_in_link[i]
+                if city1 not in graph:
+                    graph[city1] = set()
+                
+                # Добавляем связи со всеми остальными городами в этой связи
+                for j in range(len(cities_in_link)):
+                    if i != j:
+                        city2 = cities_in_link[j]
+                        graph[city1].add(city2)
+
+        # BFS
         visited = set()
         queue = deque([(start, 0)])
         visited.add(start)
-        found_cities = {}
-        if find_all and target_check(start):
-            found_cities[start] = 0
+        found_cities = {start: 0} if find_all and target_check(start) else {}
 
         while queue:
-            current_city_name, distance = queue.popleft()
+            current_city, distance = queue.popleft()
             
-            for link in self.cities[current_city_name].links.values():
-                if link.owner is None:
-                    continue
-                for connected_city in link.cities:
-                    if connected_city not in visited:
-                        visited.add(connected_city)
-                        new_distance = distance + 1
+            # Получаем соседей из графа (если город есть в графе)
+            neighbors = graph.get(current_city, set())
+            
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    new_distance = distance + 1
+                    
+                    if target_check(neighbor):
+                        if not find_all:
+                            return True
+                        found_cities[neighbor] = new_distance
+                    
+                    queue.append((neighbor, new_distance))
 
-                        if target_check(connected_city):
-                            if not find_all:
-                                return True
-                            found_cities[connected_city] = new_distance
-                        queue.append((connected_city, new_distance))
-        
-        if find_all:
-            return found_cities
-        return False
+        return found_cities if find_all else False
 
     def get_building_slot_location(self, building_slot_id:str) -> str:
         for city_name, city in self.cities.items():
@@ -313,7 +335,7 @@ class BoardState(BaseModel):
         out = 0
         for building_slot in self.cities[city_name].slots.values():
             if building_slot.building_placed:
-                if building_slot.building_placed.IndustryType == resource_type:
+                if building_slot.building_placed.industry_type == resource_type:
                     out += building_slot.building_placed.resource_count
         return out
     
@@ -326,13 +348,13 @@ class ResourceSourceType(StrEnum):
 class ResourceSource(BaseModel):
     source_type: ResourceSourceType
     resource_type: ResourceType
-    building_slot_id: Optional[str]
+    building_slot_id: Optional[int]
     merchant: Optional[City] # beer only
     amount: int
 
 class PlayerState(BaseModel):
     common_state: BoardStateExposed
-    your_hand: Dict[str, Card]
+    your_hand: Dict[int, Card]
     your_color: PlayerColor
 
 class ValidationResult(BaseModel):
@@ -348,4 +370,4 @@ class ResourceStrategy(StrEnum):
 
 class AutoResourceSelection(BaseModel):
     mode: Literal["auto"]
-    strategy = ResourceStrategy
+    strategy: ResourceStrategy

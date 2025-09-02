@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, Action, ResourceSelection, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, BuildAction, SellAction, LoanAction
+from ...schema import BoardState, Action, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, BuildAction, SellAction, LoanAction
 from typing import Dict, List
 from collections import defaultdict
 
@@ -20,7 +20,6 @@ def validate_card_in_hand(func):
     return wrapper
 
 class BaseValidator(ActionValidator, ABC):
-    @validate_card_in_hand
     def validate(self, action:PassAction, game_state:BoardState, player:Player) -> True:
         return ValidationResult(True)
     
@@ -89,8 +88,10 @@ class BaseValidator(ActionValidator, ABC):
     
     
 class PassValidator(BaseValidator):
-    pass
-
+    @validate_card_in_hand
+    def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
+        return ValidationResult(True)
+    
 class ScoutValidator(BaseValidator):
     @validate_card_in_hand
     def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
@@ -141,4 +142,22 @@ class DevelopValidator(BaseValidator):
 class NetworkValidator(BaseValidator):
     @validate_card_in_hand
     def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
-        if action.link_id not in game_state.
+        pass
+
+class NetworkDoubleValidator(BaseValidator):
+    pass
+
+class NetworkEndValidator(BaseValidator):
+    pass
+
+class BuildValidator(BaseValidator):
+    pass
+
+class SellValidator(BaseValidator):
+    pass
+
+class SellStepValidator(BaseValidator):
+    pass
+
+class SellEndValidator(BaseValidator):
+    pass

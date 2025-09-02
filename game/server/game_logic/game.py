@@ -10,18 +10,13 @@ from .validation_service import ActionValidationService
 
 
 
-
 class Game:
     RES_PATH = Path(r'game\server\res')
     BUILDING_ROSTER_PATH = Path(RES_PATH / 'building_table.json')
     CARD_LIST_PATH = Path(RES_PATH / 'card_list.json')
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
     MERCHANTS_TOKENS_PATH = Path(RES_PATH /'merchant_tokens.json')
-    SPECIAL_CITY_GROUPS = {
-        "worcester_group": ["Worcester", "Kidderminster", "farm_brewery_south"]
-    }
-    SPECIAL_MERCHANT = 'Shrewsbury'
-    TOTAL_MERCHANT_TOKENS = 9
+    LINKS_PATH = Path(RES_PATH / 'city_links.json')
     logging.basicConfig(level=logging.INFO)
     def __repr__(self) -> str:
         # Основная информация об игре
@@ -108,7 +103,7 @@ class Game:
         self.status = GameStatus.CREATED
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
-        self.validation_service = ActionValidationService(self.state)
+        self.validation_service = ActionValidationService()
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state = self._create_initial_state(player_count, players_colors)
@@ -121,6 +116,8 @@ class Game:
         players = {color: self._create_player(color) for color in player_colors}
 
         cities = self._create_cities(player_count)
+
+        links = self._create_links()
 
         market = self._create_starting_market()
 
@@ -138,7 +135,7 @@ class Game:
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard, wild_deck=wild_deck)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard, wild_deck=wild_deck, links=links)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}
@@ -146,6 +143,7 @@ class Game:
             building_json:List[dict] = json.load(openfile)
         for building in building_json:
             building = Building(
+                id=building['id'],
                 industry_type=building['industry'],
                 level=building['level'],
                 city=str(),
@@ -179,119 +177,92 @@ class Game:
             cards_data = json.load(cardfile)
         for card_data in cards_data:
             if card_data['player_count'] <= player_count:
-                for _ in range(card_data['count']):
-                    logging.debug(f"processing card data {card_data}")
-                    card = Card(**card_data)
-                    logging.debug(f"appending card{card}")
-                    out.append(card)
+                logging.debug(f"processing card data {card_data}")
+                card = Card(
+                    id=card_data["id"],
+                    card_type=CardType(card_data["card_type"]),
+                    value=card_data["value"]
+                )
+                logging.debug(f"appending card{card}")
+                out.append(card)
         random.shuffle(out)
         return out
 
     def _build_wild_deck(self) -> List[Card]:
-        return [Card(card_type=t, value='wild') for t in [CardType.INDUSTRY]*4 + [CardType.CITY]*4] 
+        INDUSTRY_START_ID = 65
+        CITY_OFFSET = 4
+        NUM_WILD_CARDS = 4
         
+        return [
+            card
+            for base_id in range(INDUSTRY_START_ID, INDUSTRY_START_ID + NUM_WILD_CARDS)
+            for card in (
+                Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'),
+                Card(id=base_id + CITY_OFFSET, card_type=CardType.CITY, value='wild'),
+            )
+        ]
+ 
     def _create_cities(self, player_count:int) -> Dict[str, City]:
         '''
         Базовая генерация городов без связей
         '''
         out:Dict[str, City] = {}
-        links_dict:dict[tuple, Link] = {}
         with open(self.CITIES_LIST_PATH) as cityfile:
             cities_data:dict = json.load(cityfile)
+
+        with open(self.MERCHANTS_TOKENS_PATH) as merchantsfile:
+            tokens_data = json.load(merchantsfile)
+        tokens = []
+        for token_data in tokens_data:
+            if token_data['player_count'] <= player_count:
+                tokens.append(MerchantType(token_data['type']))
+        random.shuffle(tokens)
+
         for city_data in cities_data:
             city_name = city_data['name']
             logging.debug(f'creating city {city_name}')
             logging.debug(f'merchant player count: {city_data["player_count"]}') if 'player_count' in city_data.keys() else logging.debug('not a merchant')
             slots=[BuildingSlot(
+                    id=slot['id'],
                     city=city_name,
-                    industry_type_options=[IndustryType(industry) for industry in slot]
-                ) for slot in city_data['slots']] if 'slots' in city_data.keys() else []
+                    industry_type_options=[IndustryType(industry) for industry in slot['industry_type_options']]
+                ) for slot in city_data['building_slots']] if 'building_slots' in city_data.keys() else []
+            is_merchant = city_data.get('merchant', False)
+            if is_merchant:
+                mslots = {}
+                city_player_count = city_data['player_count']
+                if player_count >= city_player_count:
+                    merchant_slot_types = [tokens.pop() for _ in range(len(city_data['merchant_slots']))]
+                else:
+                    merchant_slot_types = [mslot['merchant_type'] for mslot in city_data["merchant_slots"]] 
+                for slot in city_data['merchant_slots']:
+                    mslots[slot['id']] = (MerchantSlot(
+                        id=slot['id'],
+                        city=city_name,
+                        merchant_type=merchant_slot_types.pop()
+                    ))
             city = (City(
                 name=city_name,
                 slots={slot.id: slot for slot in slots},
                 is_merchant=city_data.get('merchant', False),
-                links={},
-                merchant_min_players=city_data.get('player_count')
+                merchant_min_players=city_data.get('player_count'),
+                merchant_slots=mslots if is_merchant else None
             ))
             out[city_name] = city
 
-        '''
-        Создаем линки
-        '''
+        return out
 
-        for city_data in cities_data:
-            added_link_keys = set()
-            city_name = city_data['name']
-            logging.debug(f'Processing links for city {city_name}')
-            city = out[city_name]
-            for link_data in city_data['links']:
-                if 'group' in link_data:
-                    group_name = link_data['group']
-                    group_cities = self.SPECIAL_CITY_GROUPS[group_name]
-                    for transport_type in link_data['transport']:
-                        link_key = f'{group_name}_{transport_type}'
-                        if link_key not in added_link_keys:
-                            if link_key not in links_dict:
-                                link = Link(
-                                    type=LinkType(transport_type),
-                                    cities=group_cities
-                                )
-                                links_dict[link_key] = link
-                            link = links_dict[link_key]
-                            city.links[link.id] = link
-                            added_link_keys.add(link_key)
-                else:
-                    linked_city_name = link_data['name']
-                    for transport_type in link_data['transport']:
-                        cities_key = tuple(sorted([city_name, linked_city_name]))
-                        link_key = f'{cities_key}-{transport_type}'
-                        if link_key not in links_dict:
-                            link = Link(
-                                type=LinkType(transport_type),
-                                cities=[city_name, linked_city_name]
-                            )
-                            links_dict[link_key] = link
-                        link = links_dict[link_key]
-                        city.links[link.id] = (link)
-                        added_link_keys.add(link_key)
-        
-        '''
-        Размещаем коммивояжеров
-        '''
-        all_merchants = [city for city in out.values() if city.is_merchant] 
-        playable_merchants = [city for city in all_merchants if city.merchant_min_players <= player_count]
-        empty_merchants = [city for city in all_merchants if city.merchant_min_players > player_count]
-        tokens = []
-        with open(self.MERCHANTS_TOKENS_PATH) as merchantsfile:
-            tokens_data = json.load(merchantsfile)
-        for token_data in tokens_data:
-            if token_data['player_count'] <= player_count:
-                tokens.append(MerchantType(token_data['type']))
-        random.shuffle(tokens)
-        for city in playable_merchants:
-            city.merchant_slots = {}
-            if city.name != self.SPECIAL_MERCHANT:
-                for _ in range(2):
-                    token = tokens.pop()
-                    slot = MerchantSlot(
-                        city=city.name,
-                        merchant_type=token
-                    )
-                    logging.debug(f'Placed token {token} in city {city.name}')
-                    city.merchant_slots[slot.id] = slot
-            else:
-                token = tokens.pop()
-                slot = MerchantSlot(
-                    city=city.name,
-                    merchant_type=token
-                )
-                logging.debug(f'Placed token {token} in city {city.name}')
-                city.merchant_slots[slot.id] = slot
-        for city in empty_merchants:
-            city.merchant_slots = {}
-            for _ in range(2):
-                slot = MerchantSlot(city=city.name, merchant_type=MerchantType.EMPTY)
-                city.merchant_slots[slot.id] = slot
+
+    def _create_links(self) -> List[Link]:
+        out:Dict[int, Link] = {}
+        with open(self.LINKS_PATH) as linksfile:
+            links_data:dict = json.load(linksfile) 
+        for link_data in links_data:
+            out[link_data["id"]] = Link(
+                id=link_data['id'],
+                type=link_data['transport'],
+                cities=link_data['cities']
+            )
         return out
     
     def _create_starting_market(self) -> Market:
