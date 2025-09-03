@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, Action, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, BuildAction, SellAction, LoanAction
+from ...schema import BoardState, Action, ResourceAmounts, Player, BuildingAction, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, ResourceAction, BuildAction, SellAction, LoanAction, ActionType
 from typing import Dict, List
 from collections import defaultdict
 
@@ -12,10 +12,52 @@ class ActionValidator(ABC):
     def validate(self, action: Action, game_state:BoardState, player: Player):
         pass
 
-def validate_card_in_hand(func):
+def validate_card_in_hand(func, disable=False):
     def wrapper(validator:BaseValidator, action:Action, game_state:BoardState, player:Player):
+        if disable:
+            return func(validator, action, game_state, player)
         if action.card_id not in player.hand:
             return ValidationResult(False, "Card not in player's hand")
+        return func(validator, action, game_state, player)
+    return wrapper
+
+def validate_resources(func):
+    def wrapper(validator:BaseValidator, action:ResourceAction, game_state:BoardState, player:Player):
+        if not action.is_auto_resource_selection():
+
+            preference_validation = validator._validate_iron_preference(game_state, action.resources_used)
+            if not preference_validation.is_valid:
+                return preference_validation
+            
+            coal_validation = validator._validate_coal_preference(game_state, action.resources_used,)
+            if not coal_validation.is_valid:
+                return coal_validation
+            
+            base_cost_validation = validator._validate_base_action_cost(action, game_state,player)
+            if not base_cost_validation.is_valid:
+                return base_cost_validation
+
+            market_coal = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET and resource.resource_type == ResourceType.COAL]
+            market_coal_amount = sum(resource.amount for resource in market_coal)
+            market_iron = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET and resource.resource_type == ResourceType.IRON]
+            market_iron_amount = sum(resource.amount for resource in market_iron)
+            resource_expense = game_state.market.calculate_coal_cost(market_coal_amount) + game_state.market.calculate_iron_cost(market_iron_amount)
+            base_expense = sum(resource.amount for resource in action.resources_used if resource.resource_type == ResourceType.MONEY)
+            total_expense = base_expense + resource_expense
+            if total_expense > player.bank:
+                return ValidationResult(False, "Not enough money in the bank")
+        return func(validator, action, game_state, player)
+    return wrapper
+
+def validate_building_is_valid(func):
+    def wrapper(validator:BaseValidator, action:BuildingAction, game_state:BoardState, player:Player):
+        building = action.building_id
+        if building not in player.available_buildings:
+            return ValidationResult(False, f"Building ID {building} not in player's roster")
+
+        building_validation = validator._validate_lowest_level_building(building, player)
+        if not building_validation.is_valid:
+            building_validation
         return func(validator, action, game_state, player)
     return wrapper
 
@@ -46,8 +88,13 @@ class BaseValidator(ActionValidator, ABC):
                 return ValidationResult(False, "Market resource requested when player resource is available")
         return ValidationResult(True)
             
-    def _validate_coal_preference(self, game_state:BoardState, resources: List[ResourceSource], location:str) -> ValidationResult:
-        available_player_sources = game_state.get_player_coal_sources(location)
+    def _validate_coal_preference(self, game_state:BoardState, resources: List[ResourceSource], city_name:str=None, link_id:int = None) -> ValidationResult:
+        if city_name:
+            available_player_sources = game_state.get_player_coal_locations(city_name=city_name)
+        elif link_id:
+            available_player_sources = game_state.get_player_coal_locations(link_id=link_id)
+        else:
+            raise ValueError("Must provide either city name or link id")
         asking_amount = sum(resource.amount for resource in resources if resource.resource_type == ResourceType.COAL)
         resource_requests = [resource for resource in resources if resource.resource_type == ResourceType.COAL]
         requested_cities = [game_state.get_building_slot_location(resource.building_slot_id) for resource in resource_requests]
@@ -84,7 +131,10 @@ class BaseValidator(ActionValidator, ABC):
             if market_consumption != remaining_amount:
                 return ValidationResult(False, "whut?")
             
-        return ValidationResult(True)
+        return ValidationResult(True)    
+    
+    def _validate_base_action_cost(self) -> ValidationResult:
+        raise ValueError("Must be defined for every resource action")
     
     
 class PassValidator(BaseValidator):
@@ -95,6 +145,9 @@ class PassValidator(BaseValidator):
 class ScoutValidator(BaseValidator):
     @validate_card_in_hand
     def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
+        for card in action.additional_card_cost:
+            if not card in player.hand:
+                return ValidationResult(False, "Smart guy, huh")
         if any(card.value == "wild" for card in player.hand):
             return ValidationResult(False, "Cannot scout with wild cards in hand")
         return ValidationResult(True)
@@ -108,47 +161,65 @@ class LoanValidator(BaseValidator):
             
 class DevelopValidator(BaseValidator): 
     @validate_card_in_hand
+    @validate_resources
+    @validate_building_is_valid
     def validate(self, action:DevelopAction, game_state:BoardState, player:Player):
-        if action.buildings > 2:
-            return ValidationResult(False, "Cannot develop over 2 buildings in one action")
-
-        for building in action.buildings:
-            if building not in player.available_buildings:
-                return ValidationResult(False, f"Building ID {building} not in player's roster")
-
-            building_validation = self._validate_lowest_level_building(building, player)
-            if not building_validation.is_valid:
-                building_validation
-            
-        if not action.is_auto_resource_selection():
-            for resource in action.resources_used:
-                if resource.resource_type != ResourceType.IRON:
-                    return ValidationResult(False, "Must only use iron to develop")
-
-            preference_validation = self._validate_iron_preference(game_state, action.resources_used)
-            if not preference_validation.is_valid:
-                return preference_validation
-
-            if sum(resource.amount for resource in action.resources_used) != len(action.buildings):
-                return ValidationResult(False, "Must use amount of iron equal to the number of buildings developed")
-
-            market_resources = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET]
-            market_amount = sum(resource.amount for resource in market_resources)
-            if game_state.market.calculate_iron_cost(market_amount) > player.bank:
-                return ValidationResult(False, "Not enough money in the bank")
-
-        return True
+        return ValidationResult(True)
     
+    def _validate_base_action_cost(self, action:DevelopAction, game_state, player):
+        target_cost = ResourceAmounts(iron=1)
+        if action.get_resource_amounts() != target_cost:
+            return ValidationResult(False, "Base action cost doesn't match")
+
+
+class DevelopDoubleValidator(DevelopValidator):
+    @validate_card_in_hand(disable=True)
+    @validate_building_is_valid
+    @validate_resources
+    def validate(self, action, game_state, player):
+        return super().validate(action, game_state, player)()
+    
+    def _validate_base_action_cost(self, action, game_state, player):
+        return super()._validate_base_action_cost(action, game_state, player)
+
+class DevelopEndValidator(BaseValidator):
+    def validate(self, action, game_state, player):
+        if not (game_state.previous_actor == player.color and game_state.previous_action in (ActionType.DEVELOP, ActionType.DEVELOP_DOUBLE)):
+            return ValidationResult(False, "Action must follow a develop action")
+        return ValidationResult(True)
+
 class NetworkValidator(BaseValidator):
     @validate_card_in_hand
+    @validate_resources
     def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
-        pass
+        link = game_state.links.get(action.link_id)
+        if not link:
+            return ValidationResult(False, f"Link {action.link_id} does not exist")
+        network = game_state.get_player_network(player.color)
+        if not network:
+            if not set(link.cities) & network:
+                return ValidationResult(False, "Link not in player's network")
 
-class NetworkDoubleValidator(BaseValidator):
-    pass
+    def _validate_base_action_cost(self, action:NetworkAction, game_state:BoardState, player):
+        base_link_cost = game_state.get_link_cost()
+        if base_link_cost != action.get_resource_amounts():
+            return ValidationResult(False, "Base action cost doesn't match")
+            
+
+class NetworkDoubleValidator(NetworkValidator):
+    @validate_card_in_hand(disable=True)
+    def validate(self, action, game_state, player):
+        return super().validate(action, game_state, player)
+    
+    def _validate_base_action_cost(self, action, game_state, player):
+        base_link_cost = game_state.get_link_cost(double=True)
+        if base_link_cost != action.get_resource_amounts():
+            return ValidationResult(False, "Base action cost doens't match")
 
 class NetworkEndValidator(BaseValidator):
-    pass
+    def validate(self, action, game_state, player):
+        if not (game_state.previous_actor == player.color and game_state.previous_action is ActionType.NETWORK):
+            return ValidationResult(False, "Action must follow a network action. God I hope someone doing double rail didn't get stuck")
 
 class BuildValidator(BaseValidator):
     pass

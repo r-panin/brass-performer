@@ -5,6 +5,8 @@ from collections import deque
 import math
 import json
 import hashlib
+from .actions import ActionType
+
 
 class GameEntity(BaseModel):
     _excluded_from_hash: ClassVar[Set[str]] = {'type_hash', 'id'}
@@ -222,6 +224,8 @@ class BoardState(BaseModel):
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wild_deck: List[Card]
+    previous_action: Optional[ActionType] = None,
+    previous_actor: Optional[PlayerColor] = None
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
@@ -241,8 +245,8 @@ class BoardState(BaseModel):
             if building.industry_type == IndustryType.IRON and building.resource_count > 0:
                 yield building
 
-    def get_player_coal_locations(self, city_name: str) -> Dict[str, int]:
-        return self.find_paths(self, city_name, target_condition=lambda city: any(
+    def get_player_coal_locations(self, city_name:Optional[str]=None, link_id:Optional[int]=None) -> Dict[str, int]:
+        return self.find_paths(self, city_name=city_name, start_link_id=link_id, target_condition=lambda city: any(
             slot.building_placed is not None and
             slot.building_placed.industry_type == IndustryType.COAL and
             slot.building_placed.resource_count > 0
@@ -262,13 +266,31 @@ class BoardState(BaseModel):
 
     def find_paths(
         self,
-        start: str,
+        start: Optional[str] = None,
         target_condition: Optional[Callable[[str], bool]] = None,
         end: Optional[str] = None,
-        find_all: bool = False
+        find_all: bool = False,
+        start_link_id: Optional[str] = None  # Новый параметр
     ) -> Union[bool, Dict[str, int]]:
-        if start not in self.cities:
-            return {} if find_all else False
+        # Проверяем, что указан ровно один вариант старта
+        if (start is None) == (start_link_id is None):
+            raise ValueError("Specify exactly one: start city or start_link_id")
+
+        # Обработка старта через связь
+        if start_link_id is not None:
+            if start_link_id not in self.links:
+                return {} if find_all else False
+            link = self.links[start_link_id]
+            start_cities = link.cities
+            # Фильтруем города, отсутствующие в self.cities
+            valid_start_cities = [city for city in start_cities if city in self.cities]
+            if not valid_start_cities:
+                return {} if find_all else False
+        else:
+            # Проверка существования стартового города
+            if start not in self.cities:
+                return {} if find_all else False
+            valid_start_cities = [start]
 
         # Определяем условие поиска
         if end is not None:
@@ -278,50 +300,49 @@ class BoardState(BaseModel):
         else:
             raise ValueError("Must have either target city or condition")
 
-        if not find_all and target_check(start):
-            return True if not find_all else {start: 0}
+        # Проверяем условие для стартовых городов
+        if not find_all:
+            for city in valid_start_cities:
+                if target_check(city):
+                    return True
+        else:
+            found_cities = {}
+            for city in valid_start_cities:
+                if target_check(city):
+                    found_cities[city] = 0
 
-        # Строим граф связей с учетом многогородских связей
+        # Построение графа связей
         graph = {}
         for link in self.links.values():
             if link.owner is None:
                 continue
-            
-            # Для связи с N городами создаем полный граф между всеми городами
             cities_in_link = link.cities
             for i in range(len(cities_in_link)):
                 city1 = cities_in_link[i]
                 if city1 not in graph:
                     graph[city1] = set()
-                
-                # Добавляем связи со всеми остальными городами в этой связи
                 for j in range(len(cities_in_link)):
                     if i != j:
                         city2 = cities_in_link[j]
                         graph[city1].add(city2)
 
-        # BFS
-        visited = set()
-        queue = deque([(start, 0)])
-        visited.add(start)
-        found_cities = {start: 0} if find_all and target_check(start) else {}
+        # Инициализация BFS
+        visited = set(valid_start_cities)
+        queue = deque([(city, 0) for city in valid_start_cities])
+        found_cities = found_cities if find_all else {}
 
+        # Основной цикл BFS
         while queue:
             current_city, distance = queue.popleft()
-            
-            # Получаем соседей из графа (если город есть в графе)
             neighbors = graph.get(current_city, set())
-            
             for neighbor in neighbors:
                 if neighbor not in visited:
                     visited.add(neighbor)
                     new_distance = distance + 1
-                    
                     if target_check(neighbor):
                         if not find_all:
                             return True
                         found_cities[neighbor] = new_distance
-                    
                     queue.append((neighbor, new_distance))
 
         return found_cities if find_all else False
@@ -338,6 +359,30 @@ class BoardState(BaseModel):
                 if building_slot.building_placed.industry_type == resource_type:
                     out += building_slot.building_placed.resource_count
         return out
+    
+    def get_player_network(self, player_color: PlayerColor):
+        slot_cities = {
+            city.name for city in self.cities.values()
+            if any(slot.building_placed and slot.building_placed.owner == player_color
+                for slot in city.slots.values())
+        }
+        
+        link_cities = {
+            city for link in self.links.values()
+            if link.owner == player_color
+            for city in link.cities
+        }
+        
+        return slot_cities | link_cities 
+
+    def get_link_cost(self, double=False):
+        if self.era == LinkType.CANAL:
+            return ResourceAmounts(money=3)
+        elif self.era == LinkType.RAIL:
+            if not double:
+                return ResourceAmounts(money=5, coal=1)
+            else:
+                return ResourceAmounts(money=10, coal=1, beer=1)
     
 
 class ResourceSourceType(StrEnum):
@@ -371,3 +416,9 @@ class ResourceStrategy(StrEnum):
 class AutoResourceSelection(BaseModel):
     mode: Literal["auto"]
     strategy: ResourceStrategy
+
+class ResourceAmounts(BaseModel):
+    iron: int = 0
+    coal: int = 0
+    beer: int = 0
+    money: int = 0

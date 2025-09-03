@@ -9,6 +9,8 @@ class ActionValidationService():
             ActionType.SCOUT: ScoutValidator(),
             ActionType.LOAN: LoanValidator(),
             ActionType.DEVELOP: DevelopValidator(),
+            ActionType.DEVELOP_DOUBLE: DevelopDoubleValidator(),
+            ActionType.DEVELOP_END: DevelopEndValidator(),
             ActionType.NETWORK: NetworkValidator(),
             ActionType.NETWORK_DOUBLE: NetworkDoubleValidator(),
             ActionType.NETWORK_END: NetworkEndValidator(),
