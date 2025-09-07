@@ -5,7 +5,7 @@ from collections import deque
 import math
 import json
 import hashlib
-from .actions import ActionType
+from .common import ActionType, ResourceType, ResourceAmounts
 
 
 class GameEntity(BaseModel):
@@ -59,12 +59,6 @@ class LinkType(StrEnum):
     CANAL = "canal"
     RAIL = "rail"
     
-class ResourceType(StrEnum):
-    COAL = "coal"
-    IRON = "iron"
-    BEER = "beer"
-    MONEY = "money"
-
 class Building(GameEntity):
     id: int
     industry_type: IndustryType
@@ -80,6 +74,13 @@ class Building(GameEntity):
     is_developable: bool
     link_victory_points: int
     era_exclusion: Optional[LinkType]
+
+    def get_cost(self):
+        return ResourceAmounts(
+            iron=self.cost[ResourceType.IRON],
+            coal=self.cost[ResourceType.COAL],
+            money=self.cost[ResourceType.MONEY]
+        )
 
 
 class BuildingSlot(GameEntity):
@@ -270,7 +271,7 @@ class BoardState(BaseModel):
         target_condition: Optional[Callable[[str], bool]] = None,
         end: Optional[str] = None,
         find_all: bool = False,
-        start_link_id: Optional[str] = None  # Новый параметр
+        start_link_id: Optional[str] = None  
     ) -> Union[bool, Dict[str, int]]:
         # Проверяем, что указан ровно один вариант старта
         if (start is None) == (start_link_id is None):
@@ -347,10 +348,15 @@ class BoardState(BaseModel):
 
         return found_cities if find_all else False
 
-    def get_building_slot_location(self, building_slot_id:str) -> str:
-        for city_name, city in self.cities.items():
-            if building_slot_id in city.slots:
-                return city_name
+    def get_building_slot(self, building_slot_id, get_city_name=False) -> Union[str, BuildingSlot]:
+        if get_city_name:
+            for city_name, city in self.cities.items():
+                if building_slot_id in city.slots:
+                    return city_name
+        else:
+            for city in self.cities.values():
+                if building_slot_id in city.slots:
+                    return city.slots[building_slot_id]
 
     def get_resource_amount_in_city(self, city_name:str, resource_type:ResourceType) -> int:
         out = 0
@@ -384,18 +390,12 @@ class BoardState(BaseModel):
             else:
                 return ResourceAmounts(money=10, coal=1, beer=1)
     
-
-class ResourceSourceType(StrEnum):
-    PLAYER = "player"
-    MARKET = "market"
-    MERCHANT = "merchant" # Beer
-
-class ResourceSource(BaseModel):
-    source_type: ResourceSourceType
-    resource_type: ResourceType
-    building_slot_id: Optional[int]
-    merchant: Optional[City] # beer only
-    amount: int
+    def can_sell(self, city_name:str, industry:IndustryType) -> bool:
+        eligible_merchants = [city for city in self.cities.values() if city.is_merchant and (any(slot.merchant_type in [MerchantType.ANY, MerchantType(industry)] for slot in city.merchant_slots.values()))]
+        for merchant in eligible_merchants:
+            if self.find_paths(start=city_name, end=merchant):
+                return True
+    
 
 class PlayerState(BaseModel):
     common_state: BoardStateExposed
@@ -404,21 +404,8 @@ class PlayerState(BaseModel):
 
 class ValidationResult(BaseModel):
     is_valid: bool
-    message: Optional[str]
+    message: Optional[str] = None
 
 class ExecutionResult(BaseModel):
     executed: bool
-    message: Optional[str]
-
-class ResourceStrategy(StrEnum):
-    OWN_FIRST = 'own_first'
-
-class AutoResourceSelection(BaseModel):
-    mode: Literal["auto"]
-    strategy: ResourceStrategy
-
-class ResourceAmounts(BaseModel):
-    iron: int = 0
-    coal: int = 0
-    beer: int = 0
-    money: int = 0
+    message: Optional[str] = None

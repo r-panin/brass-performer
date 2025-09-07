@@ -1,27 +1,12 @@
 from pydantic import BaseModel, Field
-from enum import StrEnum
-from typing import Literal, List, Union, Dict
-from .game_state import ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType
+from typing import Literal, List, Union 
 from collections import defaultdict
+from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType
 
-class ActionType(StrEnum):
-    BUILD = 'build'
-    SELL = 'sell'
-    SELL_STEP = 'sell_step'
-    SELL_END = 'sell_end'
-    LOAN = 'loan'
-    SCOUT = 'scout'
-    DEVELOP = 'develop'
-    DEVELOP_DOUBLE = 'develop_double'
-    DEVELOP_END = 'develop_end'
-    NETWORK = 'network'
-    NETWORK_DOUBLE = 'network_double'
-    NETWORK_END = 'network_end'
-    PASS = 'pass'
 
 class BaseAction(BaseModel):
     action_type: ActionType
-    card_id: str 
+    card_id: int 
 
 class ResourceAction(BaseModel):
     action_type: ActionType
@@ -52,7 +37,8 @@ class BuildAction(BaseAction, ResourceAction, BuildingAction):
     action_type: Literal[ActionType.BUILD] = ActionType.BUILD
     slot_id: int # building slot ID
     
-class SellAction(BaseAction, ResourceAction, BuildingAction):
+class SellAction(BaseAction, ResourceAction):
+    slot_id: int 
     action_type: Literal[ActionType.SELL] = ActionType.SELL
 
 class SellStep(ResourceAction, BuildingAction):

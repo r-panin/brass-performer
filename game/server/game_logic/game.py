@@ -7,6 +7,7 @@ from uuid import uuid4
 import logging
 import copy
 from .validation_service import ActionValidationService
+from ...schema import ResourceAction, AutoResourceSelection, ResourceSource, ResourceSourceType
 
 
 
@@ -281,11 +282,19 @@ class Game:
     
     def play_action(self, action:Action, color:PlayerColor) -> ExecutionResult:
         player = self.state.players[color]
-        validation_result = self.validation_service.validate_action(action, player)
+        if action is ResourceAction:
+            if action.resources_used is AutoResourceSelection:
+                action.resources_used = self._select_resources(action, player)
+        validation_result = self.validation_service.validate_action(action, self.state, player)
         if not validation_result.is_valid:
             return ExecutionResult(executed=False, message=validation_result.message)
+        return self._execute_action(action, player)
+    
+    def _execute_action(self, action:Action, player:Player) -> ExecutionResult:
         pass
-        
+
+    def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
+        pass
         
 
 if __name__ == '__main__':

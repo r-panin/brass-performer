@@ -37,10 +37,12 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
             # Применяем действие к игровому состоянию
             try:
                 # Здесь будет метод для применения действия
-                game.play_action(action, color)
+                action_result = game.play_action(action, color)
+                await websocket.send_json(action_result.model_dump())
                 
                 # Отправляем обновленное состояние всем игрокам
-                await connection_manager.broadcast(game_id, message=message_generator)
+                if action_result.executed:
+                    await connection_manager.broadcast(game_id, message=message_generator)
             except ValueError as e:
                 await websocket.send_json({
                     "error": str(e)
