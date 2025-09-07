@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Client Tester</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Подключаем стили json-tree.js -->
+    <link rel="stylesheet" href="./node_modules/jjsontree.js/dist/jsontree.js.css">
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h2>Game Control</h2>
+            <button id="startGameBtn">Start Game</button>
+            <span>Game ID: <span id="gameId">-</span></span>
+            <span>Status: <span id="gameStatus">Not started</span></span>
+        </div>
+
+        <div class="players-container">
+            <!-- Player 1 -->
+            <div class="player-panel" id="player1">
+                <div class="player-header">
+                    <h3>Player 1</h3>
+                    <span class="status disconnected" id="status1">Disconnected</span>
+                </div>
+                <div>
+                    <textarea class="json-input" placeholder='Enter JSON message...' id="input1">{ "action": "test" }</textarea>
+                    <button data-player="0">Send</button>
+                </div>
+                <div class="output" id="output1"></div>
+                <div class="json-tree-container">
+                    <div id="json-tree-1" data-jsontree-js="getPlayerData(0)"></div>
+                </div>
+            </div>
+
+            <!-- Player 2 -->
+            <div class="player-panel" id="player2">
+                <div class="player-header">
+                    <h3>Player 2</h3>
+                    <span class="status disconnected" id="status2">Disconnected</span>
+                </div>
+                <div>
+                    <textarea class="json-input" placeholder='Enter JSON message...' id="input2">{ "action": "test" }</textarea>
+                    <button data-player="1">Send</button>
+                </div>
+                <div class="output" id="output2"></div>
+                <div class="json-tree-container">
+                    <div id="json-tree-2" data-jsontree-js="getPlayerData(1)"></div>
+                </div>
+            </div>
+
+            <!-- Player 3 -->
+            <div class="player-panel" id="player3">
+                <div class="player-header">
+                    <h3>Player 3</h3>
+                    <span class="status disconnected" id="status3">Disconnected</span>
+                </div>
+                <div>
+                    <textarea class="json-input" placeholder='Enter JSON message...' id="input3">{ "action": "test" }</textarea>
+                    <button data-player="2">Send</button>
+                </div>
+                <div class="output" id="output3"></div>
+                <div class="json-tree-container">
+                    <div id="json-tree-3" data-jsontree-js="getPlayerData(2)"></div>
+                </div>
+            </div>
+
+            <!-- Player 4 -->
+            <div class="player-panel" id="player4">
+                <div class="player-header">
+                    <h3>Player 4</h3>
+                    <span class="status disconnected" id="status4">Disconnected</span>
+                </div>
+                <div>
+                    <textarea class="json-input" placeholder='Enter JSON message...' id="input4">{ "action": "test" }</textarea>
+                    <button data-player="3">Send</button>
+                </div>
+                <div class="output" id="output4"></div>
+                <div class="json-tree-container">
+                    <div id="json-tree-4" data-jsontree-js="getPlayerData(3)"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем скрипт json-tree.js -->
+    <script src="./node_modules/jjsontree.js/dist/jsontree.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

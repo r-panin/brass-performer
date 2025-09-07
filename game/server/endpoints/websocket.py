@@ -28,14 +28,14 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
     
     try:
         while True:
-            # Получаем сообщение от клиента
-            action_data = await websocket.receive_json()
-
-            # Парсим-парсим-парсим и сводит музыка с ума
-            action = parse_action(action_data)
-            
-            # Применяем действие к игровому состоянию
             try:
+                # Получаем сообщение от клиента
+                action_data = await websocket.receive_json()
+
+                # Парсим-парсим-парсим и сводит музыка с ума
+                action = parse_action(action_data)
+                
+                # Применяем действие к игровому состоянию
                 # Здесь будет метод для применения действия
                 action_result = game.play_action(action, color)
                 await websocket.send_json(action_result.model_dump())
