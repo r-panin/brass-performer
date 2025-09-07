@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Client Tester</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Подключаем стили json-tree.js -->
-    <link rel="stylesheet" href="./node_modules/jjsontree.js/dist/jsontree.js.css">
 </head>
 <body>
     <div class="container">
@@ -30,7 +28,7 @@
                 </div>
                 <div class="output" id="output1"></div>
                 <div class="json-tree-container">
-                    <div id="json-tree-1" data-jsontree-js="getPlayerData(0)"></div>
+                    <div class="json-tree" id="json-tree-1"></div>
                 </div>
             </div>
 
@@ -46,7 +44,7 @@
                 </div>
                 <div class="output" id="output2"></div>
                 <div class="json-tree-container">
-                    <div id="json-tree-2" data-jsontree-js="getPlayerData(1)"></div>
+                    <div class="json-tree" id="json-tree-2"></div>
                 </div>
             </div>
 
@@ -62,7 +60,7 @@
                 </div>
                 <div class="output" id="output3"></div>
                 <div class="json-tree-container">
-                    <div id="json-tree-3" data-jsontree-js="getPlayerData(2)"></div>
+                    <div class="json-tree" id="json-tree-3"></div>
                 </div>
             </div>
 
@@ -78,14 +76,12 @@
                 </div>
                 <div class="output" id="output4"></div>
                 <div class="json-tree-container">
-                    <div id="json-tree-4" data-jsontree-js="getPlayerData(3)"></div>
+                    <div class="json-tree" id="json-tree-4"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Подключаем скрипт json-tree.js -->
-    <script src="./node_modules/jjsontree.js/dist/jsontree.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

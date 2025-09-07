@@ -3,8 +3,7 @@ const state = {
     gameId: null,
     playerTokens: [],
     sockets: [null, null, null, null],
-    connected: [false, false, false, false],
-    playerData: [{}, {}, {}, {}] // Данные для каждого игрока
+    connected: [false, false, false, false]
 };
 
 // Элементы UI
@@ -36,33 +35,117 @@ const treeElements = [
     document.getElementById('json-tree-4')
 ];
 
-// Функция для получения данных игрока (используется json-tree.js)
-function getPlayerData(playerIndex) {
-    return {
-        data: state.playerData[playerIndex]
-    };
-}
-
-// Функция обновления JSON дерева
-function updateJsonTree(playerIndex, data) {
-    state.playerData[playerIndex] = data;
+// Легковесная функция для создания JSON дерева
+function createJsonTree(data, container) {
+    container.innerHTML = '';
     
-    // Переинициализируем дерево с новыми данными
-    const treeElement = treeElements[playerIndex];
-    treeElement.setAttribute('data-jsontree-js', `getPlayerData(${playerIndex})`);
-    
-    // Инициализируем json-tree
-    if (window.JsonTree) {
-        // Удаляем старый экземпляр, если есть
-        if (treeElement._jsonTreeInstance) {
-            treeElement._jsonTreeInstance.destroy();
+    // Рекурсивная функция для создания узлов дерева
+    function createNode(value, key = null, isLast = true) {
+        const node = document.createElement('div');
+        node.className = 'node';
+        
+        const type = typeof value;
+        const isArray = Array.isArray(value);
+        const isObject = value !== null && type === 'object' && !isArray;
+        
+        if (isObject || isArray) {
+            // Создаем узел для объекта или массива
+            const toggle = document.createElement('span');
+            toggle.className = 'toggle';
+            toggle.textContent = '+';
+            toggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                node.classList.toggle('expanded');
+                node.classList.toggle('collapsed');
+                toggle.textContent = node.classList.contains('expanded') ? '-' : '+';
+            });
+            
+            const bracket = document.createElement('span');
+            bracket.className = 'bracket';
+            bracket.textContent = isArray ? '[' : '{';
+            
+            const children = document.createElement('div');
+            children.className = 'children';
+            
+            // Добавляем дочерние элементы
+            const entries = isArray ? 
+                value.map((v, i) => [i, v]) : 
+                Object.entries(value);
+            
+            entries.forEach(([k, v], i) => {
+                const childNode = createNode(v, k, i === entries.length - 1);
+                children.appendChild(childNode);
+            });
+            
+            const closingBracket = document.createElement('span');
+            closingBracket.className = 'bracket';
+            closingBracket.textContent = isArray ? ']' : '}';
+            
+            if (key !== null) {
+                const keySpan = document.createElement('span');
+                keySpan.className = 'key';
+                keySpan.textContent = `"${key}": `;
+                
+                node.appendChild(toggle);
+                node.appendChild(keySpan);
+                node.appendChild(bracket);
+            } else {
+                node.appendChild(toggle);
+                node.appendChild(bracket);
+            }
+            
+            node.appendChild(children);
+            node.appendChild(closingBracket);
+            
+            if (!isLast) {
+                const separator = document.createElement('span');
+                separator.className = 'separator';
+                separator.textContent = ',';
+                node.appendChild(separator);
+            }
+            
+            // Изначально сворачиваем узлы
+            node.classList.add('collapsed');
+        } else {
+            // Создаем узел для примитивного значения
+            const valueSpan = document.createElement('span');
+            
+            if (key !== null) {
+                const keySpan = document.createElement('span');
+                keySpan.className = 'key';
+                keySpan.textContent = `"${key}": `;
+                node.appendChild(keySpan);
+            }
+            
+            if (type === 'string') {
+                valueSpan.className = 'value-string';
+                valueSpan.textContent = `"${value}"`;
+            } else if (type === 'number') {
+                valueSpan.className = 'value-number';
+                valueSpan.textContent = value;
+            } else if (type === 'boolean') {
+                valueSpan.className = 'value-boolean';
+                valueSpan.textContent = value;
+            } else if (value === null) {
+                valueSpan.className = 'value-null';
+                valueSpan.textContent = 'null';
+            }
+            
+            node.appendChild(valueSpan);
+            
+            if (!isLast) {
+                const separator = document.createElement('span');
+                separator.className = 'separator';
+                separator.textContent = ',';
+                node.appendChild(separator);
+            }
         }
         
-        // Создаем новый экземпляр
-        treeElement._jsonTreeInstance = JsonTree.create(treeElement, {
-            data: data
-        });
+        return node;
     }
+    
+    const rootNode = createNode(data);
+    container.appendChild(rootNode);
 }
 
 // Обработчик кнопки "Start Game"
@@ -153,16 +236,16 @@ function setupWebSocket(playerIndex) {
             // Парсим входящие данные
             const data = JSON.parse(event.data);
             const formatted = JSON.stringify(data, null, 2);
-            console.log(`Received data: ${event.data}`)
             outputElements[playerIndex].textContent += `Received: ${formatted}\n`;
             
             // Обновляем дерево JSON
-            updateJsonTree(playerIndex, data);
+            createJsonTree(data, treeElements[playerIndex]);
             
             // Автопрокрутка к новому сообщению
             outputElements[playerIndex].scrollTop = outputElements[playerIndex].scrollHeight;
         } catch (e) {
             outputElements[playerIndex].textContent += `Received: ${event.data}\n`;
+            treeElements[playerIndex].textContent = "Non-JSON response";
         }
     };
     
@@ -220,12 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Инициализируем json-tree для каждого игрока
-    if (window.JsonTree) {
-        treeElements.forEach((element, index) => {
-            element._jsonTreeInstance = JsonTree.create(element, {
-                data: state.playerData[index]
-            });
-        });
-    }
+    // Инициализируем JSON деревья с пустыми данными
+    treeElements.forEach(element => {
+        element.textContent = "No data received yet";
+    });
 });

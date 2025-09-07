@@ -82,6 +82,11 @@ textarea {
     border: 1px solid #ddd;
     margin-bottom: 10px;
 }
+.json-tree {
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
 .status {
     display: inline-block;
     padding: 3px 8px;
@@ -103,38 +108,46 @@ textarea {
     font-size: 12px;
 }
 
-/* Стили для json-tree.js */
-.jt-container {
-    font-family: monospace;
-    font-size: 12px;
+/* Стили для легковесного JSON дерева */
+.json-tree .node {
+    margin: 2px 0;
+    padding-left: 15px;
+    position: relative;
 }
-
-.jt-key {
+.json-tree .node.collapsed > .children {
+    display: none;
+}
+.json-tree .node.expanded > .children {
+    display: block;
+}
+.json-tree .toggle {
+    position: absolute;
+    left: 0;
+    width: 12px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+}
+.json-tree .key {
     color: #881391;
     font-weight: bold;
 }
-
-.jt-string {
+.json-tree .value-string {
     color: #c41a16;
 }
-
-.jt-number {
+.json-tree .value-number {
     color: #1c00cf;
 }
-
-.jt-boolean {
+.json-tree .value-boolean {
     color: #0d22aa;
 }
-
-.jt-null {
+.json-tree .value-null {
     color: #808080;
 }
-
-.jt-toggle {
-    cursor: pointer;
-    margin-right: 4px;
-    user-select: none;
-    display: inline-block;
-    width: 12px;
-    text-align: center;
+.json-tree .bracket {
+    color: #000;
+    font-weight: bold;
+}
+.json-tree .separator {
+    color: #000;
 }
