@@ -5,7 +5,7 @@ from collections import deque
 import math
 import json
 import hashlib
-from .common import ActionType, ResourceType, ResourceAmounts
+from .common import IndustryType, ResourceType, ResourceAmounts
 
 
 class GameEntity(BaseModel):
@@ -23,18 +23,20 @@ class GameEntity(BaseModel):
         serialized = json.dumps(model_dict, sort_keys=True, default=str)
         return hashlib.md5(serialized.encode()).hexdigest()
 
+class ActionContext(StrEnum):
+    MAIN = 'main'
+    BUILD = 'build'
+    SELL = 'sell'
+    NETWORK = 'network'
+    SCOUT = 'scout'
+    DEVELOP = 'develop'
+    PASS = 'pass'
+    AWAITING_COMMIT = 'awaiting_commit'
+
 class GameStatus(StrEnum):
     CREATED = 'created'
     ONGOING = 'ongoing'
     COMPLETE = 'complete'
-
-class IndustryType(StrEnum):
-    COAL = "coal"
-    IRON = "iron"
-    BREWERY = "brewery"
-    COTTON = "cotton"
-    BOX = "box"
-    POTTERY = "pottery"
 
 class PlayerColor(StrEnum):
     WHITE = "white"
@@ -225,8 +227,7 @@ class BoardState(BaseModel):
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wild_deck: List[Card]
-    previous_action: Optional[ActionType] = None,
-    previous_actor: Optional[PlayerColor] = None
+    action_context = ActionContext
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
@@ -402,10 +403,16 @@ class PlayerState(BaseModel):
     your_hand: Dict[int, Card]
     your_color: PlayerColor
 
-class ValidationResult(BaseModel):
-    is_valid: bool
+class OutputToPlayer(BaseModel):
     message: Optional[str] = None
 
-class ExecutionResult(BaseModel):
+class ValidationResult(OutputToPlayer):
+    is_valid: bool
+
+class ExecutionResult(OutputToPlayer):
     executed: bool
-    message: Optional[str] = None
+
+class ActionProcessResult(OutputToPlayer):
+    processed: bool
+    awaiting: list[str]
+    provisional_state: BoardStateExposed

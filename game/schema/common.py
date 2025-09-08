@@ -5,16 +5,10 @@ from typing import Optional, Literal
 class ActionType(StrEnum):
     BUILD = 'build'
     SELL = 'sell'
-    SELL_STEP = 'sell_step'
-    SELL_END = 'sell_end'
     LOAN = 'loan'
     SCOUT = 'scout'
     DEVELOP = 'develop'
-    DEVELOP_DOUBLE = 'develop_double'
-    DEVELOP_END = 'develop_end'
     NETWORK = 'network'
-    NETWORK_DOUBLE = 'network_double'
-    NETWORK_END = 'network_end'
     PASS = 'pass'
 
 class ResourceType(StrEnum):
@@ -49,3 +43,11 @@ class ResourceStrategy(StrEnum):
 class AutoResourceSelection(BaseModel):
     mode: Literal["auto"]
     strategy: ResourceStrategy
+
+class IndustryType(StrEnum):
+    COAL = "coal"
+    IRON = "iron"
+    BREWERY = "brewery"
+    COTTON = "cotton"
+    BOX = "box"
+    POTTERY = "pottery"

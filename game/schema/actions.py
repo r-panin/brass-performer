@@ -1,15 +1,22 @@
 from pydantic import BaseModel, Field
-from typing import Literal, List, Union 
+from typing import Literal, List, Union
 from collections import defaultdict
-from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType
+from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType, IndustryType
 
-
-class BaseAction(BaseModel):
+'''
+Meta classes
+'''
+class MetaAction(BaseModel):
     action_type: ActionType
-    card_id: int 
+
+class ParameterAction(BaseModel):
+    card_id: int
+
+class IterativeAction(ParameterAction):
+    card_id: int | None = Field(default=None, exclude=True)
+    counter: int = 1
 
 class ResourceAction(BaseModel):
-    action_type: ActionType
     resources_used: Union[List[ResourceSource], AutoResourceSelection]
 
     def is_auto_resource_selection(self):
@@ -30,65 +37,95 @@ class ResourceAction(BaseModel):
             beer=amounts.get(ResourceType.BEER, 0),
         )
     
-class BuildingAction(BaseModel):
-    building_id: int
+class IndustryAction(BaseModel):
+    industry = IndustryType
 
-class BuildAction(BaseAction, ResourceAction, BuildingAction):
+class SlotAction(BaseModel):
+    slot_id: int
+
+'''
+Action init classes
+'''
+class BuildStart(MetaAction):
     action_type: Literal[ActionType.BUILD] = ActionType.BUILD
-    slot_id: int # building slot ID
-    
-class SellAction(BaseAction, ResourceAction):
-    slot_id: int 
+
+class SellStart(MetaAction):
     action_type: Literal[ActionType.SELL] = ActionType.SELL
-
-class SellStep(ResourceAction, BuildingAction):
-    action_type: Literal[ActionType.SELL_STEP] = ActionType.SELL_STEP
-
-class SellEnd(BaseModel):
-    action_type: Literal[ActionType.SELL_END] = ActionType.SELL_END
-
-class LoanAction(BaseAction):
+    
+class LoanStart(MetaAction):
     action_type: Literal[ActionType.LOAN] = ActionType.LOAN
 
-class ScoutAction(BaseAction):
+class ScoutStart(MetaAction):
     action_type: Literal[ActionType.SCOUT] = ActionType.SCOUT
-    additional_card_cost: List[int] = Field(min_length=2, max_length=2) # card ids
 
-class DevelopAction(BaseAction, ResourceAction, BuildingAction):
+class DevelopStart(MetaAction):
     action_type: Literal[ActionType.DEVELOP] = ActionType.DEVELOP
 
-class DevelopDouble(ResourceAction, BuildingAction):
-    action_type: Literal[ActionType.DEVELOP_DOUBLE] = ActionType.DEVELOP_DOUBLE
-
-class DevelopEnd(BaseModel):
-    action_type: Literal[ActionType.DEVELOP_END] = ActionType.DEVELOP_END
-
-class NetworkAction(BaseAction, ResourceAction):
+class NetworkStart(MetaAction):
     action_type: Literal[ActionType.NETWORK] = ActionType.NETWORK
-    link_id: int
 
-class NetworkDouble(ResourceAction):
-    action_type: Literal[ActionType.NETWORK_DOUBLE] = ActionType.NETWORK_DOUBLE
-    link_id: int
-
-class NetworkEnd(BaseModel):
-    action_type: Literal[ActionType.NETWORK_END] = ActionType.NETWORK_END
-    
-class PassAction(BaseAction):
+class PassStart(MetaAction):
     action_type: Literal[ActionType.PASS] = ActionType.PASS
 
-Action = Union[
-    BuildAction, 
-    SellAction, 
-    LoanAction, 
-    ScoutAction, 
-    DevelopAction, 
-    NetworkAction, 
-    PassAction,
-    SellStep,
-    SellEnd,
-    NetworkDouble,
-    NetworkEnd,
-    DevelopDouble,
-    DevelopEnd
+'''
+Specific action selections
+'''
+class BuildSelection(ParameterAction, ResourceAction, IndustryAction, SlotAction):
+    pass
+
+class SellSelection(ParameterAction, ResourceAction, SlotAction):
+    pass
+
+class SellIteration(IterativeAction, ResourceAction, SlotAction):
+    pass
+
+class ScoutSelection(ParameterAction):
+    additional_card_cost: List[int] = Field(min_length=2, max_length=2) # card ids
+
+class DevelopSelection(ParameterAction, ResourceAction, IndustryAction):
+    pass
+
+class DevelopIteration(IterativeAction, ResourceAction, IndustryAction):
+    pass
+
+class NetworkSelection(ParameterAction, ResourceAction):
+    link_id: int
+
+class NetworkIteration(IterativeAction, ResourceAction):
+    link_id: int
+
+class LoanSelection(ParameterAction):
+    pass
+
+class PassSelection(ParameterAction):
+    pass
+
+'''
+This ends the pain
+'''
+
+class CommitAction(BaseModel):
+    commit: bool
+
+MetaActions = Union[
+    LoanStart,
+    PassStart,
+    SellStart,
+    BuildStart,
+    ScoutStart,
+    DevelopStart,
+    NetworkStart
+]
+
+ParameterActions = Union[
+    LoanSelection,
+    PassSelection,
+    SellSelection,
+    SellIteration,
+    BuildSelection,
+    ScoutSelection,
+    DevelopSelection,
+    DevelopIteration,
+    NetworkSelection,
+    NetworkIteration
 ]

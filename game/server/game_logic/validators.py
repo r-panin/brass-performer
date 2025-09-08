@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, Action, Building, CardType, ResourceAmounts, Player, BuildingAction, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, PassAction, ScoutAction, NetworkAction, DevelopAction, ResourceAction, BuildAction, SellAction, LoanAction, ActionType
-from typing import Dict, List
+from ...schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, ResourceType, ResourceSourceType, IndustryType, ResourceAction, ActionType, ParameterAction, IterativeAction, PassSelection, ScoutSelection, DevelopSelection, DevelopIteration, NetworkIteration, NetworkSelection, SellIteration, SellSelection, BuildSelection, LoanSelection
+from typing import List
 from collections import defaultdict
 
 
@@ -9,30 +9,25 @@ class ActionValidator(ABC):
         super().__init__()
 
     @abstractmethod
-    def validate(self, action: Action, game_state:BoardState, player: Player):
+    def validate(self, action: ParameterAction, game_state:BoardState, player: Player):
         pass
 
-def validate_card_in_hand(disable=False):
-    def decorator(func):
-        def wrapper(self:BaseValidator, action:Action, game_state:BoardState, player:Player):
-            if disable:
-                return func(self, action, game_state, player)
-            if action.card_id not in player.hand:
-                return ValidationResult(is_valid=False, message="Card not in player's hand")
+def validate_card_in_hand(func):
+    def wrapper(self:BaseValidator, action:ParameterAction, game_state:BoardState, player:Player):
+        if isinstance(action, IterativeAction):
             return func(self, action, game_state, player)
-        return wrapper
-    return decorator
-
-def validate_move_order(func):
-    def wrapper(self:BaseValidator, action:Action, game_state:BoardState, player:Player):
-        if game_state.current_turn != player.color:
-            return ValidationResult(is_valid=False, message=f"Attempted move by {player.color}, current turn is {game_state.current_turn}")
+        if action.card_id not in player.hand:
+            return ValidationResult(is_valid=False, message="Card not in player's hand")
         return func(self, action, game_state, player)
     return wrapper
 
 def validate_resources(func):
     def wrapper(self:BaseValidator, action:ResourceAction, game_state:BoardState, player:Player):
         if not action.is_auto_resource_selection():
+            
+            base_cost_validation = self._validate_base_action_cost(action, game_state,player)
+            if not base_cost_validation.is_valid:
+                return base_cost_validation
 
             preference_validation = self._validate_iron_preference(game_state, action.resources_used)
             if not preference_validation.is_valid:
@@ -42,10 +37,6 @@ def validate_resources(func):
             if not coal_validation.is_valid:
                 return coal_validation
             
-            base_cost_validation = self._validate_base_action_cost(action, game_state,player)
-            if not base_cost_validation.is_valid:
-                return base_cost_validation
-
             market_coal = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET and resource.resource_type == ResourceType.COAL]
             market_coal_amount = sum(resource.amount for resource in market_coal)
             market_iron = [resource for resource in action.resources_used if resource.source_type == ResourceSourceType.MARKET and resource.resource_type == ResourceType.IRON]
@@ -58,29 +49,8 @@ def validate_resources(func):
         return func(self, action, game_state, player)
     return wrapper
 
-def validate_building_is_valid(func):
-    def wrapper(self:BaseValidator, action:BuildingAction, game_state:BoardState, player:Player):
-        building = action.building_id
-        if building not in player.available_buildings:
-            return ValidationResult(is_valid=False, message=f"Building ID {building} not in player's roster")
-
-        building_validation = self._validate_lowest_level_building(building, player)
-        if not building_validation.is_valid:
-            building_validation
-        return func(self, action, game_state, player)
-    return wrapper
-
 class BaseValidator(ActionValidator, ABC):
-    def validate(self, action:PassAction, game_state:BoardState, player:Player) -> True:
-        return ValidationResult(is_valid=True)
-    
-    def _validate_lowest_level_building(self, building_id:str, player:Player) -> ValidationResult:
-        building = player.available_buildings.get(building_id)
-        if not building:
-            return ValidationResult(is_valid=False, message=f"Building {building_id} is not present in player's roster")
-        for b in player.available_buildings.values():
-            if b.industry_type == building.industry_type and b.level < building.level:
-                return ValidationResult(is_valid=False, message=f"Building {b.id} has priority")
+    def validate(self, action:ParameterAction, game_state:BoardState, player:Player) -> True:
         return ValidationResult(is_valid=True)
     
     def _validate_iron_preference(self, game_state:BoardState, resources: List[ResourceSource]) -> ValidationResult:
@@ -147,15 +117,13 @@ class BaseValidator(ActionValidator, ABC):
     
     
 class PassValidator(BaseValidator):
-    @validate_move_order
-    @validate_card_in_hand()
-    def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
+    @validate_card_in_hand
+    def validate(self, action:PassSelection, game_state:BoardState, player:Player):
         return ValidationResult(is_valid=True)
     
 class ScoutValidator(BaseValidator):
-    @validate_move_order
-    @validate_card_in_hand()
-    def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
+    @validate_card_in_hand
+    def validate(self, action:ScoutSelection, game_state:BoardState, player:Player):
         for card in action.additional_card_cost:
             if not card in player.hand:
                 return ValidationResult(is_valid=False, message="Smart guy, huh")
@@ -164,50 +132,27 @@ class ScoutValidator(BaseValidator):
         return ValidationResult(is_valid=True)
 
 class LoanValidator(BaseValidator):
-    @validate_move_order
-    @validate_card_in_hand()
-    def validate(self, action:LoanAction, game_state:BoardState, player:Player):
+    @validate_card_in_hand
+    def validate(self, action:LoanSelection, game_state:BoardState, player:Player):
         if player.income_points < 3:
             return ValidationResult(is_valid=False, message="Income cannot fall below -10")
         return ValidationResult(is_valid=True)
             
 class DevelopValidator(BaseValidator): 
-    @validate_move_order
-    @validate_card_in_hand()
-    @validate_building_is_valid
+    @validate_card_in_hand
     @validate_resources
-    def validate(self, action:DevelopAction, game_state:BoardState, player:Player):
+    def validate(self, action:DevelopSelection|DevelopIteration, game_state:BoardState, player:Player):
         return ValidationResult(is_valid=True)
     
-    def _validate_base_action_cost(self, action:DevelopAction, game_state, player):
+    def _validate_base_action_cost(self, action:DevelopSelection|DevelopIteration, game_state, player):
         target_cost = ResourceAmounts(iron=1)
         if action.get_resource_amounts() != target_cost:
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
 
-
-class DevelopDoubleValidator(DevelopValidator):
-    @validate_move_order
-    @validate_card_in_hand(disable=True)
-    @validate_building_is_valid
-    @validate_resources
-    def validate(self, action, game_state, player):
-        return super().validate(action, game_state, player)()
-    
-    def _validate_base_action_cost(self, action, game_state, player):
-        return super()._validate_base_action_cost(action, game_state, player)
-
-class DevelopEndValidator(BaseValidator):
-    @validate_move_order
-    def validate(self, action, game_state, player):
-        if not (game_state.previous_actor == player.color and game_state.previous_action in (ActionType.DEVELOP, ActionType.DEVELOP_DOUBLE)):
-            return ValidationResult(is_valid=False, message="Action must follow a develop action")
-        return ValidationResult(is_valid=True)
-
 class NetworkValidator(BaseValidator):
-    @validate_move_order
-    @validate_card_in_hand()
+    @validate_card_in_hand
     @validate_resources
-    def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
+    def validate(self, action:NetworkSelection|NetworkIteration, game_state:BoardState, player:Player):
         link = game_state.links.get(action.link_id)
         if not link:
             return ValidationResult(is_valid=False, message=f"Link {action.link_id} does not exist")
@@ -215,43 +160,26 @@ class NetworkValidator(BaseValidator):
         if link.owner is not None:
             return ValidationResult(is_valid=False, message=f"Link {link.id} is already owned by {link.owner}")
         
+        if game_state.era not in link.type:
+            return ValidationResult(is_valid=False, message=f"Link {link.id} doesn't support transport type {game_state.era}")
+        
         network = game_state.get_player_network(player.color)
         if not network:
             if not set(link.cities) & network:
                 return ValidationResult(is_valid=False, message="Link not in player's network")
 
-    def _validate_base_action_cost(self, action:NetworkAction, game_state:BoardState, player):
+    def _validate_base_action_cost(self, action:NetworkSelection|NetworkIteration, game_state:BoardState, player):
         base_link_cost = game_state.get_link_cost()
         if base_link_cost != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
             
 
-class NetworkDoubleValidator(NetworkValidator):
-    @validate_move_order
-    @validate_card_in_hand(disable=True)
-    def validate(self, action, game_state, player):
-        return super().validate(action, game_state, player)
-    
-    def _validate_base_action_cost(self, action, game_state, player):
-        base_link_cost = game_state.get_link_cost(double=True)
-        if base_link_cost != action.get_resource_amounts():
-            return ValidationResult(is_valid=False, message="Base action cost doens't match")
-
-class NetworkEndValidator(BaseValidator):
-    @validate_move_order
-    def validate(self, action, game_state, player):
-        if not (game_state.previous_actor == player.color and game_state.previous_action is ActionType.NETWORK):
-            return ValidationResult(is_valid=False, message="Action must follow a network action. God I hope someone doing double rail didn't get stuck")
-        return ValidationResult(is_valid=True)
-
 class BuildValidator(BaseValidator):
     OVERBUILDABLE = (IndustryType.IRON, IndustryType.COAL)
 
-    @validate_move_order
-    @validate_card_in_hand()
-    @validate_building_is_valid
+    @validate_card_in_hand
     @validate_resources
-    def validate(self, action:BuildAction, game_state, player):
+    def validate(self, action:BuildSelection, game_state, player):
         card = player.hand[action.card_id]
         building = player.available_buildings[action.building_id]
         slot = game_state.get_building_slot(action.slot_id)
@@ -300,16 +228,15 @@ class BuildValidator(BaseValidator):
 
         return ValidationResult(is_valid=True)  
 
-    def _validate_base_action_cost(self, action:BuildAction, game_state, player:Player):
+    def _validate_base_action_cost(self, action:BuildSelection, game_state, player:Player):
         building = player.available_buildings[action.building_id]
         if building.get_cost() != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Building base cost doens't match resource selecion")
         return ValidationResult(is_valid=True)
 
 class SellValidator(BaseValidator):
-    @validate_move_order
-    @validate_card_in_hand()
-    def validate(self, action:SellAction, game_state:BoardState, player:Player):
+    @validate_card_in_hand
+    def validate(self, action:SellSelection|SellIteration, game_state:BoardState, player:Player):
         slot = game_state.get_building_slot(action.slot_id)
         if not slot.building_placed:
             return ValidationResult(is_valid=False, message=f"Slot {action.slot_id} does not contain a building")
@@ -333,18 +260,3 @@ class SellValidator(BaseValidator):
         required_amounts = ResourceAmounts(beer=slot.building_placed.sell_cost)
         if offered_amounts != required_amounts:
             return ValidationResult(is_valid=False, message=f"Action requires {required_amounts}, offered are {offered_amounts}")
-
-
-class SellStepValidator(SellValidator):
-    @validate_move_order
-    @validate_card_in_hand(disable=True)
-    def validate(self, action, game_state, player):
-        return super().validate(action, game_state, player)
-
-class SellEndValidator(BaseValidator):
-    @validate_move_order
-    def validate(self, action, game_state, player):
-        allowed_from = (ActionType.SELL, ActionType.SELL_STEP)
-        if not (game_state.previous_actor == player.color and game_state.previous_action in allowed_from):
-            return ValidationResult(is_valid=False, message=f"Action must follow actions {allowed_from}, is following {game_state.previous_action}")
-        return True

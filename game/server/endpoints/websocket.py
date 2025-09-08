@@ -37,7 +37,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 
                 # Применяем действие к игровому состоянию
                 # Здесь будет метод для применения действия
-                action_result = game.play_action(action, color)
+                action_result = game.process_action(action, color)
                 await websocket.send_json(action_result.model_dump())
                 
                 # Отправляем обновленное состояние всем игрокам
@@ -47,11 +47,13 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 await websocket.send_json({
                     "error": str(e)
                 })
+                continue
             except ValidationError as e:
                 await websocket.send_json({
                     "error": "Validation error",
                     "details": e.errors()
                 })
+                continue
                 
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket, game_id)

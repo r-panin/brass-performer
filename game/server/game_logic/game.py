@@ -1,4 +1,4 @@
-from ...schema import BoardState, Player, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, Action, ExecutionResult, CardType
+from ...schema import BoardState, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, CommitAction, MetaActions, ParameterActions, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict
 import random
 from pathlib import Path
@@ -7,7 +7,7 @@ from uuid import uuid4
 import logging
 import copy
 from .validation_service import ActionValidationService
-from ...schema import ResourceAction, AutoResourceSelection, ResourceSource, ResourceSourceType
+from ...schema import ResourceAction, AutoResourceSelection, ResourceSource
 
 
 
@@ -131,6 +131,8 @@ class Game:
         discard = []
 
         wild_deck = self._build_wild_deck()
+
+        action_context = ActionContext.MAIN
 
         #burn initial cards
         for _ in players:
@@ -279,22 +281,48 @@ class Game:
             your_color=color,
             your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
+
+    def process_action(self, action:MetaActions|ParameterActions|CommitAction, color:PlayerColor) -> ActionProcessResult:
+        if not self.is_player_to_move():
+            return ActionProcessResult(is_valid=False, message=f"Attempted move by {player.color}, current turn is {self.state.current_turn}")
+        
+        if isinstance(action, MetaAction):
+            if self.state.action_context is not ActionContext.MAIN:
+                return ActionProcessResult(processed=False, message="Cannot submit a meta action outside of main context", awaiting=self.get_expected_params())
+            self.provisional_state = self.state.model_copy(deep=True)
+            self.provisional_state.action_context = ActionContext(action.action_type)
+            return ActionProcessResult(processed=True, message=f"Entered {self.provisional_state.action_context}")
+
+        elif isinstance(action, ParameterAction):
+            player = self.state.players[color]
+            if action is ResourceAction:
+                if action.resources_used is AutoResourceSelection:
+                    action.resources_used = self._select_resources(action, player)
+            validation_result = self.validation_service.validate_action(action, self.state, player)
+            if not validation_result.is_valid:
+                return ExecutionResult(executed=False, message=validation_result.message)
+            self._apply_action(self.provisional_state, action, player)
+            return ActionProcessResult(processed=True, awaiting=self.get_expected_params())
+            
+        elif isinstance(action, CommitAction):
+            pass
+        else:
+            # I couldn't see this coming
+            return ActionProcessResult(processed=False, message="wowsers")
     
-    def play_action(self, action:Action, color:PlayerColor) -> ExecutionResult:
-        player = self.state.players[color]
-        if action is ResourceAction:
-            if action.resources_used is AutoResourceSelection:
-                action.resources_used = self._select_resources(action, player)
-        validation_result = self.validation_service.validate_action(action, self.state, player)
-        if not validation_result.is_valid:
-            return ExecutionResult(executed=False, message=validation_result.message)
-        return self._execute_action(action, player)
-    
-    def _execute_action(self, action:Action, player:Player) -> ExecutionResult:
+    def _apply_action(self, state:BoardState, action:ParameterAction, player:Player):
         pass
 
     def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
         pass
+
+    def get_expected_params(self):
+        return []
+    
+    def is_player_to_move(self, player:Player):
+        if self.state.current_turn != player.color:
+            return False
+        return True
         
 
 if __name__ == '__main__':
