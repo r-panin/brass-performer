@@ -24,6 +24,7 @@ class GameEntity(BaseModel):
         return hashlib.md5(serialized.encode()).hexdigest()
 
 class ActionContext(StrEnum):
+    END_OF_TURN = 'end_of_turn'
     MAIN = 'main'
     BUILD = 'build'
     SELL = 'sell'
@@ -31,6 +32,7 @@ class ActionContext(StrEnum):
     SCOUT = 'scout'
     DEVELOP = 'develop'
     PASS = 'pass'
+    LOAN = 'loan'
     AWAITING_COMMIT = 'awaiting_commit'
 
 class GameStatus(StrEnum):
@@ -56,6 +58,22 @@ class MerchantSlot(GameEntity):
     city: str
     merchant_type: MerchantType
     beer_available: bool = True 
+    
+    def buys(self) -> List[IndustryType]:
+        out = set()
+        for slot in self.merchant_slots.values:
+            if slot.merchant_type is MerchantType.ANY:
+                out.add(IndustryType.BOX)
+                out.add(IndustryType.COTTON)
+                out.add(IndustryType.POTTERY)
+                break
+            elif slot.merchant_type is MerchantType.POTTERY:
+                out.add(IndustryType.POTTERY)
+            elif slot.merchant_type is MerchantType.BOX:
+                out.add(IndustryType.BOX)
+            elif slot.merchant_type is MerchantType.COTTON:
+                out.add(IndustryType.COTTON)
+        return list(out)
 
 class LinkType(StrEnum):
     CANAL = "canal"
@@ -77,12 +95,17 @@ class Building(GameEntity):
     link_victory_points: int
     era_exclusion: Optional[LinkType]
 
-    def get_cost(self):
+    def get_cost(self) -> ResourceAmounts:
         return ResourceAmounts(
             iron=self.cost[ResourceType.IRON],
             coal=self.cost[ResourceType.COAL],
             money=self.cost[ResourceType.MONEY]
         )
+
+    def is_sellable(self) -> bool:
+        if self.industry_type in (IndustryType.BOX, IndustryType.COTTON, IndustryType.POTTERY):
+            return True
+        return False
 
 
 class BuildingSlot(GameEntity):
@@ -103,6 +126,7 @@ class City(GameEntity):
     is_merchant: bool
     merchant_slots: Optional[Dict[int, MerchantSlot]] = None
     merchant_min_players: Optional[int] = None
+
 
 class Market(BaseModel):
     coal_count: int = Field(le=14)
@@ -227,7 +251,7 @@ class BoardState(BaseModel):
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wild_deck: List[Card]
-    action_context = ActionContext
+    subaction_count: int = Field(default=0, exclude=True)
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
@@ -258,13 +282,6 @@ class BoardState(BaseModel):
     
     def market_access_exists(self, city_name: str):
         return self.find_paths(self, city_name, target_condition=lambda city: self.cities[city].is_merchant)
-
-    def find_connected_cities(self, city_name:str) -> Set:
-        out = set()
-        for link in self.links.values():
-            if city_name in link.cities:
-                out.add(set(link.cities))
-        return out
 
     def find_paths(
         self,
@@ -349,15 +366,16 @@ class BoardState(BaseModel):
 
         return found_cities if find_all else False
 
-    def get_building_slot(self, building_slot_id, get_city_name=False) -> Union[str, BuildingSlot]:
-        if get_city_name:
-            for city_name, city in self.cities.items():
-                if building_slot_id in city.slots:
-                    return city_name
-        else:
+    def get_building_slot(self, building_slot_id) -> BuildingSlot:
+        for city in self.cities.values():
+            if building_slot_id in city.slots:
+                return city.slots[building_slot_id]
+    
+    def get_merchant_slot(self, merchant_slot_id) -> MerchantSlot:
             for city in self.cities.values():
-                if building_slot_id in city.slots:
-                    return city.slots[building_slot_id]
+                if city.merchant_slots is not None:
+                    if merchant_slot_id in city.slots:
+                        return city.merchant_slots[merchant_slot_id]
 
     def get_resource_amount_in_city(self, city_name:str, resource_type:ResourceType) -> int:
         out = 0
@@ -382,11 +400,11 @@ class BoardState(BaseModel):
         
         return slot_cities | link_cities 
 
-    def get_link_cost(self, double=False):
+    def get_link_cost(self):
         if self.era == LinkType.CANAL:
             return ResourceAmounts(money=3)
         elif self.era == LinkType.RAIL:
-            if not double:
+            if self.subaction_count == 0:
                 return ResourceAmounts(money=5, coal=1)
             else:
                 return ResourceAmounts(money=10, coal=1, beer=1)
@@ -414,5 +432,6 @@ class ExecutionResult(OutputToPlayer):
 
 class ActionProcessResult(OutputToPlayer):
     processed: bool
-    awaiting: list[str]
-    provisional_state: BoardStateExposed
+    awaiting: Dict[str, List[str]]
+    provisional_state: Optional[BoardStateExposed] = None
+    end_of_turn: bool = False

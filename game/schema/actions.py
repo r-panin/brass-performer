@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, List, Union
+from typing import Literal, List, Union, Optional
 from collections import defaultdict
 from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType, IndustryType
 
@@ -7,14 +7,10 @@ from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceA
 Meta classes
 '''
 class MetaAction(BaseModel):
-    action_type: ActionType
+    action: ActionType
 
 class ParameterAction(BaseModel):
-    card_id: int
-
-class IterativeAction(ParameterAction):
-    card_id: int | None = Field(default=None, exclude=True)
-    counter: int = 1
+    card_id: Optional[int]
 
 class ResourceAction(BaseModel):
     resources_used: Union[List[ResourceSource], AutoResourceSelection]
@@ -38,7 +34,7 @@ class ResourceAction(BaseModel):
         )
     
 class IndustryAction(BaseModel):
-    industry = IndustryType
+    industry: IndustryType
 
 class SlotAction(BaseModel):
     slot_id: int
@@ -47,25 +43,25 @@ class SlotAction(BaseModel):
 Action init classes
 '''
 class BuildStart(MetaAction):
-    action_type: Literal[ActionType.BUILD] = ActionType.BUILD
+    action: Literal[ActionType.BUILD] = ActionType.BUILD
 
 class SellStart(MetaAction):
-    action_type: Literal[ActionType.SELL] = ActionType.SELL
+    action: Literal[ActionType.SELL] = ActionType.SELL
     
 class LoanStart(MetaAction):
-    action_type: Literal[ActionType.LOAN] = ActionType.LOAN
+    action: Literal[ActionType.LOAN] = ActionType.LOAN
 
 class ScoutStart(MetaAction):
-    action_type: Literal[ActionType.SCOUT] = ActionType.SCOUT
+    action: Literal[ActionType.SCOUT] = ActionType.SCOUT
 
 class DevelopStart(MetaAction):
-    action_type: Literal[ActionType.DEVELOP] = ActionType.DEVELOP
+    action: Literal[ActionType.DEVELOP] = ActionType.DEVELOP
 
 class NetworkStart(MetaAction):
-    action_type: Literal[ActionType.NETWORK] = ActionType.NETWORK
+    action: Literal[ActionType.NETWORK] = ActionType.NETWORK
 
 class PassStart(MetaAction):
-    action_type: Literal[ActionType.PASS] = ActionType.PASS
+    action: Literal[ActionType.PASS] = ActionType.PASS
 
 '''
 Specific action selections
@@ -76,29 +72,14 @@ class BuildSelection(ParameterAction, ResourceAction, IndustryAction, SlotAction
 class SellSelection(ParameterAction, ResourceAction, SlotAction):
     pass
 
-class SellIteration(IterativeAction, ResourceAction, SlotAction):
-    pass
-
 class ScoutSelection(ParameterAction):
     additional_card_cost: List[int] = Field(min_length=2, max_length=2) # card ids
 
 class DevelopSelection(ParameterAction, ResourceAction, IndustryAction):
     pass
 
-class DevelopIteration(IterativeAction, ResourceAction, IndustryAction):
-    pass
-
 class NetworkSelection(ParameterAction, ResourceAction):
     link_id: int
-
-class NetworkIteration(IterativeAction, ResourceAction):
-    link_id: int
-
-class LoanSelection(ParameterAction):
-    pass
-
-class PassSelection(ParameterAction):
-    pass
 
 '''
 This ends the pain
@@ -107,6 +88,9 @@ This ends the pain
 class CommitAction(BaseModel):
     commit: bool
 
+class EndOfTurnAction(BaseModel):
+    end_turn: bool
+
 MetaActions = Union[
     LoanStart,
     PassStart,
@@ -114,18 +98,21 @@ MetaActions = Union[
     BuildStart,
     ScoutStart,
     DevelopStart,
-    NetworkStart
+    NetworkStart,
 ]
 
-ParameterActions = Union[
-    LoanSelection,
-    PassSelection,
+Action = Union[
+    LoanStart,
+    PassStart,
+    SellStart,
+    BuildStart,
+    ScoutStart,
+    DevelopStart,
+    NetworkStart,
     SellSelection,
-    SellIteration,
     BuildSelection,
     ScoutSelection,
     DevelopSelection,
-    DevelopIteration,
     NetworkSelection,
-    NetworkIteration
+    CommitAction
 ]

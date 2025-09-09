@@ -41,7 +41,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 await websocket.send_json(action_result.model_dump())
                 
                 # Отправляем обновленное состояние всем игрокам
-                if action_result.executed:
+                if action_result.end_of_turn:
                     await connection_manager.broadcast(game_id, message=message_generator)
             except ValueError as e:
                 await websocket.send_json({

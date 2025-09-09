@@ -1,4 +1,4 @@
-from ...schema import BoardState, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, Link, MerchantType, MerchantSlot, Market, GameStatus, PlayerState, CommitAction, MetaActions, ParameterActions, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict
 import random
 from pathlib import Path
@@ -19,6 +19,21 @@ class Game:
     MERCHANTS_TOKENS_PATH = Path(RES_PATH /'merchant_tokens.json')
     LINKS_PATH = Path(RES_PATH / 'city_links.json')
     logging.basicConfig(level=logging.INFO)
+    ACTION_CONTEXT_MAP = {
+        ActionContext.MAIN: (MetaActions),
+        ActionContext.AWAITING_COMMIT: (CommitAction,),
+        ActionContext.BUILD: (BuildSelection,),
+        ActionContext.DEVELOP: (DevelopSelection, CommitAction),
+        ActionContext.NETWORK: (NetworkSelection, CommitAction),
+        ActionContext.PASS: (ParameterAction,),
+        ActionContext.SCOUT: (ScoutSelection,),
+        ActionContext.SELL: (SellSelection, CommitAction),
+        ActionContext.LOAN: (ParameterAction,),
+        ActionContext.END_OF_TURN: (EndOfTurnAction,)
+    }
+    SINGLE_ACTION_CONTEXTS = {ActionContext.BUILD, ActionContext.PASS, ActionContext.SCOUT, ActionContext.LOAN}
+    DOUBLE_ACTION_CONTEXTS = {ActionContext.NETWORK, ActionContext.DEVELOP}
+    MULTIPLE_ACTION_CONTEXTS = {ActionContext.SELL}
     def __repr__(self) -> str:
         # Основная информация об игре
         game_info = f"Game(id={self.id[:8]}..., players={len(self.state.players)}, era={self.state.era.value})"
@@ -105,10 +120,11 @@ class Game:
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
         self.validation_service = ActionValidationService()
+        self.action_context = ActionContext.MAIN
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state = self._create_initial_state(player_count, players_colors)
-        self.exposed_state = self.state.hide_state()
+        self.turn_state = self.state.model_copy(deep=True)
 
     def _create_initial_state(self, player_count: int, player_colors: List[PlayerColor]) -> BoardState:
         
@@ -132,7 +148,6 @@ class Game:
 
         wild_deck = self._build_wild_deck()
 
-        action_context = ActionContext.MAIN
 
         #burn initial cards
         for _ in players:
@@ -282,33 +297,80 @@ class Game:
             your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
 
-    def process_action(self, action:MetaActions|ParameterActions|CommitAction, color:PlayerColor) -> ActionProcessResult:
-        if not self.is_player_to_move():
-            return ActionProcessResult(is_valid=False, message=f"Attempted move by {player.color}, current turn is {self.state.current_turn}")
+    def process_action(self, action:Action, color:PlayerColor) -> ActionProcessResult:
+        if not self.is_player_to_move(color):
+            return ActionProcessResult(processed=False, message=f"Attempted move by {color}, current turn is {self.state.current_turn}", awaiting={}, current_context=self.action_context)
         
         if isinstance(action, MetaAction):
-            if self.state.action_context is not ActionContext.MAIN:
-                return ActionProcessResult(processed=False, message="Cannot submit a meta action outside of main context", awaiting=self.get_expected_params())
-            self.provisional_state = self.state.model_copy(deep=True)
-            self.provisional_state.action_context = ActionContext(action.action_type)
-            return ActionProcessResult(processed=True, message=f"Entered {self.provisional_state.action_context}")
+            if self.action_context is not ActionContext.MAIN:
+                return ActionProcessResult(processed=False, message="Cannot submit a meta action outside of main context", awaiting=self.get_expected_params(), current_context=self.action_context)
+            
+            self.action_state = self.turn_state.model_copy(deep=True)
+            self.action_context = ActionContext(action.action)
+            self.action_state.subaction_count = 0
+            return ActionProcessResult(processed=True, message=f"Entered {self.action_context}", awaiting=self.get_expected_params(), current_context=self.action_context)
 
         elif isinstance(action, ParameterAction):
-            player = self.state.players[color]
+            if not hasattr(self, 'action_state'):
+                return ActionProcessResult(
+                processed=False,
+                message="No active transaction. Start with meta action",
+                awaiting=self.get_expected_params(), current_context=self.action_context
+            )
+
+            player = self.action_state.players[color]
+
             if action is ResourceAction:
                 if action.resources_used is AutoResourceSelection:
                     action.resources_used = self._select_resources(action, player)
-            validation_result = self.validation_service.validate_action(action, self.state, player)
+
+            validation_result = self.validation_service.validate_action(action, self.action_state, player, self.action_context)
             if not validation_result.is_valid:
-                return ExecutionResult(executed=False, message=validation_result.message)
-            self._apply_action(self.provisional_state, action, player)
-            return ActionProcessResult(processed=True, awaiting=self.get_expected_params())
+                return ActionProcessResult(processed=False, message=validation_result.message, awaiting=self.get_expected_params(), current_context=self.action_context)
+            
+            self._apply_action(action, self.action_state, player)
+
+            self.action_state.subaction_count += 1
+            if self.action_state.subaction_count > 1 and self.action_context in self.SINGLE_ACTION_CONTEXTS:
+                self.action_context = ActionContext.AWAITING_COMMIT
+            elif self.action_state.subaction_count > 2 and self.action_context in self.DOUBLE_ACTION_CONTEXTS:
+                self.action_context = ActionContext.AWAITING_COMMIT
+
+            return ActionProcessResult(processed=True, provisional_state=self.action_state, awaiting=self.get_expected_params(), current_context=self.action_context)
             
         elif isinstance(action, CommitAction):
-            pass
+            if action.commit:
+
+                if self.action_state.subaction_count == 0:
+                    return ActionProcessResult(processed=False, message="No changes to state, nothing to commit", awaiting=self.get_expected_params(), current_context=self.action_context)
+                
+                self.turn_state = self.action_state.model_copy(deep=True)
+
+                self.turn_state.actions_left -= 1
+                if self.turn_state.actions_left > 0:
+                    self.action_context = ActionContext.MAIN
+
+                else:
+                    self.action_context = ActionContext.END_OF_TURN
+
+            else:
+                self.action_context = ActionContext.MAIN
+                return ActionProcessResult(processed=True, message=f'Unstaging action, returned to action context {self.action_context}', awaiting=self.get_expected_params(), current_context=self.action_context)
+
+        elif isinstance(action, EndOfTurnAction):
+            if action.end_turn:
+                self.state = self.turn_state.model_copy(deep=True)
+                self.pass_turn()
+                return ActionProcessResult(processed=True, end_of_turn=True, awaiting={})
+            
+            else:
+                self.turn_state = self.state
+                self.action_context = ActionContext.MAIN
+                return ActionProcessResult(processed=True, message='Reverted to turn start', provisional_state=self.turn_state.hide_state(), awaiting={}, current_context=self.action_context)
+            
         else:
             # I couldn't see this coming
-            return ActionProcessResult(processed=False, message="wowsers")
+            return ActionProcessResult(processed=False, message="wowsers", awaiting={'W': ('T', 'F')}, current_context=self.action_context)
     
     def _apply_action(self, state:BoardState, action:ParameterAction, player:Player):
         pass
@@ -316,11 +378,31 @@ class Game:
     def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
         pass
 
-    def get_expected_params(self):
-        return []
+    def get_expected_params(self) -> Dict[str, List[str]]:
+        classes = self.ACTION_CONTEXT_MAP[self.action_context]
+        out = {}
+
+        for cls in classes:
+            fields = cls.model_fields.keys()
+            if self.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
+                if self.action_state.subaction_count > 0 and 'card_id' in fields:
+                    fields.remove('card_id')
+                elif self.action_state.subaction_count == 0 and cls.__name__ == 'CommitAction':
+                    continue  # Пропускаем CommitAction если нет изменений
+            out[cls.__name__] = fields
+        
+        return out
+
     
-    def is_player_to_move(self, player:Player):
-        if self.state.current_turn != player.color:
+    def validate_action_context(self, action_context, action) -> ValidationResult:
+            allowed_actions = self.ACTION_CONTEXT_MAP.get(action_context)
+            is_allowed = isinstance(action, allowed_actions) if allowed_actions else False
+            if not is_allowed:
+                return ValidationResult(is_valid=False, message=f'Action is not appropriate for context {action_context}')
+            return ValidationResult(is_valid=True)
+
+    def is_player_to_move(self, color:PlayerColor):
+        if self.state.current_turn != color:
             return False
         return True
         
