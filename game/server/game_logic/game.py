@@ -1,5 +1,5 @@
 from ...schema import BoardState, ResourceSourceType, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
-from typing import List, Dict
+from typing import List, Dict, get_args
 import random
 from pathlib import Path
 import json
@@ -21,7 +21,7 @@ class Game:
     LINKS_PATH = Path(RES_PATH / 'city_links.json')
     logging.basicConfig(level=logging.INFO)
     ACTION_CONTEXT_MAP = {
-        ActionContext.MAIN: (MetaActions),
+        ActionContext.MAIN: get_args(MetaAction),
         ActionContext.AWAITING_COMMIT: (CommitAction,),
         ActionContext.BUILD: (BuildSelection,),
         ActionContext.DEVELOP: (DevelopSelection, CommitAction),
@@ -43,6 +43,7 @@ class Game:
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
         self.validation_service = ActionValidationService()
+        logging.basicConfig(level=logging.DEBUG)
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state_manager = GameStateManager(self._create_initial_state(player_count, players_colors))
@@ -218,6 +219,7 @@ class Game:
         )
 
     def process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
+        print(f'RECEIVED ACTION OF TYPE {type(action)}')
         # Проверяем, может ли игрок делать ход
         if not self.is_player_to_move(color):
             return ActionProcessResult(

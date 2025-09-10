@@ -1,13 +1,15 @@
+from typing import Any, Dict
 from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
+
 from ..dependancies import get_connection_manager, get_game_manager, get_action_parser
 from ..managers import ConnectionManager, GameManager
-from ...schema import PlayerColor
+from ...schema import PlayerColor, ActionType, Action, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart
 from pydantic import ValidationError
 
 router = APIRouter()
 
 @router.websocket("/ws/{game_id}/player/{player_token}")
-async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: str, connection_manager:ConnectionManager=Depends(get_connection_manager), game_manager:GameManager=Depends(get_game_manager), parse_action:callable=Depends(get_action_parser)):
+async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: str, connection_manager:ConnectionManager=Depends(get_connection_manager), game_manager:GameManager=Depends(get_game_manager)):
     if not game_manager.validate_token(game_id, player_token):
         await websocket.close(code=4001, reason="Game not started or invalid token")
 
@@ -62,3 +64,42 @@ def create_board_state_message(game):
     def board_state_generator(websocket:WebSocket, player_color:PlayerColor):
         return game.get_player_state(player_color).model_dump()
     return board_state_generator
+
+def parse_action(data: Dict[str, Any]) -> Action:
+    # Сначала проверяем наличие уникальных полей для каждого типа действия
+    if "additional_card_cost" in data:
+        return ScoutSelection(**data)
+    elif "link_id" in data:
+        return NetworkSelection(**data)
+    elif "slot_id" in data and "industry" in data:
+        return BuildSelection(**data)
+    elif "slot_id" in data:
+        return SellSelection(**data)
+    elif "industry" in data:
+        return DevelopSelection(**data)
+    elif "card_id" in data:
+        return ParameterAction(**data)
+    elif "commit" in data:
+        return CommitAction(**data)
+    elif "end_turn" in data:
+        return EndOfTurnAction(**data)
+    
+    # Затем проверяем действия Start
+    action_type = data.get("action")
+    if action_type == ActionType.LOAN:
+        return LoanStart(**data)
+    elif action_type == ActionType.PASS:
+        return PassStart(**data)
+    elif action_type == ActionType.SELL:
+        return SellStart(**data)
+    elif action_type == ActionType.BUILD:
+        return BuildStart(**data)
+    elif action_type == ActionType.SCOUT:
+        return ScoutStart(**data)
+    elif action_type == ActionType.DEVELOP:
+        return DevelopStart(**data)
+    elif action_type == ActionType.NETWORK:
+        return NetworkStart(**data)
+    
+    # Если ни один тип не подошел
+    raise ValueError(f"Неизвестный тип действия: {data}")

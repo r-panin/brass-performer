@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Union, Optional
 from collections import defaultdict
 from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType, IndustryType
@@ -8,9 +8,11 @@ Meta classes
 '''
 class MetaAction(BaseModel):
     action: ActionType
+    model_config = ConfigDict(extra='forbid')  
 
 class ParameterAction(BaseModel):
     card_id: Optional[int]
+    model_config = ConfigDict(extra='forbid')  
 
 class ResourceAction(BaseModel):
     resources_used: Union[List[ResourceSource], AutoResourceSelection]
@@ -87,9 +89,11 @@ This ends the pain
 
 class CommitAction(BaseModel):
     commit: bool
+    model_config = ConfigDict(extra='forbid')  
 
 class EndOfTurnAction(BaseModel):
     end_turn: bool
+    model_config = ConfigDict(extra='forbid')  
 
 MetaActions = Union[
     LoanStart,
