@@ -1,4 +1,4 @@
-from ...schema import BoardState, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ResourceSourceType, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict
 import random
 from pathlib import Path
@@ -8,6 +8,7 @@ import logging
 import copy
 from .validation_service import ActionValidationService
 from ...schema import ResourceAction, AutoResourceSelection, ResourceSource
+from .game_state_manager import GameStateManager, GamePhase
 
 
 
@@ -31,88 +32,10 @@ class Game:
         ActionContext.LOAN: (ParameterAction,),
         ActionContext.END_OF_TURN: (EndOfTurnAction,)
     }
-    SINGLE_ACTION_CONTEXTS = {ActionContext.BUILD, ActionContext.PASS, ActionContext.SCOUT, ActionContext.LOAN}
-    DOUBLE_ACTION_CONTEXTS = {ActionContext.NETWORK, ActionContext.DEVELOP}
-    MULTIPLE_ACTION_CONTEXTS = {ActionContext.SELL}
-    def __repr__(self) -> str:
-        # Основная информация об игре
-        game_info = f"Game(id={self.id[:8]}..., players={len(self.state.players)}, era={self.state.era.value})"
-        
-        # Информация о игроках
-        players_info = "\nPlayers:"
-        for i, player in enumerate(self.state.players):
-            players_info += f"\n  {i+1}. {player.color.value}: {player.bank}£, {player.income} income, {player.victory_points} VP, {len(player.hand)} cards, {len(player.available_buildings)} buildings"
-        
-        # Информация о городах
-        cities_info = f"\nCities: {len(self.state.cities)} total"
-        
-        # Города с коммивояжерами
-        merchant_cities = [city for city in self.state.cities if city.is_merchant]
-        cities_info += f", {len(merchant_cities)} with merchants"
-        
-        # Примеры городов (3 случайных)
-        if self.state.cities:
-            sample_cities = random.sample(self.state.cities, min(3, len(self.state.cities)))
-            cities_info += "\nSample cities:"
-            for city in sample_cities:
-                merchant_status = "with merchant" if city.is_merchant else "without merchant"
-                
-                # Детали слотов (разные для обычных городов и городов с коммивояжерами)
-                if city.is_merchant:
-                    # Для городов с коммивояжерами показываем merchant_slots
-                    slot_details = ", ".join([
-                        f"[{(slot.merchant_type)}]" 
-                        for slot in city.merchant_slots
-                    ])
-                    slot_type = "Merchant slots"
-                elif hasattr(city, 'slots') and city.slots:
-                    # Для обычных городов показываем обычные slots
-                    slot_details = ", ".join([
-                        f"[{', '.join([industry.value for industry in slot.industry_type_options])}]" 
-                        for slot in city.slots
-                    ])
-                    slot_type = "Building slots"
-                else:
-                    slot_details = "no slots"
-                    slot_type = "Slots"        
-                # Детали связей
-                link_details = {}
-                for link in city.links:
-                    for linked_city in link.cities:
-                        if linked_city != city.name:  # Исключаем текущий город
-                            if linked_city not in link_details:
-                                link_details[linked_city] = []
-                            link_details[linked_city].append(link.type.value)
-                
-                # Форматируем информацию о связях
-                connections = ", ".join([
-                    f"{city_name} ({', '.join(link_types)})" 
-                    for city_name, link_types in link_details.items()
-                ])
-                
-                cities_info += f"\n  - {city.name} ({merchant_status})"
-                cities_info += f"\n    {slot_type}: {slot_details}"
-                cities_info += f"\n    Links: {connections}"
-        
-        # Информация о связях (общая статистика)
-        link_types = {}
-        for city in self.state.cities:
-            for link in city.links:
-                link_type = link.type.value
-                link_types[link_type] = link_types.get(link_type, 0) + 1
-        
-        links_info = "\nLink statistics:"
-        for link_type, count in link_types.items():
-            links_info += f"\n  {link_type}: {count} connections"
-        
-        # Информация о коммивояжерах
-        merchants_info = ""
-        if merchant_cities:
-            merchants_info = "\nMerchants in cities:"
-            for city in merchant_cities:
-                merchants_info += f"\n  - {city.name}"
-        
-        return game_info + players_info + cities_info + links_info + merchants_info
+
+    @property
+    def state(self):
+        return self.state_manager.current_state
 
     def __init__(self):
         self.id = str(uuid4())
@@ -120,11 +43,9 @@ class Game:
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
         self.validation_service = ActionValidationService()
-        self.action_context = ActionContext.MAIN
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
-        self.state = self._create_initial_state(player_count, players_colors)
-        self.turn_state = self.state.model_copy(deep=True)
+        self.state_manager = GameStateManager(self._create_initial_state(player_count, players_colors))
 
     def _create_initial_state(self, player_count: int, player_colors: List[PlayerColor]) -> BoardState:
         
@@ -140,7 +61,8 @@ class Game:
 
         self.status = GameStatus.ONGOING
         
-        current_turn = random.choice(list(players.keys()))
+        turn_order = player_colors
+        random.shuffle(turn_order)
 
         actions_left = 1
 
@@ -148,12 +70,11 @@ class Game:
 
         wild_deck = self._build_wild_deck()
 
-
         #burn initial cards
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, current_turn=current_turn, actions_left=actions_left, discard=discard, wild_deck=wild_deck, links=links)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wild_deck=wild_deck, links=links)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}
@@ -173,7 +94,8 @@ class Game:
                 sell_cost=building.get('sell_cost'),
                 is_developable=building.get('developable', True),
                 link_victory_points=building['conn_vp'],
-                era_exclusion=building.get('era_exclusion')
+                era_exclusion=building.get('era_exclusion'),
+                income=building['income']
             )
             out[building.id] = building
         return out
@@ -206,20 +128,16 @@ class Game:
         random.shuffle(out)
         return out
 
-    def _build_wild_deck(self) -> List[Card]:
+    def _build_wild_deck(self) -> List[tuple[Card]]:
         INDUSTRY_START_ID = 65
         CITY_OFFSET = 4
         NUM_WILD_CARDS = 4
-        
-        return [
-            card
-            for base_id in range(INDUSTRY_START_ID, INDUSTRY_START_ID + NUM_WILD_CARDS)
-            for card in (
-                Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'),
-                Card(id=base_id + CITY_OFFSET, card_type=CardType.CITY, value='wild'),
-            )
-        ]
- 
+        out = []
+        for base_id in range(INDUSTRY_START_ID, INDUSTRY_START_ID + NUM_WILD_CARDS):
+            out.append((Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'),
+                        Card(id=base_id+CITY_OFFSET, card_type=CardType.CITY, value='wild')))
+        return out  
+
     def _create_cities(self, player_count:int) -> Dict[str, City]:
         '''
         Базовая генерация городов без связей
@@ -290,105 +208,306 @@ class Game:
         market.update_market_costs()
         return market
     
-    def get_player_state(self, color:PlayerColor) -> PlayerState:
+    def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
+        if state is None:
+            state = self.state_manager.current_state
         return PlayerState(
-            common_state=self.state.hide_state(),
+            common_state=state.hide_state(),
             your_color=color,
             your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
 
-    def process_action(self, action:Action, color:PlayerColor) -> ActionProcessResult:
+    def process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
+        # Проверяем, может ли игрок делать ход
         if not self.is_player_to_move(color):
-            return ActionProcessResult(processed=False, message=f"Attempted move by {color}, current turn is {self.state.current_turn}", awaiting={}, current_context=self.action_context)
-        
-        if isinstance(action, MetaAction):
-            if self.action_context is not ActionContext.MAIN:
-                return ActionProcessResult(processed=False, message="Cannot submit a meta action outside of main context", awaiting=self.get_expected_params(), current_context=self.action_context)
-            
-            self.action_state = self.turn_state.model_copy(deep=True)
-            self.action_context = ActionContext(action.action)
-            self.action_state.subaction_count = 0
-            return ActionProcessResult(processed=True, message=f"Entered {self.action_context}", awaiting=self.get_expected_params(), current_context=self.action_context)
-
-        elif isinstance(action, ParameterAction):
-            if not hasattr(self, 'action_state'):
-                return ActionProcessResult(
+            return ActionProcessResult(
                 processed=False,
-                message="No active transaction. Start with meta action",
-                awaiting=self.get_expected_params(), current_context=self.action_context
+                message=f"Attempted move by {color}, current turn is {self.state_manager.current_state.turn_order[0]}",
+                awaiting={},
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
+        
+        # Обрабатываем действие в зависимости от типа
+        if isinstance(action, MetaAction):
+            return self._process_meta_action(action, color)
+        elif isinstance(action, ParameterAction):
+            return self._process_parameter_action(action, color)
+        elif isinstance(action, CommitAction):
+            return self._process_commit_action(action, color)
+        elif isinstance(action, EndOfTurnAction):
+            return self._process_end_of_turn_action(action, color)
+        else:
+            return ActionProcessResult(
+                processed=False, 
+                message="Unknown action type", 
+                awaiting={'W': ('T', 'F')}, 
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
             )
 
-            player = self.action_state.players[color]
+    def _process_meta_action(self, action: MetaAction, color: PlayerColor) -> ActionProcessResult:
+        if self.state_manager.phase != GamePhase.MAIN:
+            return ActionProcessResult(
+                processed=False,
+                message="Cannot submit a meta action outside of main context",
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
+        
+        try:
+            self.state_manager.start_transaction(ActionContext(action.action))
+            return ActionProcessResult(
+                processed=True,
+                message=f"Entered {self.state_manager.action_context}",
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                provisional_state=self.state_manager.get_provisional_state(),
+                hand=self.state_manager.current_state.players[color].hand
+            )
+        except ValueError as e:
+            return ActionProcessResult(
+                processed=False,
+                message=str(e),
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
 
-            if action is ResourceAction:
-                if action.resources_used is AutoResourceSelection:
-                    action.resources_used = self._select_resources(action, player)
+    def _process_parameter_action(self, action: ParameterAction, color: PlayerColor) -> ActionProcessResult:
+        if self.state_manager.phase != GamePhase.TRANSACTION:
+            return ActionProcessResult(
+                processed=False,
+                message="No active transaction. Start with meta action",
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
+        
+        player = self.state_manager.current_state.players[color]
+        
+        # Автоматический выбор ресурсов, если нужно
+        if isinstance(action, ResourceAction) and action.resources_used is AutoResourceSelection:
+            action.resources_used = self._select_resources(action, player)
+        
+        # Валидация действия
+        validation_result = self.validation_service.validate_action(
+            action, 
+            self.state_manager.current_state, 
+            player
+        )
+        
+        if not validation_result.is_valid:
+            return ActionProcessResult(
+                processed=False,
+                message=validation_result.message,
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=player.hand
+            )
+        
+        # Применяем действие
+        self._apply_action(action, self.state_manager.current_state, player, self.state_manager.action_context)
+        
+        # Обновляем состояние
+        try:
+            self.state_manager.add_subaction()
+            return ActionProcessResult(
+                processed=True,
+                provisional_state=self.state_manager.get_provisional_state(),
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=player.hand
+            )
+        except ValueError as e:
+            return ActionProcessResult(
+                processed=False,
+                message=str(e),
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=player.hand
+            )
 
-            validation_result = self.validation_service.validate_action(action, self.action_state, player, self.action_context)
-            if not validation_result.is_valid:
-                return ActionProcessResult(processed=False, message=validation_result.message, awaiting=self.get_expected_params(), current_context=self.action_context)
+    def _process_commit_action(self, action: CommitAction, color: PlayerColor) -> ActionProcessResult:
+        if self.state_manager.phase not in (GamePhase.TRANSACTION, GamePhase.AWAITING_COMMIT):
+            return ActionProcessResult(
+                processed=False,
+                message="No active transaction to commit",
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
+        
+        if action.commit:
+            if self.state_manager._state.subaction_count == 0:
+                return ActionProcessResult(
+                    processed=False,
+                    message="No changes to state, nothing to commit",
+                    awaiting=self.get_expected_params(),
+                    current_context=self.state_manager.action_context,
+                    hand=self.state_manager.current_state.players[color].hand
+                )
             
-            self._apply_action(action, self.action_state, player)
-
-            self.action_state.subaction_count += 1
-            if self.action_state.subaction_count > 1 and self.action_context in self.SINGLE_ACTION_CONTEXTS:
-                self.action_context = ActionContext.AWAITING_COMMIT
-            elif self.action_state.subaction_count > 2 and self.action_context in self.DOUBLE_ACTION_CONTEXTS:
-                self.action_context = ActionContext.AWAITING_COMMIT
-
-            return ActionProcessResult(processed=True, provisional_state=self.action_state, awaiting=self.get_expected_params(), current_context=self.action_context)
-            
-        elif isinstance(action, CommitAction):
-            if action.commit:
-
-                if self.action_state.subaction_count == 0:
-                    return ActionProcessResult(processed=False, message="No changes to state, nothing to commit", awaiting=self.get_expected_params(), current_context=self.action_context)
+            try:
+                self.state_manager.commit_transaction()
                 
-                self.turn_state = self.action_state.model_copy(deep=True)
-
-                self.turn_state.actions_left -= 1
-                if self.turn_state.actions_left > 0:
-                    self.action_context = ActionContext.MAIN
-
+                # Обновляем количество оставшихся действий
+                self.state_manager.current_state.actions_left -= 1
+                
+                if self.state_manager.current_state.actions_left > 0:
+                    # Продолжаем ход
+                    return ActionProcessResult(
+                        processed=True,
+                        message="Changes committed",
+                        provisional_state=self.state_manager.get_provisional_state(),
+                        awaiting=self.get_expected_params(),
+                        current_context=self.state_manager.action_context,
+                        hand=self.state_manager.current_state.players[color].hand
+                    )
                 else:
-                    self.action_context = ActionContext.END_OF_TURN
-
-            else:
-                self.action_context = ActionContext.MAIN
-                return ActionProcessResult(processed=True, message=f'Unstaging action, returned to action context {self.action_context}', awaiting=self.get_expected_params(), current_context=self.action_context)
-
-        elif isinstance(action, EndOfTurnAction):
-            if action.end_turn:
-                self.state = self.turn_state.model_copy(deep=True)
-                self.pass_turn()
-                return ActionProcessResult(processed=True, end_of_turn=True, awaiting={})
-            
-            else:
-                self.turn_state = self.state
-                self.action_context = ActionContext.MAIN
-                return ActionProcessResult(processed=True, message='Reverted to turn start', provisional_state=self.turn_state.hide_state(), awaiting={}, current_context=self.action_context)
-            
+                    # Завершаем ход
+                    self.state_manager.end_turn()
+                    return ActionProcessResult(
+                        processed=True,
+                        message="Changes committed, confirm end of turn",
+                        provisional_state=self.state_manager.get_provisional_state(),
+                        awaiting=self.get_expected_params(),
+                        current_context=self.state_manager.action_context,
+                        hand=self.state_manager.current_state.players[color].hand
+                    )
+            except ValueError as e:
+                return ActionProcessResult(
+                    processed=False,
+                    message=str(e),
+                    awaiting=self.get_expected_params(),
+                    current_context=self.state_manager.action_context,
+                    hand=self.state_manager.current_state.players[color].hand
+                )
         else:
-            # I couldn't see this coming
-            return ActionProcessResult(processed=False, message="wowsers", awaiting={'W': ('T', 'F')}, current_context=self.action_context)
-    
-    def _apply_action(self, state:BoardState, action:ParameterAction, player:Player):
-        pass
+            # Откатываем транзакцию
+            try:
+                self.state_manager.rollback_transaction()
+                return ActionProcessResult(
+                    processed=True,
+                    message='Transaction rolled back',
+                    provisional_state=self.state_manager.get_provisional_state(),
+                    awaiting=self.get_expected_params(),
+                    current_context=self.state_manager.action_context,
+                    hand=self.state_manager.current_state.players[color].hand
+                )
+            except ValueError as e:
+                return ActionProcessResult(
+                    processed=False,
+                    message=str(e),
+                    awaiting=self.get_expected_params(),
+                    current_context=self.state_manager.action_context,
+                    hand=self.state_manager.current_state.players[color].hand
+                )
+
+    def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
+        if action.end_turn:
+            # Завершаем ход и переходим к следующему игроку
+            next_state = self._prepare_next_turn()
+            self.state_manager.start_new_turn(next_state)
+            return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state_manager.current_state.players[color].hand)
+        else:
+            # Откатываемся к началу хода
+            self.state_manager.rollback_transaction()
+            return ActionProcessResult(
+                processed=True, 
+                message='Reverted to turn start', 
+                provisional_state=self.state_manager.get_provisional_state(), 
+                awaiting={}, 
+                current_context=self.state_manager.action_context,
+                hand=self.state_manager.current_state.players[color].hand
+            )
+     
+    def _apply_action(self, state:BoardState, action:ParameterAction, player:Player, action_context:ActionContext):
+        if action.card_id is not None:
+            state.discard.append(player.hand[action.card_id])
+            player.hand.pop(action.card_id)
+
+        if isinstance(action, ResourceAction):
+            for resource in action.resources_used:
+                if resource.source_type == ResourceSourceType.PLAYER and resource.resource_type is not ResourceType.MONEY:
+                    building = self.state_manager.current_state.get_building_slot(resource.building_slot_id).building_placed
+                    building.resource_count -= resource.amount
+                    if building.resource_count == 0:
+                        building.flipped = True
+                        owner = self.state_manager.current_state.players[building.owner]
+                        owner.income_points += building.income
+                        owner.recalculate_income()
+                        
+                elif resource.source_type == ResourceSourceType.MERCHANT:
+                    merchant = self.state_manager.current_state.get_merchant_slot(resource.merchant_slot_id)
+                    merchant.beer_available = False
+                elif resource.source_type == ResourceSourceType.MARKET:
+                    cost = self.state_manager.current_state.market.purchase_resource(resource.resource_type, resource.amount)
+                    player.bank -= cost
+                elif resource.resource_type == ResourceType.MONEY:
+                    player.bank -= resource.amount
+                else:
+                    raise ValueError("Cannot process these resources")
+
+        if action_context is ActionContext.PASS:
+            return
+
+        elif self.state_manager.action_context is ActionContext.LOAN:
+            player.income -= 3
+            player.bank += 30
+            player.recalculate_income(keep_points=False)
+            return
+
+        elif self.action_context is ActionContext.SCOUT:
+            for card_id in action.additional_card_cost:
+                state.discard.append(player.hand[card_id])
+                player.hand.pop(card_id)
+            jokers = self.action_state.wild_deck.pop()
+            for joker in jokers:
+                player.hand[joker.id] = joker
+            return
+        
+        elif self.state_manager.action_context is ActionContext.DEVELOP:
+            building = min(
+                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
+                            key=lambda x: x.level,
+                            default=None
+                            )
+            player.available_buildings.pop(building)
+
+        elif self.state_manager.action_context is ActionContext.NETWORK:
+            self.state_manager.current_state.links[action.link_id].owner = player.color
+
+        elif self.state_manager.action_context is ActionContext.SELL:
+            building = self.state_manager.current_state.get_building_slot(action.slot_id).building_placed
+            building.flipped = True
+            owner = self.state_manager.current_state.players[building.owner]
+            owner.income += building.income
+
+        elif self.state_manager.action_context is ActionContext.BUILD:
+            building = min(
+                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
+                            key=lambda x: x.level,
+                            default=None
+                            )
+            self.state_manager.current_state.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
 
     def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
         pass
 
+    def _prepare_next_turn(self):
+        pass
+
     def get_expected_params(self) -> Dict[str, List[str]]:
-        classes = self.ACTION_CONTEXT_MAP[self.action_context]
+        classes = self.ACTION_CONTEXT_MAP[self.state_manager.action_context]
         out = {}
 
         for cls in classes:
             fields = cls.model_fields.keys()
-            if self.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
-                if self.action_state.subaction_count > 0 and 'card_id' in fields:
+            if self.state_manager.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
+                if self.state_manager.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
-                elif self.action_state.subaction_count == 0 and cls.__name__ == 'CommitAction':
-                    continue  # Пропускаем CommitAction если нет изменений
             out[cls.__name__] = fields
         
         return out
@@ -402,7 +521,7 @@ class Game:
             return ValidationResult(is_valid=True)
 
     def is_player_to_move(self, color:PlayerColor):
-        if self.state.current_turn != color:
+        if self.state_manager.current_state.turn_order[0] != color:
             return False
         return True
         

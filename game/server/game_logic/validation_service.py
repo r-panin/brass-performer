@@ -14,14 +14,11 @@ class ActionValidationService():
             ActionType.SELL: SellValidator(),
         }
 
-    def validate_action(self, action: ParameterAction, board_state:BoardState, player: Player, action_context:ActionContext) -> ValidationResult:
+    def validate_action(self, action: ParameterAction, board_state:BoardState, player: Player) -> ValidationResult:
         validator = self.validators.get(action.action_type)
         if not validator:
             return ValidationResult(is_valid=False, message=f"No validator for action type {action.action_type}") 
 
-        context_validation = self.validate_action_context(action_context, action)
-        if not context_validation.is_valid:
-             return context_validation
         
         return validator.validate(action, board_state, player)
     

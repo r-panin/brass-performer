@@ -94,6 +94,7 @@ class Building(GameEntity):
     is_developable: bool
     link_victory_points: int
     era_exclusion: Optional[LinkType]
+    income: int
 
     def get_cost(self) -> ResourceAmounts:
         return ResourceAmounts(
@@ -221,6 +222,7 @@ class Player(BaseModel):
     income: int
     income_points: int
     victory_points: int
+    money_spent: int = 0
 
     def hide_hand(self) -> PlayerExposed:
         data = self.model_dump()
@@ -228,17 +230,38 @@ class Player(BaseModel):
         del data["hand"]
         return PlayerExposed(**data)
 
+    def recalculate_income(self, keep_points=True):
+        if keep_points:
+            if self.income_points <= 10:
+                self.income = self.income_points - 10
+            elif self.income_points <= 30:
+                self.income = (self.income_points - 10) // 2
+            elif self.income_points <= 60:
+                self.income = (10 + self.income_points - 30) // 3
+            else:
+                self.income = (20 + self.income_points - 60) // 4
+        else:
+            if self.income <= 0:
+                self.income_points = self.income + 10
+            elif self.income <= 10:
+                self.income_points = 2 * self.income + 10
+            elif self.income <= 20:
+                self.income_points = 3 * self.income
+            else:
+                self.income_points = 3 * self.income + (self.income % 10)
+
 
 class BoardStateExposed(BaseModel):
     cities: Dict[str, City]
+    links: Dict[int, Link]
     players: Dict[PlayerColor, PlayerExposed]
     market: Market
     deck_size: int
     era: LinkType
-    current_turn: PlayerColor
+    turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[Card]
+    wild_deck: List[tuple[Card, Card]]
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
@@ -247,10 +270,10 @@ class BoardState(BaseModel):
     market: Market
     deck: List[Card]
     era: LinkType
-    current_turn: PlayerColor
+    turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[Card]
+    wild_deck: List[tuple[Card, Card]]
     subaction_count: int = Field(default=0, exclude=True)
 
     def hide_state(self) -> BoardStateExposed:
@@ -434,4 +457,12 @@ class ActionProcessResult(OutputToPlayer):
     processed: bool
     awaiting: Dict[str, List[str]]
     provisional_state: Optional[BoardStateExposed] = None
+    hand: Dict[int, Card]
     end_of_turn: bool = False
+    current_context: ActionContext
+
+class TurnState(StrEnum):
+    MAIN = 'main'
+    IN_TRANSACTION = 'in_transaction'
+    AWAITING_COMMIT = 'awaiting_commit'
+    END_OF_TURN = 'end_of_turn'
