@@ -14,8 +14,9 @@ class ActionValidationService():
             ActionType.SELL: SellValidator(),
         }
 
-    def validate_action(self, action: ParameterAction, board_state:BoardState, player: Player) -> ValidationResult:
-        validator = self.validators.get(action.action_type)
+    def validate_action(self, action: ParameterAction, board_state:BoardState, player: Player, context:ActionContext) -> ValidationResult:
+        validator = self.validators.get(ActionType(context))
+        print(F"USING VALIDATOR {validator}")
         if not validator:
             return ValidationResult(is_valid=False, message=f"No validator for action type {action.action_type}") 
 

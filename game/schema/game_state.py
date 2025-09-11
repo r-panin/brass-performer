@@ -250,6 +250,13 @@ class Player(BaseModel):
             else:
                 self.income_points = 3 * self.income + (self.income % 10)
 
+    def get_lowest_level_building(self, industry:IndustryType):
+            return min(
+                            (b for b in self.available_buildings.values() if b.industry_type is industry),
+                            key=lambda x: x.level,
+                            default=None
+                            )
+
 
 class BoardStateExposed(BaseModel):
     cities: Dict[str, City]

@@ -227,7 +227,8 @@ class Game:
                 message=f"Attempted move by {color}, current turn is {self.state_manager.current_state.turn_order[0]}",
                 awaiting={},
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
         # Обрабатываем действие в зависимости от типа
@@ -245,7 +246,8 @@ class Game:
                 message="Unknown action type", 
                 awaiting={'W': ('T', 'F')}, 
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
 
     def _process_meta_action(self, action: MetaAction, color: PlayerColor) -> ActionProcessResult:
@@ -255,7 +257,8 @@ class Game:
                 message="Cannot submit a meta action outside of main context",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
         try:
@@ -274,7 +277,8 @@ class Game:
                 message=str(e),
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
 
     def _process_parameter_action(self, action: ParameterAction, color: PlayerColor) -> ActionProcessResult:
@@ -284,7 +288,8 @@ class Game:
                 message="No active transaction. Start with meta action",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
         player = self.state_manager.current_state.players[color]
@@ -297,7 +302,8 @@ class Game:
         validation_result = self.validation_service.validate_action(
             action, 
             self.state_manager.current_state, 
-            player
+            player,
+            self.state_manager.action_context
         )
         
         if not validation_result.is_valid:
@@ -310,7 +316,7 @@ class Game:
             )
         
         # Применяем действие
-        self._apply_action(action, self.state_manager.current_state, player, self.state_manager.action_context)
+        self._apply_action(self.state_manager.current_state, action, player, self.state_manager.action_context)
         
         # Обновляем состояние
         try:
@@ -338,7 +344,8 @@ class Game:
                 message="No active transaction to commit",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state_manager.current_state.players[color].hand,
+                provisional_state=self.state_manager.get_provisional_state()
             )
         
         if action.commit:
@@ -348,7 +355,8 @@ class Game:
                     message="No changes to state, nothing to commit",
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
             
             try:
@@ -376,7 +384,7 @@ class Game:
                         provisional_state=self.state_manager.get_provisional_state(),
                         awaiting=self.get_expected_params(),
                         current_context=self.state_manager.action_context,
-                        hand=self.state_manager.current_state.players[color].hand
+                        hand=self.state_manager.current_state.players[color].hand,
                     )
             except ValueError as e:
                 return ActionProcessResult(
@@ -384,7 +392,8 @@ class Game:
                     message=str(e),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
         else:
             # Откатываем транзакцию
@@ -396,7 +405,7 @@ class Game:
                     provisional_state=self.state_manager.get_provisional_state(),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state_manager.current_state.players[color].hand,
                 )
             except ValueError as e:
                 return ActionProcessResult(
@@ -404,7 +413,8 @@ class Game:
                     message=str(e),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
 
     def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
@@ -412,7 +422,8 @@ class Game:
             # Завершаем ход и переходим к следующему игроку
             next_state = self._prepare_next_turn()
             self.state_manager.start_new_turn(next_state)
-            return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state_manager.current_state.players[color].hand)
+            return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state_manager.current_state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state())
         else:
             # Откатываемся к началу хода
             self.state_manager.rollback_transaction()
@@ -455,13 +466,13 @@ class Game:
         if action_context is ActionContext.PASS:
             return
 
-        elif self.state_manager.action_context is ActionContext.LOAN:
+        elif action_context is ActionContext.LOAN:
             player.income -= 3
             player.bank += 30
             player.recalculate_income(keep_points=False)
             return
 
-        elif self.action_context is ActionContext.SCOUT:
+        elif action_context is ActionContext.SCOUT:
             for card_id in action.additional_card_cost:
                 state.discard.append(player.hand[card_id])
                 player.hand.pop(card_id)
@@ -470,35 +481,27 @@ class Game:
                 player.hand[joker.id] = joker
             return
         
-        elif self.state_manager.action_context is ActionContext.DEVELOP:
-            building = min(
-                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
-                            key=lambda x: x.level,
-                            default=None
-                            )
+        elif action_context is ActionContext.DEVELOP:
+            building = player.get_lowest_level_building(action.industry)
             player.available_buildings.pop(building)
 
-        elif self.state_manager.action_context is ActionContext.NETWORK:
+        elif action_context is ActionContext.NETWORK:
             self.state_manager.current_state.links[action.link_id].owner = player.color
 
-        elif self.state_manager.action_context is ActionContext.SELL:
+        elif action_context is ActionContext.SELL:
             building = self.state_manager.current_state.get_building_slot(action.slot_id).building_placed
             building.flipped = True
             owner = self.state_manager.current_state.players[building.owner]
             owner.income += building.income
 
-        elif self.state_manager.action_context is ActionContext.BUILD:
-            building = min(
-                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
-                            key=lambda x: x.level,
-                            default=None
-                            )
+        elif action_context is ActionContext.BUILD:
+            building = player.get_lowest_level_building(action.industry)
             self.state_manager.current_state.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
 
     def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
         pass
 
-    def _prepare_next_turn(self):
+    def _prepare_next_turn(self) -> BoardState:
         pass
 
     def get_expected_params(self) -> Dict[str, List[str]]:
@@ -506,7 +509,7 @@ class Game:
         out = {}
 
         for cls in classes:
-            fields = cls.model_fields.keys()
+            fields = list(cls.model_fields.keys())
             if self.state_manager.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
                 if self.state_manager.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')

@@ -36,8 +36,15 @@ def validate_resources(func):
             preference_validation = self._validate_iron_preference(game_state, action.resources_used)
             if not preference_validation.is_valid:
                 return preference_validation
+
+            if isinstance(action, BuildSelection):
+                city_name = game_state.get_building_slot(action.slot_id).city
+                link_id = None
+            elif isinstance(action, NetworkSelection):
+                city_name = None
+                link_id = action.link_id
             
-            coal_validation = self._validate_coal_preference(game_state, action.resources_used,)
+            coal_validation = self._validate_coal_preference(game_state, action.resources_used, city_name=city_name, link_id=link_id)
             if not coal_validation.is_valid:
                 return coal_validation
             
@@ -72,6 +79,9 @@ class BaseValidator(ActionValidator, ABC):
         return ValidationResult(is_valid=True)
             
     def _validate_coal_preference(self, game_state:BoardState, resources: List[ResourceSource], city_name:str=None, link_id:int = None) -> ValidationResult:
+        coal_in_resources = any(resource.resource_type == ResourceType.COAL for resource in resources)
+        if not coal_in_resources:
+            return ValidationResult(is_valid=True)
         if city_name:
             available_player_sources = game_state.get_player_coal_locations(city_name=city_name)
         elif link_id:
@@ -145,6 +155,7 @@ class BaseValidator(ActionValidator, ABC):
                     connected = game_state.find_paths(start_link_id=action.link_id, end=coal_city)
                     if not connected:
                         return ValidationResult(is_valid=False, message=f"Link {action.link_id} is not connected to city {coal_city}")
+        return ValidationResult(is_valid=True)
 
 
 class PassValidator(BaseValidator):
@@ -224,7 +235,7 @@ class BuildValidator(BaseValidator):
     @validate_resources
     def validate(self, action:BuildSelection, game_state, player):
         card = player.hand[action.card_id]
-        building = player.available_buildings[action.building_id]
+        building = player.get_lowest_level_building(action.industry)
         slot = game_state.get_building_slot(action.slot_id)
         if card.card_type == CardType.INDUSTRY:
             if building.industry_type not in card.value:
@@ -237,8 +248,13 @@ class BuildValidator(BaseValidator):
         else:
             return ValidationResult(is_valid=False, message='wut?')
         
-        if building.industry_type not in slot.industry_type_options:
+        if action.industry not in slot.industry_type_options:
             return ValidationResult(is_valid=False, message=f"Can't build {building.industry_type} in a slot that supports {slot.industry_type_options}")
+
+        city = game_state.cities[slot.city]
+        for s in city.slots.values():
+            if (len(s.industry_type_options) < len(slot.industry_type_options)) and action.industry in s.industry_type_options:
+                return ValidationResult(is_valid=False, message=f"Can't build in slot {slot.id} when {s.id} has priority for this industry")
         
         # Overbuilding validation
         if slot.building_placed is not None:
@@ -272,7 +288,7 @@ class BuildValidator(BaseValidator):
         return ValidationResult(is_valid=True)  
 
     def _validate_base_action_cost(self, action:BuildSelection, game_state, player:Player):
-        building = player.available_buildings[action.building_id]
+        building = player.get_lowest_level_building(action.industry)
         if building.get_cost() != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Building base cost doens't match resource selecion")
         return ValidationResult(is_valid=True)
