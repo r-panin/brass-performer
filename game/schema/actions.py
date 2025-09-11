@@ -15,7 +15,7 @@ class ParameterAction(BaseModel):
     model_config = ConfigDict(extra='forbid')  
 
 class ResourceAction(BaseModel):
-    resources_used: Union[List[ResourceSource], AutoResourceSelection]
+    resources_used: Optional[Union[List[ResourceSource], AutoResourceSelection]] = []
 
     def is_auto_resource_selection(self):
         return isinstance(self.resources_used, AutoResourceSelection)
@@ -26,12 +26,12 @@ class ResourceAction(BaseModel):
         
         amounts = defaultdict(int)
         for resource in self.resources_used:
-            amounts[resource.resource_type] += resource.amount
+            amounts[resource.resource_type] += 1
         
         return ResourceAmounts(
             iron=amounts.get(ResourceType.IRON, 0),
             coal=amounts.get(ResourceType.COAL, 0),
-            money=amounts.get(ResourceType.MONEY, 0),
+            money=amounts.get("money", 0),
             beer=amounts.get(ResourceType.BEER, 0),
         )
     

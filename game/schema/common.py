@@ -15,54 +15,23 @@ class ResourceType(StrEnum):
     COAL = "coal"
     IRON = "iron"
     BEER = "beer"
-    MONEY = "money"
-
-class ResourceSourceType(StrEnum):
-    PLAYER = "player"
-    MARKET = "market"
-    MERCHANT = "merchant" # Beer
 
 class ResourceSource(BaseModel):
-    source_type: ResourceSourceType
     resource_type: ResourceType
-    building_slot_id: Optional[int]
-    merchant_slot_id: Optional[int] 
-    amount: int
+    building_slot_id: Optional[int] = None
+    merchant_slot_id: Optional[int] = None
 
     @model_validator(mode='after')
-    @classmethod
-    def validate_dependencies(cls, values):
-        source_type = values.get('source_type')
-        resource_type = values.get('resource_type')
-        building_slot_id = values.get('building_slot_id')
-        merchant_slot_id = values.get('merchant_slot_id')
+    def validate_dependencies(self):
 
-        if resource_type == ResourceType.MONEY:
-            if source_type != ResourceSourceType.PLAYER:
-                raise ValueError('Money must come from player')
-            if building_slot_id is not None:
-                raise ValueError('Money cannot have building_slot_id')
-            if merchant_slot_id is not None:
-                raise ValueError('Money cannot have merchant')
+        if self.resource_type == ResourceType.BEER:
+            if self.building_slot_id is None and self.merchant_slot_id is None:
+                raise ValueError("Beer must be sourced from a building or from a merchant")
 
-        elif resource_type == ResourceType.IRON or resource_type == ResourceType.COAL:
-            if source_type == ResourceSourceType.MERCHANT:
-                raise ValueError(f'{resource_type} cannot be sourced from merchant')
+        if self.building_slot_id is not None and self.merchant_slot_id is not None:
+            raise ValueError("May only provide either a building slot or a merchant slot, not both")
             
-        elif resource_type == ResourceType.BEER:
-            if source_type == ResourceSourceType.MARKET:
-                raise ValueError(f"Beer cannot come from market")
-            
-        if merchant_slot_id is not None and source_type != ResourceSourceType.MERCHANT:
-            raise ValueError('Merchant field requires merchant source type')
-        
-        if merchant_slot_id is None and source_type is ResourceSourceType.MERCHANT:
-            raise ValueError("Must specify merchant")
-        
-        if source_type == ResourceSourceType.PLAYER and building_slot_id is None and resource_type is not ResourceType.MONEY:
-            raise ValueError(f'Must specify sourcing building')
-        
-        return values
+        return self
         
 
 
@@ -75,13 +44,19 @@ class ResourceAmounts(BaseModel):
     money: int = 0
 
 class ResourceStrategy(StrEnum):
-    OWN_FIRST = 'own_first'
+    MAXIMIZE_INCOME = 'maximize_income'
+    MAXIMIZE_VP = 'maximize_vp'
     MERCHANT_FIRST = 'merchant_first'
-    ENEMY_FIRST = 'enemy_first'
 
 class AutoResourceSelection(BaseModel):
     mode: Literal["auto"]
     strategy: ResourceStrategy
+    then: Optional[ResourceStrategy] = None
+
+    @model_validator(mode='after')
+    def validate(self):
+        if self.strategy is ResourceStrategy.MERCHANT_FIRST and self.then is None:
+            raise ValueError(f"Strategy {self.strategy} requires a 'then' strategy")
 
 class IndustryType(StrEnum):
     COAL = "coal"

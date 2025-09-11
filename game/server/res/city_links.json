@@ -106,17 +106,17 @@
     },
     {
         "id": 22,
-        "cities": ["Shrewsbury", "Coalsbrookdale"],
+        "cities": ["Shrewsbury", "Coalbrookdale"],
         "transport": ["canal", "rail"]
     },
     {
         "id": 23,
-        "cities": ["Coalsbrookdale", "Wolverhampton"],
+        "cities": ["Coalbrookdale", "Wolverhampton"],
         "transport": ["canal", "rail"]
     },
     {
         "id": 24,
-        "cities": ["Coalsbrookdale", "Kidderminster"],
+        "cities": ["Coalbrookdale", "Kidderminster"],
         "transport": ["canal", "rail"]
     },
     {

@@ -1,4 +1,4 @@
-from ...schema import BoardState, ResourceSourceType, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ResourceStrategy, ResourceAmounts, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict, get_args
 import random
 from pathlib import Path
@@ -34,7 +34,7 @@ class Game:
     }
 
     @property
-    def state(self):
+    def state(self) -> BoardState:
         return self.state_manager.current_state
 
     def __init__(self):
@@ -211,7 +211,7 @@ class Game:
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
         if state is None:
-            state = self.state_manager.current_state
+            state = self.state
         return PlayerState(
             common_state=state.hide_state(),
             your_color=color,
@@ -224,10 +224,11 @@ class Game:
         if not self.is_player_to_move(color):
             return ActionProcessResult(
                 processed=False,
-                message=f"Attempted move by {color}, current turn is {self.state_manager.current_state.turn_order[0]}",
+                message=f"Attempted move by {color}, current turn is {self.state.turn_order[0]}",
                 awaiting={},
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
         # Обрабатываем действие в зависимости от типа
@@ -245,7 +246,8 @@ class Game:
                 message="Unknown action type", 
                 awaiting={'W': ('T', 'F')}, 
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
 
     def _process_meta_action(self, action: MetaAction, color: PlayerColor) -> ActionProcessResult:
@@ -255,7 +257,8 @@ class Game:
                 message="Cannot submit a meta action outside of main context",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
         try:
@@ -266,7 +269,7 @@ class Game:
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
                 provisional_state=self.state_manager.get_provisional_state(),
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand
             )
         except ValueError as e:
             return ActionProcessResult(
@@ -274,7 +277,8 @@ class Game:
                 message=str(e),
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
 
     def _process_parameter_action(self, action: ParameterAction, color: PlayerColor) -> ActionProcessResult:
@@ -284,10 +288,11 @@ class Game:
                 message="No active transaction. Start with meta action",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
             )
         
-        player = self.state_manager.current_state.players[color]
+        player = self.state.players[color]
         
         # Автоматический выбор ресурсов, если нужно
         if isinstance(action, ResourceAction) and action.resources_used is AutoResourceSelection:
@@ -296,8 +301,9 @@ class Game:
         # Валидация действия
         validation_result = self.validation_service.validate_action(
             action, 
-            self.state_manager.current_state, 
-            player
+            self.state, 
+            player,
+            self.state_manager.action_context
         )
         
         if not validation_result.is_valid:
@@ -310,7 +316,7 @@ class Game:
             )
         
         # Применяем действие
-        self._apply_action(action, self.state_manager.current_state, player, self.state_manager.action_context)
+        self._apply_action(self.state, action, player, self.state_manager.action_context)
         
         # Обновляем состояние
         try:
@@ -338,7 +344,8 @@ class Game:
                 message="No active transaction to commit",
                 awaiting=self.get_expected_params(),
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand,
+                provisional_state=self.state_manager.get_provisional_state()
             )
         
         if action.commit:
@@ -348,16 +355,17 @@ class Game:
                     message="No changes to state, nothing to commit",
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
             
             try:
                 self.state_manager.commit_transaction()
                 
                 # Обновляем количество оставшихся действий
-                self.state_manager.current_state.actions_left -= 1
+                self.state.actions_left -= 1
                 
-                if self.state_manager.current_state.actions_left > 0:
+                if self.state.actions_left > 0:
                     # Продолжаем ход
                     return ActionProcessResult(
                         processed=True,
@@ -365,7 +373,7 @@ class Game:
                         provisional_state=self.state_manager.get_provisional_state(),
                         awaiting=self.get_expected_params(),
                         current_context=self.state_manager.action_context,
-                        hand=self.state_manager.current_state.players[color].hand
+                        hand=self.state.players[color].hand
                     )
                 else:
                     # Завершаем ход
@@ -376,7 +384,7 @@ class Game:
                         provisional_state=self.state_manager.get_provisional_state(),
                         awaiting=self.get_expected_params(),
                         current_context=self.state_manager.action_context,
-                        hand=self.state_manager.current_state.players[color].hand
+                        hand=self.state.players[color].hand,
                     )
             except ValueError as e:
                 return ActionProcessResult(
@@ -384,7 +392,8 @@ class Game:
                     message=str(e),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
         else:
             # Откатываем транзакцию
@@ -396,7 +405,7 @@ class Game:
                     provisional_state=self.state_manager.get_provisional_state(),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state.players[color].hand,
                 )
             except ValueError as e:
                 return ActionProcessResult(
@@ -404,7 +413,8 @@ class Game:
                     message=str(e),
                     awaiting=self.get_expected_params(),
                     current_context=self.state_manager.action_context,
-                    hand=self.state_manager.current_state.players[color].hand
+                    hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state()
                 )
 
     def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
@@ -412,7 +422,8 @@ class Game:
             # Завершаем ход и переходим к следующему игроку
             next_state = self._prepare_next_turn()
             self.state_manager.start_new_turn(next_state)
-            return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state_manager.current_state.players[color].hand)
+            return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,
+                    provisional_state=self.state_manager.get_provisional_state())
         else:
             # Откатываемся к началу хода
             self.state_manager.rollback_transaction()
@@ -422,7 +433,7 @@ class Game:
                 provisional_state=self.state_manager.get_provisional_state(), 
                 awaiting={}, 
                 current_context=self.state_manager.action_context,
-                hand=self.state_manager.current_state.players[color].hand
+                hand=self.state.players[color].hand
             )
      
     def _apply_action(self, state:BoardState, action:ParameterAction, player:Player, action_context:ActionContext):
@@ -431,37 +442,37 @@ class Game:
             player.hand.pop(action.card_id)
 
         if isinstance(action, ResourceAction):
+            market_cost = 0
             for resource in action.resources_used:
-                if resource.source_type == ResourceSourceType.PLAYER and resource.resource_type is not ResourceType.MONEY:
-                    building = self.state_manager.current_state.get_building_slot(resource.building_slot_id).building_placed
-                    building.resource_count -= resource.amount
+                if resource.building_slot_id is not None:
+                    building = self.state.get_building_slot(resource.building_slot_id).building_placed
+                    building.resource_count -= 1
                     if building.resource_count == 0:
                         building.flipped = True
-                        owner = self.state_manager.current_state.players[building.owner]
+                        owner = self.state.players[building.owner]
                         owner.income_points += building.income
                         owner.recalculate_income()
                         
-                elif resource.source_type == ResourceSourceType.MERCHANT:
-                    merchant = self.state_manager.current_state.get_merchant_slot(resource.merchant_slot_id)
+                elif resource.merchant_slot_id is not None:
+                    merchant = self.state.get_merchant_slot(resource.merchant_slot_id)
                     merchant.beer_available = False
-                elif resource.source_type == ResourceSourceType.MARKET:
-                    cost = self.state_manager.current_state.market.purchase_resource(resource.resource_type, resource.amount)
-                    player.bank -= cost
-                elif resource.resource_type == ResourceType.MONEY:
-                    player.bank -= resource.amount
                 else:
-                    raise ValueError("Cannot process these resources")
+                    market_cost += self.state.market.purchase_resource(resource.resource_type, resource.amount)
+            base_cost = self.get_resource_amounts(action, player).money
+            spent = base_cost + market_cost
+            player.bank -= spent
+            player.money_spent += spent
 
         if action_context is ActionContext.PASS:
             return
 
-        elif self.state_manager.action_context is ActionContext.LOAN:
+        elif action_context is ActionContext.LOAN:
             player.income -= 3
             player.bank += 30
             player.recalculate_income(keep_points=False)
             return
 
-        elif self.action_context is ActionContext.SCOUT:
+        elif action_context is ActionContext.SCOUT:
             for card_id in action.additional_card_cost:
                 state.discard.append(player.hand[card_id])
                 player.hand.pop(card_id)
@@ -470,43 +481,95 @@ class Game:
                 player.hand[joker.id] = joker
             return
         
-        elif self.state_manager.action_context is ActionContext.DEVELOP:
-            building = min(
-                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
-                            key=lambda x: x.level,
-                            default=None
-                            )
+        elif action_context is ActionContext.DEVELOP:
+            building = player.get_lowest_level_building(action.industry)
             player.available_buildings.pop(building)
 
-        elif self.state_manager.action_context is ActionContext.NETWORK:
-            self.state_manager.current_state.links[action.link_id].owner = player.color
+        elif action_context is ActionContext.NETWORK:
+            self.state.links[action.link_id].owner = player.color
 
-        elif self.state_manager.action_context is ActionContext.SELL:
-            building = self.state_manager.current_state.get_building_slot(action.slot_id).building_placed
+        elif action_context is ActionContext.SELL:
+            building = self.state.get_building_slot(action.slot_id).building_placed
             building.flipped = True
-            owner = self.state_manager.current_state.players[building.owner]
+            owner = self.state.players[building.owner]
             owner.income += building.income
 
-        elif self.state_manager.action_context is ActionContext.BUILD:
-            building = min(
-                            (b for b in player.available_buildings.values() if b.industry_type is action.industry),
-                            key=lambda x: x.level,
-                            default=None
-                            )
-            self.state_manager.current_state.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
+        elif action_context is ActionContext.BUILD:
+            building = player.get_lowest_level_building(action.industry)
+            building.slot_id = action.slot_id
+            self.state.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
 
     def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
+        amounts = self.get_resource_amounts(action, player)
+        out = []
+        if action.resources_used.strategy is ResourceStrategy.MERCHANT_FIRST:
+            merchant_first = True
+            strategy = action.resources_used.then
+        else:
+            strategy = action.resources_used.strategy
+
+        if isinstance(action, (BuildSelection, SellSelection)):
+            action_city = self.state.get_building_slot(action.slot_id).city
+            link_id = None
+        elif isinstance(action, NetworkSelection):
+            action_city = None
+            link_id = action.link_id
+
+        if amounts.iron:
+            iron_buildings = self.state.get_player_iron_sources()
+            with_scores = [(building,
+                            self.calculate_resource_score(building, strategy))
+                            for building in iron_buildings]
+            with_scores.sort(key=lambda x: x[1], reverse=True)
+            taken_iron = 0
+
+
+        if amounts.coal:
+            coal_buildings = self.state.get_player_coal_sources(city_name=action_city, link_id=link_id)
+
+        if amounts.beer:
+            beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
+        # TODO
+
+    def _prepare_next_turn(self) -> BoardState:
         pass
 
-    def _prepare_next_turn(self):
-        pass
+    def calcualte_resource_score(self, building:Building, strategy:ResourceStrategy, color) -> float:
+        match type(strategy):
+            case ResourceStrategy.MAXIMIZE_INCOME:
+                return building.income / building.resource_count if building.owner == color else -(building.income / building.resource_count)
+            case ResourceStrategy.MAXIMIZE_VP:
+                vp_score = building.victory_points if building.owner == color else -building.victory_points
+                city = self.state.get_building_slot(building.slot_id).city
+                for link in self.state.links.values():
+                    if city in link.cities:
+                        if link.owner == color:
+                            vp_score += building.link_victory_points
+                        elif link.owner is not None:
+                            vp_score -= building.link_victory_points
+                return vp_score
+        return 0 
+
+    def get_resource_amounts(self, action:ResourceAction, player:Player) -> ResourceAmounts:
+        if isinstance(action, BuildSelection):
+            building = player.get_lowest_level_building(action.industry)
+            return building.get_cost()
+        elif isinstance(action, SellSelection):
+            building = self.state.get_building_slot(action.slot_id).building_placed
+            return ResourceAmounts(beer=building.sell_cost)
+        elif isinstance(action, NetworkSelection):
+            return self.state.get_link_cost(subaction_count=self.state_manager.subaction_count)
+        elif isinstance(action, DevelopSelection):
+            return self.state.get_develop_cost()
+        else:
+            raise ValueError("Unknown resource action")
 
     def get_expected_params(self) -> Dict[str, List[str]]:
         classes = self.ACTION_CONTEXT_MAP[self.state_manager.action_context]
         out = {}
 
         for cls in classes:
-            fields = cls.model_fields.keys()
+            fields = list(cls.model_fields.keys())
             if self.state_manager.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
                 if self.state_manager.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
@@ -523,7 +586,7 @@ class Game:
             return ValidationResult(is_valid=True)
 
     def is_player_to_move(self, color:PlayerColor):
-        if self.state_manager.current_state.turn_order[0] != color:
+        if self.state.turn_order[0] != color:
             return False
         return True
         
