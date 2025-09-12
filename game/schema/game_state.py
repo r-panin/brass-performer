@@ -95,6 +95,7 @@ class Building(GameEntity):
     link_victory_points: int
     era_exclusion: Optional[LinkType]
     income: int
+    slot_id: Optional[int] = None
 
     def get_cost(self) -> ResourceAmounts:
         return ResourceAmounts(
@@ -296,12 +297,15 @@ class BoardState(BaseModel):
                 if slot.building_placed:
                     yield slot.building_placed
     
-    def get_player_iron_sources(self) -> Iterator[Building]:
+    def get_player_iron_sources(self) -> List[Building]:
+        out = []
         for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.IRON and building.resource_count > 0:
-                yield building
+                out.append(building)
+        return out
 
-    def get_player_coal_locations(self, city_name:Optional[str]=None, link_id:Optional[int]=None) -> Dict[str, int]:
+    def get_player_coal_locations(self, city_name:Optional[str]=None, link_id:Optional[int]=None) -> Dict[str, int] : 
+        '''Returns dict: city name, priority'''
         return self.find_paths(self, city_name=city_name, start_link_id=link_id, target_condition=lambda city: any(
             slot.building_placed is not None and
             slot.building_placed.industry_type == IndustryType.COAL and
@@ -309,6 +313,33 @@ class BoardState(BaseModel):
             for slot in self.cities[city].slots.values
         ),
         find_all=True)
+
+    def get_player_coal_sources(self, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[tuple[Building, int]]:
+        '''Returns list of tuples: Building, priority'''        
+        out = []
+        coal_cities = self.get_player_coal_location(city_name, link_id)
+        for city, priority in coal_cities.items():
+            for slot in self.cities[city].slots.values():
+                if slot.building_placed is not None:
+                    building = slot.building_placed
+                    if building.industry_type == IndustryType.COAL and building.resource_count > 0:
+                        out.append((building, priority))
+
+        out.sort(key=lambda x: x[1])
+        return out
+    
+    def get_player_beer_sources(self, color:PlayerColor, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[Building]:
+        out = []
+        for building in self.iter_placed_buildings:
+            if building.industry_type == IndustryType.BREWERY:
+                if building.owner == color:
+                    out.append(building)
+                else:
+                    city = self.get_building_slot(building.slot).city
+                    connected = self.find_paths(start=city, end=city_name, start_link_id=link_id)
+                    if connected:
+                        out.append(building)
+        return out
     
     def market_access_exists(self, city_name: str):
         return self.find_paths(self, city_name, target_condition=lambda city: self.cities[city].is_merchant)
@@ -430,11 +461,11 @@ class BoardState(BaseModel):
         
         return slot_cities | link_cities 
 
-    def get_link_cost(self):
+    def get_link_cost(self, subaction_count=0):
         if self.era == LinkType.CANAL:
             return ResourceAmounts(money=3)
         elif self.era == LinkType.RAIL:
-            if self.subaction_count == 0:
+            if subaction_count == 0:
                 return ResourceAmounts(money=5, coal=1)
             else:
                 return ResourceAmounts(money=10, coal=1, beer=1)
@@ -444,6 +475,9 @@ class BoardState(BaseModel):
         for merchant in eligible_merchants:
             if self.find_paths(start=city_name, end=merchant):
                 return True
+
+    def get_develop_cost(self) -> ResourceAmounts:
+        return ResourceAmounts(iron=1)
     
 
 class PlayerState(BaseModel):

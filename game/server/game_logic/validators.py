@@ -186,8 +186,8 @@ class DevelopValidator(BaseValidator):
     def validate(self, action:DevelopSelection, game_state:BoardState, player:Player):
         return ValidationResult(is_valid=True)
     
-    def _validate_base_action_cost(self, action:DevelopSelection, game_state, player):
-        target_cost = ResourceAmounts(iron=1)
+    def _validate_base_action_cost(self, action:DevelopSelection, game_state:BoardState, player):
+        target_cost = game_state.get_develop_cost()
         if action.get_resource_amounts() != target_cost:
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
 

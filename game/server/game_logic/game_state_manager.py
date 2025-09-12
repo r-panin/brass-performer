@@ -46,6 +46,10 @@ class GameStateManager:
     @property
     def phase(self) -> GamePhase:
         return self._state.phase
+
+    @property
+    def subaction_count(self) -> int:
+        return self._state.subaction_count
     
     def start_transaction(self, context: ActionContext) -> None:
         """Начинает новую транзакцию"""

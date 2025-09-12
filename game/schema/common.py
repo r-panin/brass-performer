@@ -70,13 +70,19 @@ class ResourceAmounts(BaseModel):
     money: int = 0
 
 class ResourceStrategy(StrEnum):
-    OWN_FIRST = 'own_first'
+    MAXIMIZE_INCOME = 'maximize_income'
+    MAXIMIZE_VP = 'maximize_vp'
     MERCHANT_FIRST = 'merchant_first'
-    ENEMY_FIRST = 'enemy_first'
 
 class AutoResourceSelection(BaseModel):
     mode: Literal["auto"]
     strategy: ResourceStrategy
+    then: Optional[ResourceStrategy] = None
+
+    @model_validator(mode='after')
+    def validate(self):
+        if self.strategy is ResourceStrategy.MERCHANT_FIRST and self.then is None:
+            raise ValueError(f"Strategy {self.strategy} requires a 'then' strategy")
 
 class IndustryType(StrEnum):
     COAL = "coal"
