@@ -460,6 +460,7 @@ class Game:
 
                 else:
                     market_amounts[resource.resource_type] += 1
+
             market_cost = 0
             for rtype, amount in market_amounts:
                 market_cost += self.state.market.purchase_resource(rtype, amount)
@@ -537,6 +538,9 @@ class Game:
         # TODO
 
     def _prepare_next_turn(self) -> BoardState:
+        pass
+
+    def _prepare_next_round(self) -> BoardState:
         pass
 
     def calcualte_resource_score(self, building:Building, strategy:ResourceStrategy, color) -> float:
