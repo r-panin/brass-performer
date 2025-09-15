@@ -87,7 +87,7 @@ class Building(GameEntity):
     owner: PlayerColor
     flipped: bool
     cost: Dict[ResourceType, int]
-    resource_count: int
+    resource_count: int = Field(ge=0)
     victory_points: int
     cost: Dict[str, int]
     sell_cost: Optional[int]
@@ -219,10 +219,10 @@ class Player(BaseModel):
     hand: Dict[int, Card]
     available_buildings: Dict[int, Building]
     color: PlayerColor
-    bank: int
-    income: int
-    income_points: int
-    victory_points: int
+    bank: int = Field(ge=0)
+    income: int = Field(ge=-10)
+    income_points: int = Field(ge=-10)
+    victory_points: int = Field(ge=0)
     money_spent: int = 0
 
     def hide_hand(self) -> PlayerExposed:
@@ -478,7 +478,6 @@ class BoardState(BaseModel):
 
     def get_develop_cost(self) -> ResourceAmounts:
         return ResourceAmounts(iron=1)
-    
 
 class PlayerState(BaseModel):
     common_state: BoardStateExposed

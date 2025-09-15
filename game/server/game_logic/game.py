@@ -443,25 +443,24 @@ class Game:
 
         if isinstance(action, ResourceAction):
             for resource in action.resources_used:
-                if resource.source_type == ResourceSourceType.PLAYER and resource.resource_type is not ResourceType.MONEY:
+                if resource.building_slot_id is not None:
                     building = self.state.get_building_slot(resource.building_slot_id).building_placed
-                    building.resource_count -= resource.amount
+                    building.resource_count -= 1
                     if building.resource_count == 0:
                         building.flipped = True
                         owner = self.state.players[building.owner]
                         owner.income_points += building.income
                         owner.recalculate_income()
                         
-                elif resource.source_type == ResourceSourceType.MERCHANT:
+                elif resource.merchant_slot_id is not None:
                     merchant = self.state.get_merchant_slot(resource.merchant_slot_id)
                     merchant.beer_available = False
-                elif resource.source_type == ResourceSourceType.MARKET:
-                    cost = self.state.market.purchase_resource(resource.resource_type, resource.amount)
-                    player.bank -= cost
-                elif resource.resource_type == ResourceType.MONEY:
-                    player.bank -= resource.amount
                 else:
-                    raise ValueError("Cannot process these resources")
+                    market_cost = self.state.market.purchase_resource(resource.resource_type, resource.amount)
+            base_cost = self.get_resource_amounts(action, player).money
+            spent = base_cost + market_cost
+            player.bank -= spent
+            player.money_spent += spent
 
         if action_context is ActionContext.PASS:
             return
@@ -507,16 +506,6 @@ class Game:
             strategy = action.resources_used.then
         else:
             strategy = action.resources_used.strategy
-
-
-        if amounts.money:
-            out.append(
-            ResourceSource(
-                source_type = ResourceSourceType.PLAYER,
-                resource_type = ResourceType.MONEY,
-                amount = amounts.money
-            )
-            )
 
         if isinstance(action, (BuildSelection, SellSelection)):
             action_city = self.state.get_building_slot(action.slot_id).city
@@ -565,7 +554,7 @@ class Game:
 
         if amounts.beer:
             beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
-
+        # TODO
 
     def _prepare_next_turn(self) -> BoardState:
         pass
