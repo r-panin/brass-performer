@@ -301,7 +301,9 @@ class BuildValidator(BaseValidator):
 
     def _validate_base_action_cost(self, action:BuildSelection, game_state, player:Player):
         building = player.get_lowest_level_building(action.industry)
-        if building.get_cost() != action.get_resource_amounts():
+        moneyless_cost = building.get_cost()
+        moneyless_cost.money = 0 # Money is calculated within game logic and shouldn't be checked here or pass within action
+        if moneyless_cost != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Building base cost doens't match resource selecion")
         return ValidationResult(is_valid=True)
 

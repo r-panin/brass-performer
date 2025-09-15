@@ -442,6 +442,7 @@ class Game:
             player.hand.pop(action.card_id)
 
         if isinstance(action, ResourceAction):
+            market_cost = 0
             for resource in action.resources_used:
                 if resource.building_slot_id is not None:
                     building = self.state.get_building_slot(resource.building_slot_id).building_placed
@@ -456,7 +457,7 @@ class Game:
                     merchant = self.state.get_merchant_slot(resource.merchant_slot_id)
                     merchant.beer_available = False
                 else:
-                    market_cost = self.state.market.purchase_resource(resource.resource_type, resource.amount)
+                    market_cost += self.state.market.purchase_resource(resource.resource_type, resource.amount)
             base_cost = self.get_resource_amounts(action, player).money
             spent = base_cost + market_cost
             player.bank -= spent

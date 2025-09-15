@@ -101,7 +101,7 @@ class Building(GameEntity):
         return ResourceAmounts(
             iron=self.cost[ResourceType.IRON],
             coal=self.cost[ResourceType.COAL],
-            money=self.cost[ResourceType.MONEY]
+            money=self.cost.get("money", 0)
         )
 
     def is_sellable(self) -> bool:
