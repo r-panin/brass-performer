@@ -1,4 +1,4 @@
-from ...schema import BoardState, ResourceStrategy, ResourceSourceType, ResourceAmounts, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ResourceStrategy, ResourceAmounts, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict, get_args
 import random
 from pathlib import Path
@@ -521,32 +521,6 @@ class Game:
                             for building in iron_buildings]
             with_scores.sort(key=lambda x: x[1], reverse=True)
             taken_iron = 0
-            while taken_iron < amounts.iron:
-                if with_scores:
-                    best_building = with_scores[0][0]
-                    building_amount = max(best_building.resource_count, amounts.iron)
-                    out.append(
-                        ResourceSource(
-                            source_type=ResourceSourceType.PLAYER,
-                            resource_type=ResourceType.IRON,
-                            amount=building_amount,
-                            building_slot_id=best_building.slot_id
-                        )
-                    )
-                    taken_iron += building_amount
-                    if building_amount >= best_building.resource_count:
-                        with_scores.pop(0)
-                else:
-                    # should run once
-                    market_iron = amounts.iron - taken_iron
-                    out.append(
-                        ResourceSource(
-                            source_type=ResourceSourceType.MARKET,
-                            resource_type=ResourceType.IRON,
-                            amount=market_iron
-                        )
-                    )
-                    taken_iron += market_iron
 
 
         if amounts.coal:
