@@ -129,6 +129,15 @@ class City(GameEntity):
     merchant_slots: Optional[Dict[int, MerchantSlot]] = None
     merchant_min_players: Optional[int] = None
 
+    def get_link_vps(self):
+        out = 0
+        for slot in self.slots.values():
+            if slot.building_placed is not None:
+                building = slot.building_placed
+                if building.flipped:
+                    out += building.victory_points
+        return out
+
 
 class Market(BaseModel):
     coal_count: int = Field(le=14)
@@ -269,7 +278,7 @@ class BoardStateExposed(BaseModel):
     turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[tuple[Card, Card]]
+    wild_deck: List[Card]
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
@@ -281,7 +290,7 @@ class BoardState(BaseModel):
     turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[tuple[Card, Card]]
+    wild_deck: List[Card]
     subaction_count: int = Field(default=0, exclude=True)
 
     def hide_state(self) -> BoardStateExposed:

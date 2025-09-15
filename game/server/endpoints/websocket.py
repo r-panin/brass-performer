@@ -27,7 +27,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
     await websocket.send_json(game.get_player_state(color).model_dump()) # sending initial state
     
     message_generator = create_board_state_message(game)
-    
+
     try:
         while True:
             try:
@@ -45,6 +45,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 # Отправляем обновленное состояние всем игрокам
                 if action_result.end_of_turn:
                     await connection_manager.broadcast(game_id, message=message_generator)
+                if game.concluded:
+                    await connection_manager.broadcast(game_id, message=get_end_game_message(game))
+                    connection_manager.disconnect(websocket, game_id)
             except ValueError as e:
                 await websocket.send_json({
                     "error": str(e)
@@ -64,6 +67,9 @@ def create_board_state_message(game):
     def board_state_generator(websocket:WebSocket, player_color:PlayerColor):
         return game.get_player_state(player_color).model_dump()
     return board_state_generator
+
+def get_end_game_message(game) -> Dict:
+    return {"final scores": {player.color: player.victory_points for player in game.state.players}}
 
 def parse_action(data: Dict[str, Any]) -> Action:
     # Сначала проверяем наличие уникальных полей для каждого типа действия

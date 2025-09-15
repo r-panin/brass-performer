@@ -44,9 +44,9 @@ def validate_resources(func):
                 city_name = None
                 link_id = action.link_id
             
-            coal_validation = self._validate_coal_preference(game_state, action.resources_used, city_name=city_name, link_id=link_id)
-            if not coal_validation.is_valid:
-                return coal_validation
+                coal_validation = self._validate_coal_preference(game_state, action.resources_used, city_name=city_name, link_id=link_id)
+                if not coal_validation.is_valid:
+                    return coal_validation
             
             market_coal = [resource for resource in action.resources_used if resource.building_slot_id is None and resource.resource_type == ResourceType.COAL]
             market_coal_amount = len(market_coal)
@@ -157,6 +157,8 @@ class BaseValidator(ActionValidator, ABC):
                         return ValidationResult(is_valid=False, message=f"Link {action.link_id} is not connected to city {coal_city}")
 
         for slot_id, resource_list in slot_resources.items():
+            if slot_id is None:
+                continue
             building = game_state.get_building_slot(slot_id).building_placed
             if len(resource_list) > building.resource_count:
                 return ValidationResult(is_valid=False, message=f'Requested {len(resource_list)} from building in slot {slot_id}, available {building.resource_count}')
@@ -199,6 +201,7 @@ class DevelopValidator(BaseValidator):
         target_cost = game_state.get_develop_cost()
         if action.get_resource_amounts() != target_cost:
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
+        return ValidationResult(is_valid=True)
 
 class NetworkValidator(BaseValidator):
     @validate_card_in_hand
@@ -229,12 +232,14 @@ class NetworkValidator(BaseValidator):
                     connected = game_state.find_paths(start_link_id=link.id, end=beer_city)
                     if not connected:
                         return ValidationResult(is_valid=False, message=f"Link {link.id} is not connected to the city {beer_city}")
+        return ValidationResult(is_valid=True)
                         
 
     def _validate_base_action_cost(self, action:NetworkSelection, game_state:BoardState, player):
         base_link_cost = game_state.get_link_cost()
         if base_link_cost != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
+        return ValidationResult(is_valid=True)
 
     def _get_base_money_cost(self, action, game_state, player):
         return game_state.get_link_cost(game_state.subaction_count).money
@@ -354,3 +359,4 @@ class SellValidator(BaseValidator):
         required_amounts = ResourceAmounts(beer=slot.building_placed.sell_cost)
         if offered_amounts != required_amounts:
             return ValidationResult(is_valid=False, message=f"Action requires {required_amounts}, offered are {offered_amounts}")
+        return ValidationResult(is_valid=True)

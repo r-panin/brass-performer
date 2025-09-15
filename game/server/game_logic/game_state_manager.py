@@ -49,7 +49,7 @@ class GameStateManager:
 
     @property
     def subaction_count(self) -> int:
-        return self._state.subaction_count
+        return self._state.transaction_state.subaction_count
     
     def start_transaction(self, context: ActionContext) -> None:
         """Начинает новую транзакцию"""
@@ -58,18 +58,18 @@ class GameStateManager:
         
         self._state.phase = GamePhase.TRANSACTION
         self._state.action_context = context
-        self._state.subaction_count = 0
+        self._state.transaction_state.subaction_count = 0
     
     def add_subaction(self) -> None:
         """Добавляет поддействие в текущую транзакцию"""
         if self._state.phase != GamePhase.TRANSACTION:
             raise ValueError("Can only add subactions in TRANSACTION phase")
         
-        self._state.subaction_count += 1
-        
+        self._state.transaction_state.subaction_count += 1
+
         # Проверяем, нужно ли переходить в AWAITING_COMMIT
         max_actions = self._get_max_actions()
-        if self._state.subaction_count >= max_actions:
+        if self._state.transaction_state.subaction_count >= max_actions:
             self._state.phase = GamePhase.AWAITING_COMMIT
             self._state.action_context = ActionContext.AWAITING_COMMIT
     
@@ -84,7 +84,7 @@ class GameStateManager:
         # Сбрасываем транзакцию
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
-        self._state.subaction_count = 0
+        self._state.transaction_state.subaction_count = 0
     
     def rollback_transaction(self) -> None:
         """Откатывает текущую транзакцию"""
@@ -95,14 +95,14 @@ class GameStateManager:
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
         self._state.transaction_state = deepcopy(self._state.turn_state)
-        self._state.subaction_count = 0
+        self._state.transaction_state.subaction_count = 0
 
     def rollback_turn(self) -> None:
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
         self._state.turn_state = deepcopy(self._state._backup_state)
         self._state.turn_state = deepcopy(self._state._backup_state)
-        self._state.subaction_count = 0
+        self._state.transaction_state.subaction_count = 0
     
     def end_turn(self) -> None:
         """Завершает ход"""
@@ -117,7 +117,7 @@ class GameStateManager:
         self._state.transaction_state = deepcopy(new_state)
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
-        self._state.subaction_count = 0
+        self._state.transaction_state.subaction_count = 0
     
     def _get_max_actions(self) -> int:
         """Возвращает максимальное количество действий для текущего контекста"""
@@ -133,6 +133,6 @@ class GameStateManager:
         return state.hide_state()
     
     def has_subaction(self) -> bool:
-        if self._state.subaction_count > 0:
+        if self._state.transaction_state.subaction_count > 0:
             return True
         return False

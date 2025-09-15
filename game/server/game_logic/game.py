@@ -45,6 +45,7 @@ class Game:
         random.shuffle(self.available_colors)
         self.validation_service = ActionValidationService()
         logging.basicConfig(level=logging.DEBUG)
+        self.concluded = False
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state_manager = GameStateManager(self._create_initial_state(player_count, players_colors))
@@ -130,14 +131,14 @@ class Game:
         random.shuffle(out)
         return out
 
-    def _build_wild_deck(self) -> List[tuple[Card]]:
+    def _build_wild_deck(self) -> List[Card]:
         INDUSTRY_START_ID = 65
         CITY_OFFSET = 4
         NUM_WILD_CARDS = 4
         out = []
         for base_id in range(INDUSTRY_START_ID, INDUSTRY_START_ID + NUM_WILD_CARDS):
-            out.append((Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'),
-                        Card(id=base_id+CITY_OFFSET, card_type=CardType.CITY, value='wild')))
+            out.append(Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'))
+            out.append(Card(id=base_id+CITY_OFFSET, card_type=CardType.CITY, value='wild'))
         return out  
 
     def _create_cities(self, player_count:int) -> Dict[str, City]:
@@ -350,7 +351,7 @@ class Game:
             )
         
         if action.commit:
-            if self.state_manager._state.subaction_count == 0:
+            if self.state_manager.subaction_count == 0:
                 return ActionProcessResult(
                     processed=False,
                     message="No changes to state, nothing to commit",
@@ -421,13 +422,13 @@ class Game:
     def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
         if action.end_turn:
             # Завершаем ход и переходим к следующему игроку
-            next_state = self._prepare_next_turn()
+            next_state = self._prepare_next_turn(self.state)
             self.state_manager.start_new_turn(next_state)
             return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state())
         else:
             # Откатываемся к началу хода
-            self.state_manager.rollback_transaction()
+            self.state_manager.rollback_turn()
             return ActionProcessResult(
                 processed=True, 
                 message='Reverted to turn start', 
@@ -439,8 +440,11 @@ class Game:
      
     def _apply_action(self, state:BoardState, action:ParameterAction, player:Player, action_context:ActionContext):
         if action.card_id is not None:
-            state.discard.append(player.hand[action.card_id])
-            player.hand.pop(action.card_id)
+            card = player.hand.pop(action.card_id)
+            if card.value != 'wild':
+                state.discard.append(card)
+            else:
+                self.state.wild_deck.append(card)
 
         if isinstance(action, ResourceAction):
             market_amounts = defaultdict(int)
@@ -462,7 +466,7 @@ class Game:
                     market_amounts[resource.resource_type] += 1
 
             market_cost = 0
-            for rtype, amount in market_amounts:
+            for rtype, amount in market_amounts.items():
                 market_cost += self.state.market.purchase_resource(rtype, amount)
             base_cost = self.get_resource_amounts(action, player).money
             spent = base_cost + market_cost
@@ -482,14 +486,15 @@ class Game:
             for card_id in action.additional_card_cost:
                 state.discard.append(player.hand[card_id])
                 player.hand.pop(card_id)
-            jokers = self.action_state.wild_deck.pop()
-            for joker in jokers:
-                player.hand[joker.id] = joker
+            city_joker = next(j for j in self.state.wild_deck if j.card_type == CardType.CITY)
+            ind_joker = next(j for j in self.state.wild_deck if j.card_type == CardType.INDUSTRY)
+            player.hand[city_joker.id] = city_joker
+            player.hand[ind_joker.id] = ind_joker
             return
         
         elif action_context is ActionContext.DEVELOP:
             building = player.get_lowest_level_building(action.industry)
-            player.available_buildings.pop(building)
+            player.available_buildings.pop(building.id)
 
         elif action_context is ActionContext.NETWORK:
             self.state.links[action.link_id].owner = player.color
@@ -498,7 +503,8 @@ class Game:
             building = self.state.get_building_slot(action.slot_id).building_placed
             building.flipped = True
             owner = self.state.players[building.owner]
-            owner.income += building.income
+            owner.income_points += building.income
+            owner.recalculate_income()
 
         elif action_context is ActionContext.BUILD:
             building = player.get_lowest_level_building(action.industry)
@@ -537,11 +543,62 @@ class Game:
             beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
         # TODO
 
-    def _prepare_next_turn(self) -> BoardState:
-        pass
+    def _prepare_next_turn(self, state:BoardState) -> BoardState:
+        state.turn_order.pop()
+        state.actions_left = 2
+        if not state.turn_order:
+            state = self._prepare_next_round(state)
+        return state
 
-    def _prepare_next_round(self) -> BoardState:
-        pass
+    def _prepare_next_round(self, state:BoardState) -> BoardState:
+        for player in state.players.values():
+            player.bank += player.income
+            if player.bank < 0:
+                pass #wow
+            print('ADDED SUBACTION')
+            if state.deck:
+                while len(player.hand) < 8:
+                    card = state.deck.pop()
+                    player.hand[card.id] = card
+        state.turn_order = sorted(state.players, key=lambda k: state.players[k].money_spent)
+        if all(len(p.hand) == 0 for p in state.players.values()) and len(state.deck) == 0:
+            if state.era == LinkType.CANAL:
+                state = self._prepare_next_era(state)
+            elif state.era == LinkType.RAIL:
+                state = self._conclude_game(state)
+        return state
+    
+    def _prepare_next_era(self, state:BoardState) -> BoardState:
+        self.state.deck = self._build_initial_deck(len(self.state.players))
+        random.shuffle(self.state.deck)
+
+        for link in self.state.links.values():
+            if link.owner is not None:
+                for city_name in link.cities:
+                    self.state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
+                link.owner = None
+
+        for building in self.state.iter_placed_buildings():
+            if building.flipped:
+                self.state.players[building.owner].victory_points += building.victory_points
+            if building.level == 1:
+                self.state.get_building_slot(building.slot_id).building_placed = None
+
+        state.era = LinkType.RAIL
+
+        return state
+
+    def _conclude_game(self, state:BoardState) -> BoardState:
+        for link in self.state.links.values():
+            if link.owner is not None:
+                for city_name in link.cities:
+                    self.state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
+
+        for building in self.state.iter_placed_buildings():
+            if building.flipped:
+                self.state.players[building.owner].victory_points += building.victory_points
+        
+        self.concluded = True
 
     def calcualte_resource_score(self, building:Building, strategy:ResourceStrategy, color) -> float:
         match type(strategy):
@@ -576,16 +633,13 @@ class Game:
     def get_expected_params(self) -> Dict[str, List[str]]:
         classes = self.ACTION_CONTEXT_MAP[self.state_manager.action_context]
         out = {}
-
         for cls in classes:
             fields = list(cls.model_fields.keys())
             if self.state_manager.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
                 if self.state_manager.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
             out[cls.__name__] = fields
-        
         return out
-
     
     def validate_action_context(self, action_context, action) -> ValidationResult:
             allowed_actions = self.ACTION_CONTEXT_MAP.get(action_context)

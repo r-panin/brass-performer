@@ -11,7 +11,7 @@ class MetaAction(BaseModel):
     model_config = ConfigDict(extra='forbid')  
 
 class ParameterAction(BaseModel):
-    card_id: Optional[int]
+    card_id: Optional[int] = None
     model_config = ConfigDict(extra='forbid')  
 
 class ResourceAction(BaseModel):
