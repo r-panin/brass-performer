@@ -771,36 +771,45 @@ class Game:
         cards = player.hand
         slots = [slot for city in self.state.cities.values() for slot in city.slots.values() if not slot.building_placed]
         industries = list(IndustryType)
+
         iron_buildings = self.state.get_player_iron_sources()
         iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
-        coal_buildings_first_prio = []
-        coal_buildings_second_prio = []
-        current_priority = -1
-        coal_sources = self.state.get_player_coal_sources()
-        for building, priority in coal_sources:
-            # Если приоритет изменился и превышен лимит ресурсов - прекращаем добавлять в первый список
-            if priority != current_priority and total_resources > 2:
-                break
-            
-            current_priority = priority
-            
-            if total_resources <= 2:
-                coal_buildings_first_prio.append(building)
-                total_resources += building.resource_count  # Предполагается наличие поля resource_count
-            else:
-                coal_buildings_second_prio.append(building)
+        iron_amount = sum(building.resource_count for building in iron_buildings)
 
-        coal_sources = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_first_prio]
-        coal_sources_secondary = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_second_prio]
         market_iron = ResourceSource(resource_type=ResourceType.IRON)
-        if sum(building.resource_count for building in iron_buildings) < 2:
-            iron_sources.append(market_iron)
+
         market_coal = ResourceSource(resource_type=ResourceType.COAL)
+
         network = self.state.get_player_network(player.color)
 
         for card in cards:
             for slot in slots:
+                coal_buildings_first_prio = []
+                coal_buildings_second_prio = []
+                current_priority = -1
+                coal_sources = self.state.get_player_coal_sources()
+                for building, priority in coal_sources:
+                    if priority != current_priority and total_resources > 2:
+                        break
+                    current_priority = priority
+                    if total_resources <= 2:
+                        coal_buildings_first_prio.append(building)
+                        total_resources += building.resource_count
+                    else:
+                        coal_buildings_second_prio.append(building)
+
+                coal_sources = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_first_prio]
+                coal_amount = sum(building.resource_count for building in coal_buildings_first_prio)
+                coal_sources_secondary = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_second_prio]
+                coal_amount_secondary = sum(building.resource_count for building in coal_buildings_second_prio)
+
                 for industry in industries:
+                    iron_depleted = False
+                    coal_depleted = False
+                    taken_iron = 0
+                    taken_coal = 0
+                    market_coal_req = 0
+                    market_iron_req = 0
                     if industry not in slot.industry_type_options:
                         continue
                     if card.card_type == CardType.CITY:
@@ -822,11 +831,20 @@ class Game:
                         
                     for resource in req_res:
                         if resource == ResourceType.COAL:
+                            if not coal_sources or coal_depleted:
+                                if self.state.market_access_exists(slot.city):
+                                    available = [market_coal]
+                                    market_coal_req += 1
                             available = coal_sources
-                            if self.state.market_access_exists(slot.city):
-                                available.append(market_coal)
+                            taken_coal += 1
                         elif resource == ResourceType.IRON:
+                            if not iron_sources or iron_depleted:
+                                available = [market_iron]
+                                market_iron_req += 1
                             available = iron_sources
+                            taken_iron += 1
+                            if taken_iron > iron_amount:
+                                iron_depleted = True
                         else:
                             available = []
                             
@@ -916,7 +934,7 @@ class Game:
                                 industry=industry,
                                 resources_used=resources_used
                             ))
-        return out
+        return sorted(action.model_dump_json() for action in out)
 
     def _remove_duplicates(self, lst):
         seen = set()
@@ -933,4 +951,4 @@ if __name__ == '__main__':
     game = Game()
     game.start(4, ['white', 'red', 'yellow', 'purple'])
 #    print(len(game.get_valid_build_actions(state=game.state, player=game.state.players[game.state.turn_order[0]])))
-    print(len(game._get_theoretically_valid_build_actions()))
+    print(game._get_theoretically_valid_build_actions()[:9])
