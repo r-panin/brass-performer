@@ -255,11 +255,11 @@ class BuildValidator(BaseValidator):
         building = player.get_lowest_level_building(action.industry)
         slot = game_state.get_building_slot(action.slot_id)
         if card.card_type == CardType.INDUSTRY:
-            if building.industry_type not in card.value:
+            if building.industry_type not in card.value and card.value != 'wild':
                 return ValidationResult(is_valid=False, message=f"Card valude {card.value} doesn't contain the industry {building.industry_type}")
             
         elif card.card_type == CardType.CITY:
-            if slot.city != card.value:
+            if slot.city != card.value and card.value != 'wild':
                 return ValidationResult(is_valid=False, message=f"Card value {card.value} doesn't match city {slot.city}")
             
         else:

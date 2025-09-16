@@ -17,7 +17,7 @@ class ResourceType(StrEnum):
     BEER = "beer"
 
 class ResourceSource(BaseModel):
-    resource_type: ResourceType
+    resource_type: ResourceType = None
     building_slot_id: Optional[int] = None
     merchant_slot_id: Optional[int] = None
 
@@ -30,6 +30,9 @@ class ResourceSource(BaseModel):
 
         if self.building_slot_id is not None and self.merchant_slot_id is not None:
             raise ValueError("May only provide either a building slot or a merchant slot, not both")
+
+        if not self.building_slot_id is None and self.merchant_slot_id is None and self.resource_type is None:
+            raise ValueError("Object may not be empty")
             
         return self
         

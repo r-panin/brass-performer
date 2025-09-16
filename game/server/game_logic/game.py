@@ -1,4 +1,4 @@
-from ...schema import BoardState, ResourceStrategy, ResourceAmounts, ResolveShortfallAction, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ResourceStrategy, ResourceType, ResourceAmounts, BuildStart, SellStart, NetworkStart, DevelopStart, ScoutStart, LoanStart, PassStart, ResolveShortfallAction, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict, get_args
 import random
 from pathlib import Path
@@ -230,7 +230,7 @@ class Game:
                 awaiting={},
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
-                    provisional_state=self.state_manager.get_provisional_state()
+                provisional_state=self.state_manager.get_provisional_state()
             )
 
         context_validateion = self.validate_action_context(self.state_manager.action_context, action)
@@ -238,7 +238,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message=f"Attempted action {type(action)}, which current context {self.state_manager.action_context} forbids",
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                 provisional_state=self.state_manager.get_provisional_state()
@@ -270,7 +270,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message="Cannot submit a meta action outside of main context",
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -281,7 +281,7 @@ class Game:
             return ActionProcessResult(
                 processed=True,
                 message=f"Entered {self.state_manager.action_context}",
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 provisional_state=self.state_manager.get_provisional_state(),
                 hand=self.state.players[color].hand
@@ -290,7 +290,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message=str(e),
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -301,7 +301,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message="No active transaction. Start with meta action",
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -325,7 +325,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message=validation_result.message,
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=player.hand
             )
@@ -339,7 +339,7 @@ class Game:
             return ActionProcessResult(
                 processed=True,
                 provisional_state=self.state_manager.get_provisional_state(),
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=player.hand
             )
@@ -347,7 +347,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message=str(e),
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=player.hand
             )
@@ -357,7 +357,7 @@ class Game:
             return ActionProcessResult(
                 processed=False,
                 message="No active transaction to commit",
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                 provisional_state=self.state_manager.get_provisional_state()
@@ -368,7 +368,7 @@ class Game:
                 return ActionProcessResult(
                     processed=False,
                     message="No changes to state, nothing to commit",
-                    awaiting=self.get_expected_params(),
+                    awaiting=self.get_expected_params(color),
                     current_context=self.state_manager.action_context,
                     hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -386,7 +386,7 @@ class Game:
                         processed=True,
                         message="Changes committed",
                         provisional_state=self.state_manager.get_provisional_state(),
-                        awaiting=self.get_expected_params(),
+                        awaiting=self.get_expected_params(color),
                         current_context=self.state_manager.action_context,
                         hand=self.state.players[color].hand
                     )
@@ -397,7 +397,7 @@ class Game:
                         processed=True,
                         message="Changes committed, confirm end of turn",
                         provisional_state=self.state_manager.get_provisional_state(),
-                        awaiting=self.get_expected_params(),
+                        awaiting=self.get_expected_params(color),
                         current_context=self.state_manager.action_context,
                         hand=self.state.players[color].hand,
                     )
@@ -405,7 +405,7 @@ class Game:
                 return ActionProcessResult(
                     processed=False,
                     message=str(e),
-                    awaiting=self.get_expected_params(),
+                    awaiting=self.get_expected_params(color),
                     current_context=self.state_manager.action_context,
                     hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -418,7 +418,7 @@ class Game:
                     processed=True,
                     message='Transaction rolled back',
                     provisional_state=self.state_manager.get_provisional_state(),
-                    awaiting=self.get_expected_params(),
+                    awaiting=self.get_expected_params(color),
                     current_context=self.state_manager.action_context,
                     hand=self.state.players[color].hand,
                 )
@@ -426,7 +426,7 @@ class Game:
                 return ActionProcessResult(
                     processed=False,
                     message=str(e),
-                    awaiting=self.get_expected_params(),
+                    awaiting=self.get_expected_params(color),
                     current_context=self.state_manager.action_context,
                     hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
@@ -458,7 +458,7 @@ class Game:
         if self.state_manager.phase is not GamePhase.SHORTFALL:
             return ActionProcessResult(
                 processed=False,
-                awaiting=self.get_expected_params(),
+                awaiting=self.get_expected_params(color),
                 provisional_state=self.state_manager.get_provisional_state(),
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
@@ -474,7 +474,7 @@ class Game:
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand,
                 message=validation.message,
-                awaiting=self.get_expected_params()
+                awaiting=self.get_expected_params(color)
             )
 
         self._resolve_shortfall(action, player)
@@ -704,7 +704,9 @@ class Game:
         else:
             raise ValueError("Unknown resource action")
 
-    def get_expected_params(self) -> Dict[str, List[str]]:
+    def get_expected_params(self, color:PlayerColor) -> Dict[str, List[str]]:
+        if not self.is_player_to_move(color):
+            return {}
         classes = self.ACTION_CONTEXT_MAP[self.state_manager.action_context]
         out = {}
         for cls in classes:
@@ -724,11 +726,64 @@ class Game:
 
     def is_player_to_move(self, color:PlayerColor):
         if self.state_manager.action_context is ActionContext.SHORTFALL:
-            return True
+            if self.state.players[color].bank < 0:
+                return True
+            return False
+        
         if self.state.turn_order[0] != color:
             return False
         return True
         
+    def get_action_space(self, color:PlayerColor) -> Dict[str, List[Action]]:
+        player = self.state.players[color]
+        valid_action_types = self.get_expected_params(color)
+        out = defaultdict(list)
+        for action in valid_action_types:
+            match action:
+                case "BuildStart":
+                    out[action].append(BuildStart())
+                case "SellStart":
+                    out[action].append(SellStart())
+                case "NetworkStart":
+                    out[action].append(NetworkStart())
+                case "DevelopStart":
+                    out[action].append(DevelopStart())
+                case "ScoutStart":
+                    out[action].append(ScoutStart())
+                case "LoanStart":
+                    out[action].append(LoanStart())
+                case "PassStart":
+                    out[action].append(PassStart())
+                case "BuildSelection":
+                    out[action] = self.get_valid_build_actions(player)
+
+    def get_valid_build_actions(self, player:Player) -> List[BuildSelection]: # oh boy
+        '''Gets all valid parameter permutations for build action by a given Player, for a specific game state'''
+        valid_cards_naive = player.hand
+        valid_slots_naive = [slot for slot in (city.slots for city in self.state.cities.values())]
+        valid_industries_naive = list(IndustryType)
+
+    def _get_theoretically_valid_build_actions(self) -> List[BuildSelection]: # OH BOY
+        '''Gets all build action parameter permutations that could in theory be valid under a specific game state'''
+        '''Build cards'''
+        cards = self._build_initial_deck()
+        jokers = self._build_wild_deck()
+        cards.append(next(joker for joker in jokers if joker.card_type == CardType.CITY))
+        cards.append(next(joker for joker in jokers if joker.card_type == CardType.INDUSTRY))
+
+        cards = set(cards)
+
+        '''Build slots'''
+        slots = {slot for slot in (city.slots.values() for city in self.state.cities.values())}
+
+        '''Build industries'''
+        industries = set(IndustryType)
+
+        '''Build resources'''
+        iron_sources_naive = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=slot.id) for slot in slots if IndustryType.IRON in slot.industry_type_options]
+        coal_sources_naive = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=slot.id) for slot in slots if IndustryType.COAL in slot.industry_type_options]
+        build_resource_sources = set(iron_sources_naive + coal_sources_naive)
+
 
 if __name__ == '__main__':
     game = Game(4)

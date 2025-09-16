@@ -456,7 +456,7 @@ class BoardState(BaseModel):
                     out += building_slot.building_placed.resource_count
         return out
     
-    def get_player_network(self, player_color: PlayerColor):
+    def get_player_network(self, player_color: PlayerColor) -> Set[City]:
         slot_cities = {
             city.name for city in self.cities.values()
             if any(slot.building_placed and slot.building_placed.owner == player_color
