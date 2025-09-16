@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, ResourceType, IndustryType, ResourceAction, ParameterAction, ScoutSelection, DevelopSelection, NetworkSelection, SellSelection, BuildSelection
+from ...schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ParameterAction, ScoutSelection, DevelopSelection, NetworkSelection, SellSelection, BuildSelection
 from typing import List
 from collections import defaultdict
 
@@ -272,6 +272,11 @@ class BuildValidator(BaseValidator):
         for s in city.slots.values():
             if (len(s.industry_type_options) < len(slot.industry_type_options)) and action.industry in s.industry_type_options:
                 return ValidationResult(is_valid=False, message=f"Can't build in slot {slot.id} when {s.id} has priority for this industry")
+            if s.building_placed is not None:
+                if slot.id == action.slot_id:
+                    return ValidationResult(is_valid=False, message=f"Slot {slot.id} already occupied")
+                if slot.building_placed.owner == player.color and game_state.era == LinkType.CANAL:
+                    return ValidationResult(is_valid=False, message=f"Can't build two buildings in one city during canal era")
         
         # Overbuilding validation
         if slot.building_placed is not None:
