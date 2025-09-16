@@ -316,7 +316,7 @@ class BoardState(BaseModel):
 
     def get_player_coal_locations(self, city_name:Optional[str]=None, link_id:Optional[int]=None) -> Dict[str, int] : 
         '''Returns dict: city name, priority'''
-        return self.find_paths(self, city_name=city_name, start_link_id=link_id, target_condition=lambda city: any(
+        return self.find_paths(start=city_name, start_link_id=link_id, target_condition=lambda city: any(
             slot.building_placed is not None and
             slot.building_placed.industry_type == IndustryType.COAL and
             slot.building_placed.resource_count > 0
@@ -327,7 +327,7 @@ class BoardState(BaseModel):
     def get_player_coal_sources(self, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[tuple[Building, int]]:
         '''Returns list of tuples: Building, priority'''        
         out = []
-        coal_cities = self.get_player_coal_location(city_name, link_id)
+        coal_cities = self.get_player_coal_locations(city_name, link_id)
         for city, priority in coal_cities.items():
             for slot in self.cities[city].slots.values():
                 if slot.building_placed is not None:
@@ -352,7 +352,7 @@ class BoardState(BaseModel):
         return out
     
     def market_access_exists(self, city_name: str):
-        return self.find_paths(self, city_name, target_condition=lambda city: self.cities[city].is_merchant)
+        return self.find_paths(self, start=city_name, target_condition=lambda city: self.cities[city].is_merchant)
 
     def find_paths(
         self,
@@ -468,6 +468,9 @@ class BoardState(BaseModel):
             if link.owner == player_color
             for city in link.cities
         }
+
+        if not slot_cities and link_cities:
+            return set(self.cities.values())
         
         return slot_cities | link_cities 
 

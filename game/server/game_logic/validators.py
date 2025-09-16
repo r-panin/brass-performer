@@ -261,6 +261,8 @@ class BuildValidator(BaseValidator):
         elif card.card_type == CardType.CITY:
             if slot.city != card.value and card.value != 'wild':
                 return ValidationResult(is_valid=False, message=f"Card value {card.value} doesn't match city {slot.city}")
+            if card.value == 'wild' and 'brewery' in slot.city:
+                return ValidationResult(is_valid=False, message="Can't use a city joker to build in farm breweries")
             
         else:
             return ValidationResult(is_valid=False, message='wut?')

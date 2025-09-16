@@ -9,7 +9,8 @@ import copy
 from .validation_service import ActionValidationService
 from ...schema import ResourceAction, AutoResourceSelection, ResourceSource
 from .game_state_manager import GameStateManager, GamePhase
-from collections import defaultdict
+from collections import defaultdict, Counter
+import itertools
 
 
 
@@ -33,6 +34,14 @@ class Game:
         ActionContext.LOAN: (ParameterAction,),
         ActionContext.END_OF_TURN: (EndOfTurnAction,),
         ActionContext.SHORTFALL: (ResolveShortfallAction,)
+    }
+    INDUSTRY_RESOURCE_OPTIONS:Dict[IndustryType, set[tuple[ResourceType]]] = {
+        IndustryType.BOX: {(ResourceType.COAL), (ResourceType.IRON), (ResourceType.COAL, ResourceType.COAL), (), (ResourceType.COAL, ResourceType.IRON), (ResourceType.IRON, ResourceType.IRON)},
+        IndustryType.IRON: {(ResourceType.COAL)},
+        IndustryType.COAL: {(), (ResourceType.IRON)},
+        IndustryType.BREWERY: {(ResourceType.IRON)},
+        IndustryType.COTTON: {(), (ResourceType.COAL), (ResourceType.COAL, ResourceType.IRON)},
+        IndustryType.POTTERY: {(ResourceType.IRON), (ResourceType.COAL), (ResourceType.COAL, ResourceType.COAL)}
     }
 
     @property
@@ -757,34 +766,171 @@ class Game:
                 case "BuildSelection":
                     out[action] = self.get_valid_build_actions(player)
 
-    def get_valid_build_actions(self, player:Player) -> List[BuildSelection]: # oh boy
-        '''Gets all valid parameter permutations for build action by a given Player, for a specific game state'''
-        valid_cards_naive = player.hand
-        valid_slots_naive = [slot for slot in (city.slots for city in self.state.cities.values())]
-        valid_industries_naive = list(IndustryType)
+    def get_valid_build_actions(self, state:BoardState, player:Player) -> List[BuildSelection]:
+        out = []
+        cards = player.hand
+        slots = [slot for city in self.state.cities.values() for slot in city.slots.values() if not slot.building_placed]
+        industries = list(IndustryType)
+        iron_buildings = self.state.get_player_iron_sources()
+        iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
+        coal_buildings_first_prio = []
+        coal_buildings_second_prio = []
+        current_priority = -1
+        coal_sources = self.state.get_player_coal_sources()
+        for building, priority in coal_sources:
+            # Если приоритет изменился и превышен лимит ресурсов - прекращаем добавлять в первый список
+            if priority != current_priority and total_resources > 2:
+                break
+            
+            current_priority = priority
+            
+            if total_resources <= 2:
+                coal_buildings_first_prio.append(building)
+                total_resources += building.resource_count  # Предполагается наличие поля resource_count
+            else:
+                coal_buildings_second_prio.append(building)
+
+        coal_sources = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_first_prio]
+        coal_sources_secondary = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id) for building in coal_buildings_second_prio]
+        market_iron = ResourceSource(resource_type=ResourceType.IRON)
+        if sum(building.resource_count for building in iron_buildings) < 2:
+            iron_sources.append(market_iron)
+        market_coal = ResourceSource(resource_type=ResourceType.COAL)
+        network = self.state.get_player_network(player.color)
+
+        for card in cards:
+            for slot in slots:
+                for industry in industries:
+                    if industry not in slot.industry_type_options:
+                        continue
+                    if card.card_type == CardType.CITY:
+                        if slot.city != card.value and card.value != 'wild':
+                            continue
+                        if "brewery" in slot.city:
+                            continue
+                    if card.card_type == CardType.INDUSTRY:
+                        if card.value != industry.value and card.value != 'wild':
+                            continue
+                        if slot.city not in [city.name for city in network]:
+                            continue
+                    building = player.get_lowest_level_building()
+                    req_res = []
+                    for _ in range(building.cost['coal']):
+                        req_res.append(ResourceType.COAL)
+                    for _ in range(building.cost['iron']):
+                        req_res.append(ResourceType.IRON)
+                        
+                    for resource in req_res:
+                        if resource == ResourceType.COAL:
+                            available = coal_sources
+                            if self.state.market_access_exists(slot.city):
+                                available.append(market_coal)
+                        elif resource == ResourceType.IRON:
+                            available = iron_sources
+                        else:
+                            available = []
+                            
+                        product = self._remove_duplicates(list(
+                            itertools.product(available)
+                        ))
+                    
+                    for source_combinations in itertools.product(*product):
+                        resources_used = []
+                        for tuple_sources in source_combinations:
+                            resources_used.extend(tuple_sources)
+                        
+                        out.append(BuildSelection(
+                            slot_id=slot.id,
+                            card_id=card.id,
+                            industry=industry,
+                            resources_used=resources_used
+                        ))
+        return out
+
+
 
     def _get_theoretically_valid_build_actions(self) -> List[BuildSelection]: # OH BOY
         '''Gets all build action parameter permutations that could in theory be valid under a specific game state'''
+        out = []
+
         '''Build cards'''
-        cards = self._build_initial_deck()
+        cards = self._build_initial_deck(4)
         jokers = self._build_wild_deck()
         cards.append(next(joker for joker in jokers if joker.card_type == CardType.CITY))
         cards.append(next(joker for joker in jokers if joker.card_type == CardType.INDUSTRY))
 
-        cards = set(cards)
-
         '''Build slots'''
-        slots = {slot for slot in (city.slots.values() for city in self.state.cities.values())}
+        slots = [slot for city in self.state.cities.values() for slot in city.slots.values()]
 
         '''Build industries'''
         industries = set(IndustryType)
 
         '''Build resources'''
-        iron_sources_naive = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=slot.id) for slot in slots if IndustryType.IRON in slot.industry_type_options]
-        coal_sources_naive = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=slot.id) for slot in slots if IndustryType.COAL in slot.industry_type_options]
-        build_resource_sources = set(iron_sources_naive + coal_sources_naive)
+        iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=slot.id) for slot in slots if IndustryType.IRON in slot.industry_type_options]
+        iron_sources.append(ResourceSource(resource_type=ResourceType.IRON))
+        coal_sources = [ResourceSource(resource_type=ResourceType.COAL, building_slot_id=slot.id) for slot in slots if IndustryType.COAL in slot.industry_type_options]
+        coal_sources.append(ResourceSource(resource_type=ResourceType.COAL))
 
+        for card in cards:
+            for slot in slots:
+                # Фильтруем источники ресурсов для текущего слота
+                coal_filtered = [src for src in coal_sources if src.building_slot_id != slot.id]
+                iron_filtered = [src for src in iron_sources if src.building_slot_id != slot.id]
+                
+                for industry in industries:
+                    if industry not in slot.industry_type_options:
+                        continue
+                    if card.card_type == CardType.CITY:
+                        if slot.city != card.value and card.value != 'wild':
+                            continue
+                        if "brewery" in slot.city:
+                            continue
+                    if card.card_type == CardType.INDUSTRY:
+                        if card.value != industry.value and card.value != 'wild':
+                            continue
+                    
+                    for option in self.INDUSTRY_RESOURCE_OPTIONS[industry]:
+                        resource_counts = Counter(option)
+                        combinations_per_resource = {}
+                        
+                        for resource, count in resource_counts.items():
+                            if resource == ResourceType.COAL:
+                                available = coal_filtered
+                            elif resource == ResourceType.IRON:
+                                available = iron_filtered
+                            else:
+                                available = []
+                                
+                            combinations_per_resource[resource] = self._remove_duplicates(list(
+                                itertools.product(available)
+                            ))
+                        
+                        for source_combinations in itertools.product(*combinations_per_resource.values()):
+                            resources_used = []
+                            for tuple_sources in source_combinations:
+                                resources_used.extend(tuple_sources)
+                            
+                            out.append(BuildSelection(
+                                slot_id=slot.id,
+                                card_id=card.id,
+                                industry=industry,
+                                resources_used=resources_used
+                            ))
+        return out
+
+    def _remove_duplicates(self, lst):
+        seen = set()
+        result = []
+        for sublist in lst:
+            key = tuple(sorted(item.model_dump_json() for item in sublist))
+            if key not in seen:
+                seen.add(key)
+                result.append(sublist)
+        return result
+    
 
 if __name__ == '__main__':
-    game = Game(4)
-    print(game)
+    game = Game()
+    game.start(4, ['white', 'red', 'yellow', 'purple'])
+#    print(len(game.get_valid_build_actions(state=game.state, player=game.state.players[game.state.turn_order[0]])))
+    print(len(game._get_theoretically_valid_build_actions()))

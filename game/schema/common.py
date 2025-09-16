@@ -17,7 +17,7 @@ class ResourceType(StrEnum):
     BEER = "beer"
 
 class ResourceSource(BaseModel):
-    resource_type: ResourceType = None
+    resource_type: ResourceType
     building_slot_id: Optional[int] = None
     merchant_slot_id: Optional[int] = None
 
