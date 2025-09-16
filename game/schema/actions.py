@@ -95,6 +95,10 @@ class EndOfTurnAction(BaseModel):
     end_turn: bool
     model_config = ConfigDict(extra='forbid')  
 
+class ResolveShortfallAction(BaseModel):
+    action: Literal["resolve_shortfall"]
+    slot_id: Optional[int] = None
+
 MetaActions = Union[
     LoanStart,
     PassStart,

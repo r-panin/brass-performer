@@ -1,4 +1,4 @@
-from ...schema import BoardState, ResourceStrategy, ResourceAmounts, ResourceType, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
+from ...schema import BoardState, ResourceStrategy, ResourceAmounts, ResolveShortfallAction, ActionContext, Player, ActionProcessResult, PlayerColor, Building, Card, LinkType, City, BuildingSlot, IndustryType, MetaActions, EndOfTurnAction, ValidationResult, Link, MerchantType, MerchantSlot, Market, GameStatus, SellSelection, ScoutSelection, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, PlayerState, Action, CommitAction, MetaAction, ParameterAction, ExecutionResult, CardType
 from typing import List, Dict, get_args
 import random
 from pathlib import Path
@@ -31,7 +31,8 @@ class Game:
         ActionContext.SCOUT: (ScoutSelection,),
         ActionContext.SELL: (SellSelection, CommitAction),
         ActionContext.LOAN: (ParameterAction,),
-        ActionContext.END_OF_TURN: (EndOfTurnAction,)
+        ActionContext.END_OF_TURN: (EndOfTurnAction,),
+        ActionContext.SHORTFALL: (ResolveShortfallAction,)
     }
 
     @property
@@ -45,7 +46,6 @@ class Game:
         random.shuffle(self.available_colors)
         self.validation_service = ActionValidationService()
         logging.basicConfig(level=logging.DEBUG)
-        self.concluded = False
 
     def start(self, player_count:int, players_colors: List[PlayerColor]):
         self.state_manager = GameStateManager(self._create_initial_state(player_count, players_colors))
@@ -232,6 +232,17 @@ class Game:
                 hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state()
             )
+
+        context_validateion = self.validate_action_context(self.state_manager.action_context, action)
+        if not context_validateion.is_valid:
+            return ActionProcessResult(
+                processed=False,
+                message=f"Attempted action {type(action)}, which current context {self.state_manager.action_context} forbids",
+                awaiting=self.get_expected_params(),
+                current_context=self.state_manager.action_context,
+                hand=self.state.players[color].hand,
+                provisional_state=self.state_manager.get_provisional_state()
+            )
         
         # Обрабатываем действие в зависимости от типа
         if isinstance(action, MetaAction):
@@ -242,6 +253,8 @@ class Game:
             return self._process_commit_action(action, color)
         elif isinstance(action, EndOfTurnAction):
             return self._process_end_of_turn_action(action, color)
+        elif isinstance(action, ResolveShortfallAction):
+            return self._process_resolve_shortfall_action(action, color)
         else:
             return ActionProcessResult(
                 processed=False, 
@@ -423,6 +436,9 @@ class Game:
         if action.end_turn:
             # Завершаем ход и переходим к следующему игроку
             next_state = self._prepare_next_turn(self.state)
+            if self.status == GameStatus.COMPLETE:
+                return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,
+                        provisional_state=self.state_manager.get_provisional_state(), end_of_game=True)
             self.state_manager.start_new_turn(next_state)
             return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,
                     provisional_state=self.state_manager.get_provisional_state())
@@ -437,6 +453,33 @@ class Game:
                 current_context=self.state_manager.action_context,
                 hand=self.state.players[color].hand
             )
+        
+    def _process_resolve_shortfall_action(self, action:ResolveShortfallAction, color: PlayerColor) -> ActionProcessResult:
+        if self.state_manager.phase is not GamePhase.SHORTFALL:
+            return ActionProcessResult(
+                processed=False,
+                awaiting=self.get_expected_params(),
+                provisional_state=self.state_manager.get_provisional_state(),
+                current_context=self.state_manager.action_context,
+                hand=self.state.players[color].hand,
+                message="Action is only allowed within shortfall context"
+            )
+        
+        player = self.state.players[color]
+        validation = self._validate_shortfall_action(self, action, player)
+        if not validation.is_valid:
+            return ActionProcessResult(
+                processed=False,
+                provisional_state=self.state_manager.get_provisional_state(),
+                current_context=self.state_manager.action_context,
+                hand=self.state.players[color].hand,
+                message=validation.message,
+                awaiting=self.get_expected_params()
+            )
+
+        self._resolve_shortfall(action, player)
+        if not self._in_shortfall():
+            self.state_manager.exit_shortfall()
      
     def _apply_action(self, state:BoardState, action:ParameterAction, player:Player, action_context:ActionContext):
         if action.card_id is not None:
@@ -543,6 +586,31 @@ class Game:
             beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
         # TODO
 
+    def _resolve_shortfall(self, action:ResolveShortfallAction, player:Player) -> None:
+        if action.slot_id:
+            slot = self.state.get_building_slot(action.slot_id)
+            rebate = slot.building_placed.cost['money'] // 2
+            player.bank += rebate
+            slot.building_placed = None
+        else:
+            player.victory_points += player.bank
+            player.bank = 0
+        return
+
+    def _validate_shortfall_action(self, action:ResolveShortfallAction, player:Player) -> ValidationResult:
+        if player.bank >= 0:
+            return ValidationResult(is_valid=False, message=f'Player {player.color} is not in shortfall')
+        if not action.slot_id:
+            for building in self.state.iter_placed_buildings():
+                if building.owner == player.color:
+                    return ValidationResult(is_valid=False, message=f'Player {player.color} has building in slot {building.slot_id}, sell it first')
+        return ValidationResult(is_valid=True)
+
+    def _in_shortfall(self):
+        if any(player.bank < 0 for player in self.state.players.values()):
+            return True
+        return False
+
     def _prepare_next_turn(self, state:BoardState) -> BoardState:
         state.turn_order.pop()
         state.actions_left = 2
@@ -551,21 +619,26 @@ class Game:
         return state
 
     def _prepare_next_round(self, state:BoardState) -> BoardState:
-        for player in state.players.values():
-            player.bank += player.income
-            if player.bank < 0:
-                pass #wow
-            print('ADDED SUBACTION')
-            if state.deck:
-                while len(player.hand) < 8:
-                    card = state.deck.pop()
-                    player.hand[card.id] = card
         state.turn_order = sorted(state.players, key=lambda k: state.players[k].money_spent)
+
         if all(len(p.hand) == 0 for p in state.players.values()) and len(state.deck) == 0:
             if state.era == LinkType.CANAL:
                 state = self._prepare_next_era(state)
             elif state.era == LinkType.RAIL:
                 state = self._conclude_game(state)
+
+        for player in state.players.values():
+            player.bank += player.income
+            
+        
+        if any(player.bank < 0 for player in self.state.players.values()):
+            self.state_manager.enter_shortfall()
+
+            if state.deck:
+                while len(player.hand) < 8:
+                    card = state.deck.pop()
+                    player.hand[card.id] = card
+
         return state
     
     def _prepare_next_era(self, state:BoardState) -> BoardState:
@@ -589,16 +662,17 @@ class Game:
         return state
 
     def _conclude_game(self, state:BoardState) -> BoardState:
-        for link in self.state.links.values():
+        for link in state.links.values():
             if link.owner is not None:
                 for city_name in link.cities:
-                    self.state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
+                    state.players[link.owner].victory_points += state.cities[city_name].get_link_vps()
 
-        for building in self.state.iter_placed_buildings():
+        for building in state.iter_placed_buildings():
             if building.flipped:
-                self.state.players[building.owner].victory_points += building.victory_points
+                state.players[building.owner].victory_points += building.victory_points
         
-        self.concluded = True
+        self.status = GameStatus.COMPLETE
+        return state 
 
     def calcualte_resource_score(self, building:Building, strategy:ResourceStrategy, color) -> float:
         match type(strategy):
@@ -649,6 +723,8 @@ class Game:
             return ValidationResult(is_valid=True)
 
     def is_player_to_move(self, color:PlayerColor):
+        if self.state_manager.action_context is ActionContext.SHORTFALL:
+            return True
         if self.state.turn_order[0] != color:
             return False
         return True

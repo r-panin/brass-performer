@@ -24,6 +24,7 @@ class GameEntity(BaseModel):
         return hashlib.md5(serialized.encode()).hexdigest()
 
 class ActionContext(StrEnum):
+    SHORTFALL = 'shortfall'
     END_OF_TURN = 'end_of_turn'
     MAIN = 'main'
     BUILD = 'build'
@@ -509,6 +510,7 @@ class ActionProcessResult(OutputToPlayer):
     hand: Dict[int, Card]
     end_of_turn: bool = False
     current_context: ActionContext
+    end_of_game: bool = False
 
 class TurnState(StrEnum):
     MAIN = 'main'

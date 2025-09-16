@@ -8,6 +8,7 @@ class GamePhase(Enum):
     TRANSACTION = auto()
     AWAITING_COMMIT = auto()
     END_OF_TURN = auto()
+    SHORTFALL = auto()
 
 @dataclass
 class GameState:
@@ -118,6 +119,14 @@ class GameStateManager:
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
         self._state.transaction_state.subaction_count = 0
+
+    def enter_shortfall(self):
+        self.action_context = ActionContext.SHORTFALL
+        self.phase = GamePhase.SHORTFALL
+
+    def exit_shortfall(self):
+        self.action_context = ActionContext.MAIN
+        self.phase = GamePhase.MAIN
     
     def _get_max_actions(self) -> int:
         """Возвращает максимальное количество действий для текущего контекста"""

@@ -3,7 +3,7 @@ from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 
 from ..dependancies import get_connection_manager, get_game_manager, get_action_parser
 from ..managers import ConnectionManager, GameManager
-from ...schema import PlayerColor, ActionType, Action, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart
+from ...schema import PlayerColor, ActionType, Action, GameStatus, ResolveShortfallAction, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart
 from pydantic import ValidationError
 
 router = APIRouter()
@@ -29,7 +29,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
     message_generator = create_board_state_message(game)
 
     try:
-        while True:
+        while game.status == GameStatus.ONGOING:
             try:
                 # Получаем сообщение от клиента
                 action_data = await websocket.receive_json()
@@ -45,9 +45,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 # Отправляем обновленное состояние всем игрокам
                 if action_result.end_of_turn:
                     await connection_manager.broadcast(game_id, message=message_generator)
-                if game.concluded:
-                    await connection_manager.broadcast(game_id, message=get_end_game_message(game))
-                    connection_manager.disconnect(websocket, game_id)
+
             except ValueError as e:
                 await websocket.send_json({
                     "error": str(e)
@@ -106,6 +104,8 @@ def parse_action(data: Dict[str, Any]) -> Action:
         return DevelopStart(**data)
     elif action_type == ActionType.NETWORK:
         return NetworkStart(**data)
+    elif action_type == "resolve_shortfall":
+        return ResolveShortfallAction(**data)
     
     # Если ни один тип не подошел
     raise ValueError(f"Неизвестный тип действия: {data}")
