@@ -772,7 +772,6 @@ class Game:
         slots = [slot for city in self.state.cities.values() for slot in city.slots.values() if not slot.building_placed]
         industries = list(IndustryType)
 
-        # Получаем источники железа
         iron_buildings = self.state.get_player_iron_sources()
         iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
         iron_amounts = {building.slot_id: building.resource_count for building in iron_buildings}
@@ -785,34 +784,40 @@ class Game:
 
         for card in cards:
             for slot in slots:
-                # Получаем доступность рынка угля для этого слота
                 market_coal_available = self.state.market_access_exists(slot.city)
                 
-                # Получаем и сортируем источники угля по приоритету
+                # Получаем ВСЕ источники угля с приоритетами
                 coal_buildings = self.state.get_player_coal_sources(city_name=slot.city)
                 coal_sources = []
+                coal_secondary_sources = []
                 coal_amounts = {}
-                total_coal_available = 0
+                secondary_coal_amounts = {}
                 
-                for building, priority in sorted(coal_buildings, key=lambda x: x[1]):
-                    coal_sources.append(
-                        ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
-                    )
-                    coal_amounts[building.slot_id] = building.resource_count
-                    total_coal_available += building.resource_count
+                for building, priority in coal_buildings:
+                    if priority == 0:  # Primary sources
+                        coal_sources.append(
+                            ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
+                        )
+                        coal_amounts[building.slot_id] = building.resource_count
+                    else:  # Secondary sources
+                        coal_secondary_sources.append(
+                            ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
+                        )
+                        secondary_coal_amounts[building.slot_id] = building.resource_count
+
+                primary_coal_available = sum(coal_amounts.values())
+                secondary_coal_available = sum(secondary_coal_amounts.values())
 
                 for industry in industries:
                     if industry not in slot.industry_type_options:
                         continue
                         
-                    # Проверяем условия для карты города
                     if card.card_type == CardType.CITY:
                         if slot.city != card.value and card.value != 'wild':
                             continue
                         if "brewery" in slot.city:
                             continue
                     
-                    # Проверяем условия для карты индустрии
                     if card.card_type == CardType.INDUSTRY:
                         if card.value != industry.value and card.value != 'wild':
                             continue
@@ -823,44 +828,44 @@ class Game:
                     coal_required = building.cost['coal']
                     iron_required = building.cost['iron']
                     
-                    # Проверяем базовую стоимость
                     base_cost = building.cost['money']
                     if player.bank < base_cost:
                         continue
 
-                    # Для угля
+                    # Формируем варианты источников угля в порядке приоритета
                     coal_options = []
+                    # Сначала используем primary sources
+                    coal_options.extend(coal_sources)
+                    
+                    # Если primary недостаточно, добавляем secondary
+                    if primary_coal_available < coal_required:
+                        coal_options.extend(coal_secondary_sources)
+                    
+                    # Если всё ещё недостаточно и есть доступ к рынку, добавляем market
+                    if (primary_coal_available + secondary_coal_available < coal_required and 
+                        market_coal_available):
+                        coal_options.append(market_coal)
+
+                    # Генерируем комбинации для угля
                     if coal_required > 0:
-                        # Добавляем собственные источники угля
-                        coal_options.extend(coal_sources)
-                        # Добавляем рынок если доступен
-                        if market_coal_available and total_coal_available < coal_required:
-                            coal_options.append(market_coal)
-                        
-                        # Генерируем комбинации для угля
                         coal_combinations = itertools.combinations_with_replacement(coal_options, coal_required)
                     else:
                         coal_combinations = [()]
-                    
-                    # Для железа
+
+                    # Для железа оставляем без изменений
                     iron_options = []
                     if iron_required > 0:
-                        # Добавляем собственные источники железа
                         iron_options.extend(iron_sources)
-                        # Добавляем рынок если нужно
                         if total_iron_available < iron_required or not iron_sources:
                             iron_options.append(market_iron)
                         
-                        # Генерируем комбинации для железа
                         iron_combinations = itertools.combinations_with_replacement(iron_options, iron_required)
                     else:
                         iron_combinations = [()]
                     
-                    # Комбинируем все варианты
                     for coal_comb, iron_comb in itertools.product(coal_combinations, iron_combinations):
                         resources_used = list(coal_comb) + list(iron_comb)
                         
-                        # Проверяем ограничения источников
                         coal_used = {}
                         iron_used = {}
                         market_coal_count = 0
@@ -869,37 +874,46 @@ class Game:
                         
                         for resource in resources_used:
                             if resource.resource_type == ResourceType.COAL:
-                                if resource.building_slot_id:  # Собственный источник
-                                    coal_used[resource.building_slot_id] = coal_used.get(resource.building_slot_id, 0) + 1
-                                    if coal_used[resource.building_slot_id] > coal_amounts[resource.building_slot_id]:
-                                        valid = False
-                                        break
-                                else:  # Рынок
+                                if resource.building_slot_id:
+                                    # Проверяем как primary, так и secondary источники
+                                    if resource.building_slot_id in coal_amounts:
+                                        coal_used[resource.building_slot_id] = coal_used.get(resource.building_slot_id, 0) + 1
+                                        if coal_used[resource.building_slot_id] > coal_amounts[resource.building_slot_id]:
+                                            valid = False
+                                            break
+                                    elif resource.building_slot_id in secondary_coal_amounts:
+                                        coal_used[resource.building_slot_id] = coal_used.get(resource.building_slot_id, 0) + 1
+                                        if coal_used[resource.building_slot_id] > secondary_coal_amounts[resource.building_slot_id]:
+                                            valid = False
+                                            break
+                                else:
                                     market_coal_count += 1
                                     
                             elif resource.resource_type == ResourceType.IRON:
-                                if resource.building_slot_id:  # Собственный источник
+                                if resource.building_slot_id:
                                     iron_used[resource.building_slot_id] = iron_used.get(resource.building_slot_id, 0) + 1
                                     if iron_used[resource.building_slot_id] > iron_amounts[resource.building_slot_id]:
                                         valid = False
                                         break
-                                else:  # Рынок
+                                else:
                                     market_iron_count += 1
                         
+                        primary_coal_ids = coal_amounts.keys()
+                        used_ids = [r.building_slot_id for r in resources_used]
+                        if not primary_coal_ids in used_ids and primary_coal_ids:
+                            continue
+
                         if not valid:
                             continue
                         
-                        # Проверяем доступность рынка угля
                         if market_coal_count > 0 and not market_coal_available:
                             continue
                             
-                        # Проверяем финансовую возможность
                         coal_cost = self.state.market.calculate_coal_cost(market_coal_count)
                         iron_cost = self.state.market.calculate_iron_cost(market_iron_count)
                         if player.bank < base_cost + coal_cost + iron_cost:
                             continue
                         
-                        # Добавляем валидное действие
                         out.append(BuildSelection(
                             slot_id=slot.id,
                             card_id=card.id,
@@ -907,10 +921,8 @@ class Game:
                             resources_used=resources_used
                         ))
         
-        # Убираем дубликаты и возвращаем результат
         data_strings = sorted(action.model_dump_json() for action in out)
         return [BuildSelection.model_validate_json(data) for data in data_strings]
-
 
     def _get_theoretically_valid_build_actions(self) -> List[BuildSelection]: # OH BOY
         '''Gets all build action parameter permutations that could in theory be valid under a specific game state'''
