@@ -4,6 +4,7 @@ from .game_state_manager import GamePhase, GameStateManager
 import random
 from collections import defaultdict
 from typing import List, Dict, get_args
+from .turn_manager import TurnManager
 
 
 class ActionProcessor():
@@ -25,6 +26,7 @@ class ActionProcessor():
     def __init__(self, state_manager:GameStateManager):
         self.state_manager = state_manager
         self.validation_service = ActionValidationService()
+        self.turn_manager = TurnManager()
 
     @property
     def state(self):
@@ -261,8 +263,8 @@ class ActionProcessor():
     def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
         if action.end_turn:
             # Завершаем ход и переходим к следующему игроку
-            next_state = self._prepare_next_turn(self.state)
-            if self.status == GameStatus.COMPLETE:
+            next_state = self.turn_manager.prepare_next_turn(self.state)
+            if self.turn_manager.concluded:
                 return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,
                         provisional_state=self.state_manager.get_provisional_state(), end_of_game=True)
             self.state_manager.start_new_turn(next_state)
@@ -403,37 +405,6 @@ class ActionProcessor():
             case "Gloucester": # fug
                 self.state_manager.enter_gloucester_develop()
 
-    def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
-        amounts = self.get_resource_amounts(action, player)
-        out = []
-        if action.resources_used.strategy is ResourceStrategy.MERCHANT_FIRST:
-            merchant_first = True
-            strategy = action.resources_used.then
-        else:
-            strategy = action.resources_used.strategy
-
-        if isinstance(action, (BuildSelection, SellSelection)):
-            action_city = self.state.get_building_slot(action.slot_id).city
-            link_id = None
-        elif isinstance(action, NetworkSelection):
-            action_city = None
-            link_id = action.link_id
-
-        if amounts.iron:
-            iron_buildings = self.state.get_player_iron_sources()
-            with_scores = [(building,
-                            self.calculate_resource_score(building, strategy))
-                            for building in iron_buildings]
-            with_scores.sort(key=lambda x: x[1], reverse=True)
-            taken_iron = 0
-
-
-        if amounts.coal:
-            coal_buildings = self.state.get_player_coal_sources(city_name=action_city, link_id=link_id)
-
-        if amounts.beer:
-            beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
-        # TODO
 
     def _resolve_shortfall(self, action:ResolveShortfallAction, player:Player) -> None:
         if action.slot_id:
@@ -460,68 +431,6 @@ class ActionProcessor():
             return True
         return False
 
-    def _prepare_next_turn(self, state:BoardState) -> BoardState:
-        state.turn_order.pop()
-        state.actions_left = 2
-        if not state.turn_order:
-            state = self._prepare_next_round(state)
-        return state
-
-    def _prepare_next_round(self, state:BoardState) -> BoardState:
-        state.turn_order = sorted(state.players, key=lambda k: state.players[k].money_spent)
-
-        if all(len(p.hand) == 0 for p in state.players.values()) and len(state.deck) == 0:
-            if state.era == LinkType.CANAL:
-                state = self._prepare_next_era(state)
-            elif state.era == LinkType.RAIL:
-                state = self._conclude_game(state)
-
-        for player in state.players.values():
-            player.bank += player.income
-            
-        
-        if any(player.bank < 0 for player in self.state.players.values()):
-            self.state_manager.enter_shortfall()
-
-            if state.deck:
-                while len(player.hand) < 8:
-                    card = state.deck.pop()
-                    player.hand[card.id] = card
-
-        return state
-    
-    def _prepare_next_era(self, state:BoardState) -> BoardState:
-        self.state.deck = self._build_initial_deck(len(self.state.players))
-        random.shuffle(self.state.deck)
-
-        for link in self.state.links.values():
-            if link.owner is not None:
-                for city_name in link.cities:
-                    self.state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
-                link.owner = None
-
-        for building in self.state.iter_placed_buildings():
-            if building.flipped:
-                self.state.players[building.owner].victory_points += building.victory_points
-            if building.level == 1:
-                self.state.get_building_slot(building.slot_id).building_placed = None
-
-        state.era = LinkType.RAIL
-
-        return state
-
-    def _conclude_game(self, state:BoardState) -> BoardState:
-        for link in state.links.values():
-            if link.owner is not None:
-                for city_name in link.cities:
-                    state.players[link.owner].victory_points += state.cities[city_name].get_link_vps()
-
-        for building in state.iter_placed_buildings():
-            if building.flipped:
-                state.players[building.owner].victory_points += building.victory_points
-        
-        return state 
-    
     def get_expected_params(self, color:PlayerColor) -> Dict[str, List[str]]:
         if not self.is_player_to_move(color):
             return {}

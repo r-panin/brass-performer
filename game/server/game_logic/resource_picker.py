@@ -1,4 +1,5 @@
-from ...schema import Building, ResourceStrategy, ResourceAction, Player, ResourceAmounts, BuildSelection, SellSelection, NetworkSelection, DevelopSelection
+from ...schema import Building, ResourceStrategy, ResourceAction, Player, BuildSelection, SellSelection, NetworkSelection, ResourceSource
+from typing import List
 
 class ResourcePicker():
     def __init__(self, state_manager):
@@ -19,3 +20,35 @@ class ResourcePicker():
                             vp_score -= building.link_victory_points
                 return vp_score
         return 0 
+
+    def _select_resources(self, action:ResourceAction, player:Player) -> List[ResourceSource]:
+        amounts = self.get_resource_amounts(action, player)
+        out = []
+        if action.resources_used.strategy is ResourceStrategy.MERCHANT_FIRST:
+            merchant_first = True
+            strategy = action.resources_used.then
+        else:
+            strategy = action.resources_used.strategy
+
+        if isinstance(action, (BuildSelection, SellSelection)):
+            action_city = self.state.get_building_slot(action.slot_id).city
+            link_id = None
+        elif isinstance(action, NetworkSelection):
+            action_city = None
+            link_id = action.link_id
+
+        if amounts.iron:
+            iron_buildings = self.state.get_player_iron_sources()
+            with_scores = [(building,
+                            self.calculate_resource_score(building, strategy))
+                            for building in iron_buildings]
+            with_scores.sort(key=lambda x: x[1], reverse=True)
+            taken_iron = 0
+
+
+        if amounts.coal:
+            coal_buildings = self.state.get_player_coal_sources(city_name=action_city, link_id=link_id)
+
+        if amounts.beer:
+            beer_buildings = self.state.get_player_beer_sources(city_name=action_city, link_id=link_id)
+        # TODO
