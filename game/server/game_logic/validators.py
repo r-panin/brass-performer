@@ -198,7 +198,10 @@ class DevelopValidator(BaseValidator):
         return ValidationResult(is_valid=True)
     
     def _validate_base_action_cost(self, action:DevelopSelection, game_state:BoardState, player):
-        target_cost = game_state.get_develop_cost()
+        if game_state.gloucester_develop:
+            target_cost = game_state.get_develop_cost(glousecter=True)
+        else:
+            target_cost = game_state.get_develop_cost(glousecter=False)
         if action.get_resource_amounts() != target_cost:
             return ValidationResult(is_valid=False, message="Base action cost doesn't match")
         return ValidationResult(is_valid=True)
@@ -355,9 +358,9 @@ class SellValidator(BaseValidator):
             elif resource.building_slot_id is not None:
                 brewery = game_state.get_building_slot(resource.building_slot_id)
                 if brewery.building_placed.owner != player.color:
-                    connected = game_state.find_paths(start=building.city, end=brewery.city)
+                    connected = game_state.find_paths(start=slot.city, end=brewery.city)
                     if not connected:
-                        return ValidationResult(is_valid=False, message=f'Brewery in {brewery.city} is not connected to building in {building.city}')
+                        return ValidationResult(is_valid=False, message=f'Brewery in {brewery.city} is not connected to building in {slot.city}')
                 
         if not game_state.can_sell(slot.city, slot.building_placed.industry_type):
             return ValidationResult(is_valid=False, message=f"No path from city {slot.city} to eligible merchants for industry {slot.building_placed.industry_type}")

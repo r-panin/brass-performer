@@ -1,4 +1,4 @@
-from ...schema import ActionContext, ParameterAction, Player, ValidationResult, ActionType, BoardState, BuildSelection, DevelopSelection, NetworkSelection, ScoutSelection, SellSelection
+from ...schema import ActionContext, ParameterAction, Player, ValidationResult, ActionType, BoardState
 from typing import Dict
 from .validators import ActionValidator, PassValidator, ScoutValidator, LoanValidator, DevelopValidator, NetworkValidator, BuildValidator, SellValidator
 
@@ -16,7 +16,6 @@ class ActionValidationService():
 
     def validate_action(self, action: ParameterAction, board_state:BoardState, player: Player, context:ActionContext) -> ValidationResult:
         validator = self.validators.get(ActionType(context))
-        print(F"USING VALIDATOR {validator}")
         if not validator:
             return ValidationResult(is_valid=False, message=f"No validator for action type {action.action_type}") 
 

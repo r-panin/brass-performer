@@ -127,6 +127,16 @@ class GameStateManager:
     def exit_shortfall(self):
         self.action_context = ActionContext.MAIN
         self.phase = GamePhase.MAIN
+
+    def enter_gloucester_develop(self):
+        self.action_context = ActionContext.GLOUCESTER_DEVELOP
+        self._state.transaction_state.gloucester_develop = True
+        if self.subaction_count < 1:
+            self.subaction_count = 1
+
+    def exit_gloucester_develop(self):
+        self.action_context = ActionContext.SELL
+        self._state.transaction_state.gloucester_develop = False
     
     def _get_max_actions(self) -> int:
         """Возвращает максимальное количество действий для текущего контекста"""

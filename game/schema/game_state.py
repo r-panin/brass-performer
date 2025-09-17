@@ -24,6 +24,7 @@ class GameEntity(BaseModel):
         return hashlib.md5(serialized.encode()).hexdigest()
 
 class ActionContext(StrEnum):
+    GLOUCESTER_DEVELOP = 'gloucester_develop'
     SHORTFALL = 'shortfall'
     END_OF_TURN = 'end_of_turn'
     MAIN = 'main'
@@ -84,7 +85,6 @@ class Building(GameEntity):
     id: int
     industry_type: IndustryType
     level: int
-    city: str
     owner: PlayerColor
     flipped: bool
     cost: Dict[ResourceType, int]
@@ -293,6 +293,7 @@ class BoardState(BaseModel):
     discard: List[Card]
     wild_deck: List[Card]
     subaction_count: int = Field(default=0, exclude=True)
+    gloucester_develop: bool = Field(default=False, exclude=True)
 
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
@@ -306,6 +307,18 @@ class BoardState(BaseModel):
             for slot in city.slots.values():
                 if slot.building_placed:
                     yield slot.building_placed
+
+    def iter_merchant_slots(self) -> Iterator[MerchantSlot]:
+        for city in self.cities.values():
+            if city.merchant_slots:
+                for slot in city.merchant_slots.values():
+                    yield slot
+    
+    def iter_building_slots(self) -> Iterator[BuildingSlot]:
+        for city in self.cities.values():
+            if city.slots:
+                for slot in city.slots.values():
+                    yield slot
     
     def get_player_iron_sources(self) -> List[Building]:
         out = []
@@ -340,7 +353,7 @@ class BoardState(BaseModel):
     
     def get_player_beer_sources(self, color:PlayerColor, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[Building]:
         out = []
-        for building in self.iter_placed_buildings:
+        for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.BREWERY:
                 if building.owner == color:
                     out.append(building)
@@ -486,10 +499,12 @@ class BoardState(BaseModel):
     def can_sell(self, city_name:str, industry:IndustryType) -> bool:
         eligible_merchants = [city for city in self.cities.values() if city.is_merchant and (any(slot.merchant_type in [MerchantType.ANY, MerchantType(industry)] for slot in city.merchant_slots.values()))]
         for merchant in eligible_merchants:
-            if self.find_paths(start=city_name, end=merchant):
+            if self.find_paths(start=city_name, end=merchant.name):
                 return True
 
-    def get_develop_cost(self) -> ResourceAmounts:
+    def get_develop_cost(self, glousecter=False) -> ResourceAmounts:
+        if glousecter:
+            return ResourceAmounts()
         return ResourceAmounts(iron=1)
 
 class PlayerState(BaseModel):
