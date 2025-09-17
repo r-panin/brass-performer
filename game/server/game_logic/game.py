@@ -764,15 +764,17 @@ class Game:
                 case "PassStart":
                     out[action].append(PassStart())
                 case "BuildSelection":
-                    out[action] = self.get_valid_build_actions(player)
+                    out[action] = self.get_valid_build_actions(self.state, player)
+                case "SellSelection":
+                    out[action] = self.get_valid_sell_actions(self.state, player)
 
-    def get_valid_build_actions(self, state: BoardState, player: Player) -> List[BuildSelection]:
+    def get_valid_build_actions(self, state: BoardState, player: Player) -> List[BuildSelection]: # oh boy
         out = []
         cards = player.hand.values()
-        slots = [slot for city in self.state.cities.values() for slot in city.slots.values() if not slot.building_placed]
+        slots = [slot for city in state.cities.values() for slot in city.slots.values() if not slot.building_placed]
         industries = list(IndustryType)
 
-        iron_buildings = self.state.get_player_iron_sources()
+        iron_buildings = state.get_player_iron_sources()
         iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
         iron_amounts = {building.slot_id: building.resource_count for building in iron_buildings}
         total_iron_available = sum(iron_amounts.values())
@@ -780,14 +782,14 @@ class Game:
         market_iron = ResourceSource(resource_type=ResourceType.IRON)
         market_coal = ResourceSource(resource_type=ResourceType.COAL)
 
-        network = self.state.get_player_network(player.color)
+        network = state.get_player_network(player.color)
 
         for card in cards:
             for slot in slots:
-                market_coal_available = self.state.market_access_exists(slot.city)
+                market_coal_available = state.market_access_exists(slot.city)
                 
                 # Получаем ВСЕ источники угля с приоритетами
-                coal_buildings = self.state.get_player_coal_sources(city_name=slot.city)
+                coal_buildings = state.get_player_coal_sources(city_name=slot.city)
                 coal_sources = []
                 coal_secondary_sources = []
                 coal_amounts = {}
@@ -909,8 +911,8 @@ class Game:
                         if market_coal_count > 0 and not market_coal_available:
                             continue
                             
-                        coal_cost = self.state.market.calculate_coal_cost(market_coal_count)
-                        iron_cost = self.state.market.calculate_iron_cost(market_iron_count)
+                        coal_cost = state.market.calculate_coal_cost(market_coal_count)
+                        iron_cost = state.market.calculate_iron_cost(market_iron_count)
                         if player.bank < base_cost + coal_cost + iron_cost:
                             continue
                         
@@ -924,7 +926,36 @@ class Game:
         data_strings = sorted(action.model_dump_json() for action in out)
         return [BuildSelection.model_validate_json(data) for data in data_strings]
 
-    def _get_theoretically_valid_build_actions(self) -> List[BuildSelection]: # OH BOY
+    def get_valid_sell_actions(self, state:BoardState, player:Player) -> List[SellSelection]:
+        out = []
+        cards = player.hand.values()
+        slots = [
+                slot 
+                for city in state.cities.values() 
+                for slot in city.slots.values() 
+                if slot.building_placed is not None and slot.building_placed.is_sellable()
+            ] 
+
+        for slot in slots:
+            beer_buildings = state.get_player_beer_sources(player.color, city_name=slot.city)
+            beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) for building in beer_buildings]
+            beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
+            beer_required = slot.building_placed.sell_cost
+            if beer_required:
+                beer_combinations = itertools.combinations_with_replacement(beer_sources, beer_required)
+            else:
+                beer_combinations = [()]
+            for beer_combo in beer_combinations:
+                beer_used = defaultdict(int)
+                valid = True
+                for resource in beer_combo:
+                    beer_used[resource.building_slot_id] += 1
+                    if beer_used[resource.building_slot_id] > beer_amounts[resource.building_slot_id]
+
+        data_strings = sorted(action.model_dump_json() for action in out)
+        return [SellSelection.model_validate_json(data) for data in data_strings]
+
+    def _get_theoretically_valid_build_actions(self) -> List[BuildSelection]:
         '''Gets all build action parameter permutations that could in theory be valid under a specific game state'''
         out = []
 

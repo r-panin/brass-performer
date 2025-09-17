@@ -346,7 +346,7 @@ class BoardState(BaseModel):
                     out.append(building)
                 else:
                     city = self.get_building_slot(building.slot).city
-                    connected = self.find_paths(start=city, end=city_name, start_link_id=link_id)
+                    connected = self.find_paths(start=city_name, end=city, start_link_id=link_id)
                     if connected:
                         out.append(building)
         return out
