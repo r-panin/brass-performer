@@ -320,7 +320,7 @@ class BoardState(BaseModel):
             slot.building_placed is not None and
             slot.building_placed.industry_type == IndustryType.COAL and
             slot.building_placed.resource_count > 0
-            for slot in self.cities[city].slots.values
+            for slot in self.cities[city].slots.values()
         ),
         find_all=True)
 
@@ -352,7 +352,7 @@ class BoardState(BaseModel):
         return out
     
     def market_access_exists(self, city_name: str):
-        return self.find_paths(self, start=city_name, target_condition=lambda city: self.cities[city].is_merchant)
+        return self.find_paths(start=city_name, target_condition=lambda city: self.cities[city].is_merchant)
 
     def find_paths(
         self,
