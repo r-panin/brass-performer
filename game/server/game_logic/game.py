@@ -1,4 +1,4 @@
-from ...schema import BoardState, PlayerColor, IndustryType, GameStatus, PlayerState, ActionProcessResult
+from ...schema import BoardState, PlayerColor, IndustryType, GameStatus, PlayerState, ActionProcessResult, RequestResult
 from typing import List 
 import random
 from uuid import uuid4
@@ -39,12 +39,13 @@ class Game:
             your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
 
-    def process_action(self, action, color) -> ActionProcessResult:
+    def process_action(self, action, color) -> ActionProcessResult|RequestResult:
         if self.status is not GameStatus.ONGOING:
             raise ValueError(f'Cannot submit actions to a game in {self.status}')
-        process_result = self.action_processor.process_action(action, color)
-        if process_result.end_of_game:
-            self.status = GameStatus.COMPLETE
+        process_result = self.action_processor.process_incoming_message(action, color)
+        if isinstance(process_result, ActionProcessResult):
+            if process_result.end_of_game:
+                self.status = GameStatus.COMPLETE
         return process_result
 
 if __name__ == '__main__':

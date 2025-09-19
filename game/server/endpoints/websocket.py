@@ -1,9 +1,9 @@
 from typing import Any, Dict
 from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 
-from ..dependancies import get_connection_manager, get_game_manager, get_action_parser
+from ..dependancies import get_connection_manager, get_game_manager
 from ..managers import ConnectionManager, GameManager
-from ...schema import PlayerColor, ActionType, Action, GameStatus, ResolveShortfallAction, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart
+from ...schema import PlayerColor, ActionType, Action, Request, GameStatus, ResolveShortfallAction, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart, ActionProcessResult
 from pydantic import ValidationError
 
 router = APIRouter()
@@ -43,8 +43,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 await websocket.send_json(action_result.model_dump())
                 
                 # Отправляем обновленное состояние всем игрокам
-                if action_result.end_of_turn:
-                    await connection_manager.broadcast(game_id, message=message_generator)
+                if isinstance(action_result, ActionProcessResult):
+                    if action_result.end_of_turn:
+                        await connection_manager.broadcast(game_id, message=message_generator)
 
             except ValueError as e:
                 await websocket.send_json({
@@ -71,7 +72,7 @@ def get_end_game_message(game) -> Dict:
 
 def parse_action(data: Dict[str, Any]) -> Action:
     # Сначала проверяем наличие уникальных полей для каждого типа действия
-    if "additional_card_cost" in data:
+    if len(data.get("card_id", [])) == 3:
         return ScoutSelection(**data)
     elif "link_id" in data:
         return NetworkSelection(**data)
@@ -104,8 +105,11 @@ def parse_action(data: Dict[str, Any]) -> Action:
         return DevelopStart(**data)
     elif action_type == ActionType.NETWORK:
         return NetworkStart(**data)
-    elif action_type == "resolve_shortfall":
+    elif action_type == "shortfall":
         return ResolveShortfallAction(**data)
+    
+    elif 'request' in data:
+        return Request(**data)
     
     # Если ни один тип не подошел
     raise ValueError(f"Неизвестный тип действия: {data}")

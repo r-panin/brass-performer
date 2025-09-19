@@ -1,7 +1,9 @@
 from enum import Enum, auto
 from dataclasses import dataclass
 from copy import deepcopy
-from ...schema import ActionContext, BoardState
+from ...schema import ActionContext, BoardState, PlayerColor, MetaActions, CommitAction, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, ScoutSelection,SellSelection,EndOfTurnAction,ResolveShortfallAction
+from typing import List, Dict, get_args
+
 
 class GamePhase(Enum):
     MAIN = auto()
@@ -28,6 +30,20 @@ class GameState:
 class GameStateManager:
     SINGLE_ACTION_CONTEXTS = (ActionContext.BUILD, ActionContext.SCOUT, ActionContext.LOAN, ActionContext.PASS)
     DOUBLE_ACTION_CONTEXTS = (ActionContext.DEVELOP, ActionContext.NETWORK)
+    ACTION_CONTEXT_MAP = {
+        ActionContext.MAIN: get_args(MetaActions),
+        ActionContext.AWAITING_COMMIT: (CommitAction,),
+        ActionContext.BUILD: (BuildSelection,),
+        ActionContext.DEVELOP: (DevelopSelection, CommitAction),
+        ActionContext.NETWORK: (NetworkSelection, CommitAction),
+        ActionContext.PASS: (ParameterAction,),
+        ActionContext.SCOUT: (ScoutSelection,),
+        ActionContext.SELL: (SellSelection, CommitAction),
+        ActionContext.LOAN: (ParameterAction,),
+        ActionContext.END_OF_TURN: (EndOfTurnAction,),
+        ActionContext.SHORTFALL: (ResolveShortfallAction,),
+        ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection,)
+    }
     def __init__(self, initial_state):
         self._state = GameState(
             _backup_state=deepcopy(initial_state),
@@ -39,6 +55,10 @@ class GameStateManager:
     @property
     def current_state(self) -> BoardState:
         return self._state.transaction_state
+
+    @property
+    def public_state(self) -> BoardState:
+        return self._state.turn_state.hide_state()
     
     @property
     def action_context(self) -> ActionContext:
@@ -119,6 +139,9 @@ class GameStateManager:
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
         self._state.transaction_state.subaction_count = 0
+        
+        if any(player.bank < 0 for player in self.current_state.players.values()):
+            self.enter_shortfall()
 
     def enter_shortfall(self):
         self.action_context = ActionContext.SHORTFALL
@@ -155,3 +178,26 @@ class GameStateManager:
         if self._state.transaction_state.subaction_count > 0:
             return True
         return False
+    
+    def get_expected_params(self, color:PlayerColor) -> Dict[str, List[str]]:
+        if not self.is_player_to_move(color):
+            return {}
+        classes = self.ACTION_CONTEXT_MAP[self.action_context]
+        out = {}
+        for cls in classes:
+            fields = list(cls.model_fields.keys())
+            if self.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
+                if self.has_subaction() and 'card_id' in fields:
+                    fields.remove('card_id')
+            out[cls.__name__] = fields
+        return out
+    
+    def is_player_to_move(self, color:PlayerColor):
+        if self.action_context is ActionContext.SHORTFALL:
+            if self.current_state.players[color].bank < 0:
+                return True
+            return False
+        
+        if self.current_state.turn_order[0] != color:
+            return False
+        return True

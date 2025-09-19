@@ -177,11 +177,11 @@ class PassValidator(BaseValidator):
 class ScoutValidator(BaseValidator):
     @validate_card_in_hand
     def validate(self, action:ScoutSelection, game_state:BoardState, player:Player):
-        for card in action.additional_card_cost:
+        for card in action.card_id:
             if not card in player.hand:
                 return ValidationResult(is_valid=False, message="Smart guy, huh")
-        if any(card.value == "wild" for card in player.hand):
-            return ValidationResult(is_valid=False, message="Cannot scout with wild cards in hand")
+            if player.hand[card].value == "wild":
+                return ValidationResult(is_valid=False, message="Cannot scout with wild cards in hand")
         return ValidationResult(is_valid=True)
 
 class LoanValidator(BaseValidator):

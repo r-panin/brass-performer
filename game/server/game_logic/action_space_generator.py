@@ -1,4 +1,4 @@
-from ...schema import PlayerColor, Action, LoanStart, PassStart, SellStart, BuildStart, ScoutStart, DevelopStart,NetworkStart, SellSelection, BuildSelection, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType
+from ...schema import PlayerColor, Action, LoanStart, PassStart, SellStart, BuildStart, ScoutStart, DevelopStart,NetworkStart, SellSelection, BuildSelection, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, NetworkSelection, LinkType, DevelopSelection, ScoutSelection, ParameterAction, ActionContext, CommitAction, EndOfTurnAction, ResolveShortfallAction
 from typing import Dict, List
 from collections import Counter, defaultdict
 import itertools
@@ -22,7 +22,7 @@ class ActionSpaceGenerator():
 
     def get_action_space(self, color:PlayerColor) -> Dict[str, List[Action]]:
         player = self.state.players[color]
-        valid_action_types = self.get_expected_params(color)
+        valid_action_types = self.state_manager.get_expected_params(color)
         out = defaultdict(list)
         for action in valid_action_types:
             match action:
@@ -41,9 +41,32 @@ class ActionSpaceGenerator():
                 case "PassStart":
                     out[action].append(PassStart())
                 case "BuildSelection":
-                    out[action] = self.get_valid_build_actions(self.state, player)
+                    out[action] = self.get_valid_build_actions(player)
                 case "SellSelection":
-                    out[action] = self.get_valid_sell_actions(self.state, player)
+                    out[action] = self.get_valid_sell_actions(player)
+                case "NetworkSelection":
+                    out[action] = self.get_valid_network_actions(player)
+                case "DevelopSelection":
+                    gloucester = True if self.state_manager.action_context is ActionContext.GLOUCESTER_DEVELOP else False
+                    out[action] = self.get_valid_develop_actions(player, gloucester)
+                case "ScoutSelection":
+                    out[action] = self.get_valid_scout_actions(player)
+                case "ParameterAction":
+                    if self.state_manager.action_context is ActionContext.LOAN:
+                        out[action] = self.get_valid_loan_actions(player)
+                    elif self.state_manager.action_context is ActionContext.PASS:
+                        out[action] = self.get_valid_pass_actions(player)
+                    else:
+                        out[action] = []
+                case "CommitAction":
+                    out[action] = self.get_valid_commit_actions(player)
+                case "EndOfTurnAction":
+                    out[action] = self.get_valid_end_of_turn_actions(player)
+                case "ResolveShortfallAction":
+                    out[action] = self.get_valid_shortfall_actions(player)
+
+        return out
+                
 
     def get_valid_build_actions(self, player: Player) -> List[BuildSelection]: # oh boy
         out = []
@@ -71,18 +94,29 @@ class ActionSpaceGenerator():
                 coal_secondary_sources = []
                 coal_amounts = {}
                 secondary_coal_amounts = {}
-                
+                first_priority = None
+                second_priority = None
                 for building, priority in coal_buildings:
-                    if priority == 0:  # Primary sources
+                    if first_priority is None:
+                        first_priority = priority
+
+                    if priority == first_priority:  # Primary sources
                         coal_sources.append(
                             ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
                         )
                         coal_amounts[building.slot_id] = building.resource_count
+
                     else:  # Secondary sources
+                        second_priority = priority
+
+                    if priority == second_priority:
                         coal_secondary_sources.append(
                             ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
                         )
                         secondary_coal_amounts[building.slot_id] = building.resource_count
+                    
+                    else:
+                         break
 
                 primary_coal_available = sum(coal_amounts.values())
                 secondary_coal_available = sum(secondary_coal_amounts.values())
@@ -203,9 +237,9 @@ class ActionSpaceGenerator():
         data_strings = sorted(action.model_dump_json() for action in out)
         return [BuildSelection.model_validate_json(data) for data in data_strings]
 
-    def get_valid_sell_actions(self, player:Player, subaction_count:int) -> List[SellSelection]:
+    def get_valid_sell_actions(self, player:Player) -> List[SellSelection]:
         out = []
-        cards = player.hand.values()
+        cards = player.hand
         slots = [
                 slot 
                 for city in self.state.cities.values() 
@@ -248,7 +282,7 @@ class ActionSpaceGenerator():
                 if not valid:
                     continue
 
-                if subaction_count > 0:
+                if self.state_manager.subaction_count > 0:
                     out.append(SellSelection(
                         slot_id=slot.id,
                         resources_used=beer_combo))
@@ -257,11 +291,139 @@ class ActionSpaceGenerator():
                         out.append(SellSelection(
                             slot_id=slot.id,
                             resources_used=beer_combo,
-                            card_id=card.id
+                            card_id=card
                         ))
 
         data_strings = sorted(action.model_dump_json() for action in out)
         return [SellSelection.model_validate_json(data) for data in data_strings]
+
+    def get_valid_network_actions(self, player:Player) -> List[NetworkSelection]:
+        out = []
+        cards = player.hand
+        network = self.state.get_player_network(player.color)
+        links = [link for link in self.state.links.values() 
+            if link.owner is None and not network.isdisjoint(link.cities) and self.state.era in link.type]
+        base_cost = self.state.get_link_cost(self.state.subaction_count)
+        if base_cost.money > player.bank:
+            return out
+        
+        for link in links:
+            if self.state.era == LinkType.CANAL:
+                for card in cards:
+                    out.append(NetworkSelection(
+                        link_id=link.id,
+                        card_id=card.id,
+                        resources_used=[]
+                    ))
+            else: # gulp
+                coal_buildings = self.state.get_player_coal_sources(link_id=link.id)
+                coal_sources = []
+                
+                for building, priority in coal_buildings:
+                    if first_priority is None:
+                        first_priority = priority
+
+                    if priority == first_priority:  # Primary sources
+                        coal_sources.append(
+                            ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
+                        )
+                    else:
+                        break
+                
+                if not coal_sources:
+                    if any(self.state.market_access_exists(city_name=city) for city in link.cities):
+                        market_cost = self.state.market.calculate_coal_cost(base_cost.coal)
+                        coal_sources = [ResourceSource(resource_type=ResourceType.COAL)] # market coal
+                    else:
+                        continue
+                
+                if market_cost + base_cost.money > player.bank:
+                    continue
+                
+                beer_buildings = self.state.get_player_beer_sources(color=player.color, link_id=link.id)
+                beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=b.slot_id) for b in beer_buildings]
+                if self.state.subaction_count > 0:
+                    for coal_source, beer_source in itertools.product(coal_sources, beer_sources):
+                        res = list(coal_source) + list(beer_source)
+                        out.append(NetworkSelection(
+                            resources_used=res,
+                            link_id=link.id
+                        ))
+                else:
+                    for coal_source, card in itertools.product(coal_sources, cards):
+                        res = list(coal_source)
+                        out.append(NetworkSelection(
+                            resources_used=res,
+                            link_id=link.id,
+                            card_id=card
+                        ))
+
+        data_strings = sorted(action.model_dump_json() for action in out)
+        return [NetworkSelection.model_validate_json(data) for data in data_strings]
+                        
+    def get_valid_develop_actions(self, player:Player, gloucester=False) -> List[DevelopSelection]:
+        out = []
+        industries = list(IndustryType)
+        cards = player.hand
+        iron_buildings = self.state.get_player_iron_sources()
+        if not gloucester:
+            if iron_buildings:
+                iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
+            else:
+                cost = self.state.market.calculate_iron_cost(self.state.get_develop_cost())
+                if cost > player.bank:
+                    return []
+                iron_sources = [ResourceSource(resource_type=ResourceType.IRON)]
+        else:
+            iron_sources = [[]]
+        for industry in industries:
+            building = player.get_lowest_level_building(industry)
+            if not building:
+                continue
+            for source in iron_sources:
+                if self.state.subaction_count > 0:
+                    out.append(DevelopSelection(industry=industry, resources_used=list(source)))
+                else:
+                    for card in cards:
+                        out.append(DevelopSelection(industry=industry, resources_used=list(source), card_id=card))
+        data_strings = sorted(action.model_dump_json() for action in out)
+        return [NetworkSelection.model_validate_json(data) for data in data_strings]
+
+    def get_valid_scout_actions(self, player:Player) -> List[ScoutSelection]:
+        cards = player.hand.values()
+        out = []
+        if len(cards) < 3:
+            return []
+        if any(card.value == 'wild' for card in cards):
+            return []
+        for combo in itertools.combinations(cards, 3):
+            out.append(ScoutSelection(card_id=list(combo)))
+        data_strings = sorted(action.model_dump_json() for action in out)
+        return [NetworkSelection.model_validate_json(data) for data in data_strings]
+
+    def get_valid_loan_actions(self, player:Player) -> List[ParameterAction]:
+        if player.income < -7:
+            return []
+        return [ParameterAction(card_id=card) for card in player.hand]
+    
+    def get_valid_pass_actions(self, player:Player) -> List[ParameterAction]:
+        return [ParameterAction(card_id=card) for card in player.hand]
+
+    def get_valid_commit_actions(self):
+        if self.state.subaction_count > 0:
+            return [CommitAction(commit=True), CommitAction(commit=False)]
+        else:
+            return [CommitAction(commit=False)]
+
+    def get_valid_end_of_turn_actions(self):
+        return [EndOfTurnAction(end_turn=True), EndOfTurnAction(end_turn=False)]
+    
+    def get_valid_shortfall_actions(self, player:Player):
+        buildings = [building for building in self.state.iter_placed_buildings() if building.owner is player.color]
+        if buildings:
+            return [ResolveShortfallAction(action="shortfall", slot_id=building.slot_id) for building in buildings]
+        else:
+            return [ResolveShortfallAction(action="shortfall")]
 
     def _get_theoretically_valid_build_actions(self, game) -> List[BuildSelection]:
         '''Gets all build action parameter permutations that could in theory be valid under a specific game self.state'''

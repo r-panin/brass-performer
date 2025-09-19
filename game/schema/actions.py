@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Union, Optional
 from collections import defaultdict
 from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType, IndustryType
+from enum import StrEnum
 
 '''
 Meta classes
@@ -75,7 +76,7 @@ class SellSelection(ParameterAction, ResourceAction, SlotAction):
     pass
 
 class ScoutSelection(ParameterAction):
-    additional_card_cost: List[int] = Field(min_length=2, max_length=2) # card ids
+    card_id: List[int] = Field(min_length=3, max_length=3)
 
 class DevelopSelection(ParameterAction, ResourceAction, IndustryAction):
     pass
@@ -96,8 +97,8 @@ class EndOfTurnAction(BaseModel):
     model_config = ConfigDict(extra='forbid')  
 
 class ResolveShortfallAction(BaseModel):
-    resolve: bool
-    slot_id: int
+    action: Literal["shortfall"] = "shortfall"
+    slot_id: Optional[int] = None
 
 MetaActions = Union[
     LoanStart,
@@ -122,5 +123,16 @@ Action = Union[
     ScoutSelection,
     DevelopSelection,
     NetworkSelection,
-    CommitAction
+    CommitAction,
+    EndOfTurnAction,
+    ResolveShortfallAction
 ]
+
+'''Requests'''
+
+class RequestType(StrEnum):
+    REQUEST_STATE = 'state'
+    REQUEST_ACTIONS = 'actions'
+
+class Request(BaseModel):
+    request: RequestType

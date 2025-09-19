@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Callable, Union, Iterator, Literal, ClassVar, Set
+from typing import List, Optional, Dict, Callable, Union, Iterator, ClassVar, Set
 from collections import deque
 import math
 import json
@@ -338,7 +338,7 @@ class BoardState(BaseModel):
         find_all=True)
 
     def get_player_coal_sources(self, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[tuple[Building, int]]:
-        '''Returns list of tuples: Building, priority'''        
+        '''Returns list of tuples: Building, priority, sorted by priority asc'''        
         out = []
         coal_cities = self.get_player_coal_locations(city_name, link_id)
         for city, priority in coal_cities.items():
@@ -351,7 +351,7 @@ class BoardState(BaseModel):
         out.sort(key=lambda x: x[1])
         return out
     
-    def get_player_beer_sources(self, color:PlayerColor, city_name:Optional[str]=None, link_id:Optional[str]=None) -> List[Building]:
+    def get_player_beer_sources(self, color:PlayerColor, city_name:Optional[str]=None, link_id:Optional[int]=None) -> List[Building]:
         out = []
         for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.BREWERY:
@@ -535,3 +535,13 @@ class TurnState(StrEnum):
     IN_TRANSACTION = 'in_transaction'
     AWAITING_COMMIT = 'awaiting_commit'
     END_OF_TURN = 'end_of_turn'
+
+class RequestResult(OutputToPlayer):
+    success: bool
+    result: None
+
+class StateRequestResult(RequestResult):
+    result: PlayerState
+
+class ActionSpaceRequestResult(RequestResult):
+    result: Optional[Dict[str, List]] = None

@@ -24,10 +24,6 @@ class TurnManager:
         for player in state.players.values():
             player.bank += player.income
             
-        
-        if any(player.bank < 0 for player in self.state.players.values()):
-            self.state_manager.enter_shortfall()
-
             if state.deck:
                 while len(player.hand) < 8:
                     card = state.deck.pop()
@@ -36,20 +32,20 @@ class TurnManager:
         return state
     
     def _prepare_next_era(self, state:BoardState) -> BoardState:
-        self.state.deck = self._build_initial_deck(len(self.state.players))
-        random.shuffle(self.state.deck)
+        state.deck = self._build_initial_deck(len(self.state.players))
+        random.shuffle(state.deck)
 
-        for link in self.state.links.values():
+        for link in state.links.values():
             if link.owner is not None:
                 for city_name in link.cities:
-                    self.state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
+                    state.players[link.owner].victory_points += self.state.cities[city_name].get_link_vps()
                 link.owner = None
 
-        for building in self.state.iter_placed_buildings():
+        for building in state.iter_placed_buildings():
             if building.flipped:
-                self.state.players[building.owner].victory_points += building.victory_points
+                state.players[building.owner].victory_points += building.victory_points
             if building.level == 1:
-                self.state.get_building_slot(building.slot_id).building_placed = None
+                state.get_building_slot(building.slot_id).building_placed = None
 
         state.era = LinkType.RAIL
 
