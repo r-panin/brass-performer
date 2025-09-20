@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from copy import deepcopy
 from ...schema import ActionContext, BoardState, PlayerColor, MetaActions, CommitAction, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, ScoutSelection,SellSelection,EndOfTurnAction,ResolveShortfallAction
 from typing import List, Dict, get_args
+from .services.event_bus import EventBus, MetaActionEvent, CommitEvent
+from deepdiff import DeepDiff
 
 
 class GamePhase(Enum):
@@ -44,13 +46,14 @@ class GameStateManager:
         ActionContext.SHORTFALL: (ResolveShortfallAction,),
         ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection,)
     }
-    def __init__(self, initial_state):
+    def __init__(self, initial_state:BoardState, event_bus:EventBus):
         self._state = GameState(
             _backup_state=deepcopy(initial_state),
             turn_state=deepcopy(initial_state),
             transaction_state=deepcopy(initial_state),
             phase=GamePhase.MAIN
         )
+        self.event_bus = event_bus
     
     @property
     def current_state(self) -> BoardState:
@@ -77,9 +80,13 @@ class GameStateManager:
         if self._state.phase != GamePhase.MAIN:
             raise ValueError("Transaction can only start from MAIN phase")
         
+        old_context = deepcopy(self.action_context)
         self._state.phase = GamePhase.TRANSACTION
         self._state.action_context = context
         self._state.transaction_state.subaction_count = 0
+        self.event_bus.publish(MetaActionEvent(
+            old_context=old_context, new_context=self.action_context
+        ))
     
     def add_subaction(self) -> None:
         """Добавляет поддействие в текущую транзакцию"""
@@ -99,6 +106,9 @@ class GameStateManager:
         if self._state.phase not in (GamePhase.TRANSACTION, GamePhase.AWAITING_COMMIT):
             raise ValueError("Can only commit from TRANSACTION or AWAITING_COMMIT")
         
+        self.event_bus.publish(CommitEvent(
+            diff=DeepDiff(self._state.turn_state.model_dump(), self._state.transaction_state.model_dump())
+        ))
         # Обновляем состояние хода
         self._state.turn_state = deepcopy(self._state.transaction_state)
         
@@ -126,10 +136,9 @@ class GameStateManager:
         self._state.transaction_state.subaction_count = 0
     
     def end_turn(self) -> None:
-        """Завершает ход"""
+        """Переводит в состояние подтверждения завершения хода"""
         self._state.phase = GamePhase.END_OF_TURN
         self._state.action_context = ActionContext.END_OF_TURN
-        # Здесь может быть дополнительная логика завершения хода
     
     def start_new_turn(self, new_state: BoardState) -> None:
         """Начинает новый ход"""
@@ -201,3 +210,6 @@ class GameStateManager:
         if self.current_state.turn_order[0] != color:
             return False
         return True
+    
+    def get_turn_diff(self) -> DeepDiff:
+        return DeepDiff(self._state._backup_state.model_dump(), self.current_state.model_dump())

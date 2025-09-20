@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ...schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ParameterAction, ScoutSelection, DevelopSelection, NetworkSelection, SellSelection, BuildSelection
+from ....schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ParameterAction, ScoutSelection, DevelopSelection, NetworkSelection, SellSelection, BuildSelection
 from typing import List
 from collections import defaultdict
 
@@ -9,7 +9,7 @@ class ActionValidator(ABC):
         super().__init__()
 
     @abstractmethod
-    def validate(self, action: ParameterAction, game_state:BoardState, player: Player):
+    def validate(self, action: ParameterAction, game_state:BoardState, player: Player) -> ValidationResult:
         pass
 
 def validate_card_in_hand(func):

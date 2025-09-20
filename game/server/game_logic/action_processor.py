@@ -1,7 +1,7 @@
-from .validation_service import ActionValidationService
-from ...schema import Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, StateRequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, MetaActions, DevelopSelection, ScoutSelection, ParameterAction, CommitAction, ActionContext, ResourceAction, AutoResourceSelection, EndOfTurnAction, GameStatus, ResolveShortfallAction, BoardState, Player, CardType, ResourceSource, ResourceStrategy, NetworkSelection, BuildSelection, SellSelection, ValidationResult, LinkType
+from .services.validation_service import ActionValidationService
+from .services.event_bus import EventBus, TurnCommitEvent
+from ...schema import Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, StateRequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, AutoResourceSelection, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
 from .game_state_manager import GamePhase, GameStateManager
-from typing import List, Dict, get_args
 from .turn_manager import TurnManager
 from .state_changer import StateChanger
 from .action_space_generator import ActionSpaceGenerator
@@ -9,12 +9,13 @@ from .action_space_generator import ActionSpaceGenerator
 
 class ActionProcessor():
 
-    def __init__(self, state_manager:GameStateManager):
+    def __init__(self, state_manager:GameStateManager, event_bus:EventBus):
         self.state_manager = state_manager
-        self.validation_service = ActionValidationService()
-        self.turn_manager = TurnManager()
-        self.state_changer = StateChanger(state_manager)
+        self.validation_service = ActionValidationService(event_bus)
+        self.turn_manager = TurnManager(event_bus)
+        self.state_changer = StateChanger(state_manager, event_bus)
         self.action_space_generator = ActionSpaceGenerator(state_manager)
+        self.event_bus = event_bus
 
     @property
     def state(self):
@@ -162,7 +163,7 @@ class ActionProcessor():
             )
         
         # Применяем действие
-        self.state_changer.apply_action(self.state, action, player, self.state_manager.action_context)
+        self.state_changer.apply_action(action, player)
         
         # Обновляем состояние
         try:
@@ -266,6 +267,12 @@ class ActionProcessor():
     def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
         if action.end_turn:
             # Завершаем ход и переходим к следующему игроку
+            self.event_bus.publish(TurnCommitEvent(
+                diff=self.state_manager.get_turn_diff(),
+                actor=color
+            ))
+
+
             next_state = self.turn_manager.prepare_next_turn(self.state)
             if self.turn_manager.concluded:
                 return ActionProcessResult(processed=True, end_of_turn=True, awaiting={}, hand=self.state.players[color].hand,

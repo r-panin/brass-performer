@@ -1,15 +1,24 @@
 from ...schema import BoardState, LinkType
 import random
+from copy import deepcopy
+from deepdiff import DeepDiff
+from .services.event_bus import EventBus, InterturnEvent
 
 class TurnManager:
-    def __init__(self):
+    def __init__(self, event_bus:EventBus):
         self.concluded = False
+        self.event_bus = event_bus
 
     def prepare_next_turn(self, state:BoardState) -> BoardState:
+        initial_state = deepcopy(state)
         state.turn_order.pop()
         state.actions_left = 2
         if not state.turn_order:
             state = self._prepare_next_round(state)
+        diff = DeepDiff(initial_state.model_dump(), state.model_dump())
+        self.event_bus.publish(InterturnEvent(
+            diff=diff
+        ))
         return state
 
     def _prepare_next_round(self, state:BoardState) -> BoardState:

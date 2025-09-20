@@ -8,6 +8,7 @@ from .game_state_manager import GameStateManager
 from .action_space_generator import ActionSpaceGenerator
 from .game_initializer import GameInitializer
 from .action_processor import ActionProcessor
+from .services.event_bus import EventBus
 
 
 
@@ -22,10 +23,12 @@ class Game:
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
         logging.basicConfig(level=logging.INFO)
+
+        self.event_bus = EventBus()
         self.initializer = GameInitializer()
 
     def start(self, player_count:int, player_colors:List[PlayerColor]):
-        self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors))
+        self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors), self.event_bus)
         self.action_space_generator = ActionSpaceGenerator(self.state_manager)
         self.action_processor = ActionProcessor(self.state_manager)
         self.status = GameStatus.ONGOING
