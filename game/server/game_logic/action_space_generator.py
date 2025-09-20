@@ -3,6 +3,7 @@ from typing import Dict, List
 from collections import Counter, defaultdict
 import itertools
 from .game_state_manager import GameStateManager
+import logging
 
 class ActionSpaceGenerator():
     INDUSTRY_RESOURCE_OPTIONS:Dict[IndustryType, set[tuple[ResourceType]]] = {
@@ -59,9 +60,9 @@ class ActionSpaceGenerator():
                     else:
                         out[action] = []
                 case "CommitAction":
-                    out[action] = self.get_valid_commit_actions(player)
+                    out[action] = self.get_valid_commit_actions()
                 case "EndOfTurnAction":
-                    out[action] = self.get_valid_end_of_turn_actions(player)
+                    out[action] = self.get_valid_end_of_turn_actions()
                 case "ResolveShortfallAction":
                     out[action] = self.get_valid_shortfall_actions(player)
 
@@ -134,7 +135,7 @@ class ActionSpaceGenerator():
                     if card.card_type == CardType.INDUSTRY:
                         if card.value != industry.value and card.value != 'wild':
                             continue
-                        if slot.city not in [city.name for city in network]:
+                        if slot.city not in network:
                             continue
 
                     building = player.get_lowest_level_building(industry)
@@ -370,7 +371,7 @@ class ActionSpaceGenerator():
             if iron_buildings:
                 iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
             else:
-                cost = self.state.market.calculate_iron_cost(self.state.get_develop_cost())
+                cost = self.state.market.calculate_iron_cost(self.state.get_develop_cost().iron)
                 if cost > player.bank:
                     return []
                 iron_sources = [ResourceSource(resource_type=ResourceType.IRON)]
@@ -382,6 +383,7 @@ class ActionSpaceGenerator():
                 continue
             for source in iron_sources:
                 if self.state.subaction_count > 0:
+                    print(f'APPENDING ACTION WITH PARAMETERS: industry={industry}, resources_used={list(source)}')
                     out.append(DevelopSelection(industry=industry, resources_used=list(source)))
                 else:
                     for card in cards:
@@ -396,10 +398,11 @@ class ActionSpaceGenerator():
             return []
         if any(card.value == 'wild' for card in cards):
             return []
-        for combo in itertools.combinations(cards, 3):
+        ids = [card.id for card in cards]
+        for combo in itertools.combinations(ids, 3):
             out.append(ScoutSelection(card_id=list(combo)))
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [NetworkSelection.model_validate_json(data) for data in data_strings]
+        return [ScoutSelection.model_validate_json(data) for data in data_strings]
 
     def get_valid_loan_actions(self, player:Player) -> List[ParameterAction]:
         if player.income < -7:

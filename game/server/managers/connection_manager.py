@@ -14,7 +14,11 @@ class ConnectionManager:
     
     def disconnect(self, connection: WebSocket, game_id: str):
         if game_id in self.active_connections:
-            self.active_connections[game_id] = [(ws, color) for (ws, color) in self.active_connections if ws != connection]
+            self.active_connections[game_id] = [
+                (ws, color) 
+                for (ws, color) in self.active_connections[game_id]  # Обращаемся к элементу словаря
+                if ws != connection
+            ]
             if not self.active_connections[game_id]:
                 del self.active_connections[game_id]
 

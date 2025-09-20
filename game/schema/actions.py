@@ -125,7 +125,8 @@ Action = Union[
     NetworkSelection,
     CommitAction,
     EndOfTurnAction,
-    ResolveShortfallAction
+    ResolveShortfallAction,
+    ParameterAction
 ]
 
 '''Requests'''

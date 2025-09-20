@@ -9,10 +9,13 @@ from .action_space_generator import ActionSpaceGenerator
 from .game_initializer import GameInitializer
 from .action_processor import ActionProcessor
 from .services.event_bus import EventBus
+from .services.replay_service import ReplayService
+from pathlib import Path
 
 
 
 class Game:
+    REPLAYS_PATH = Path(r"game\replays")
     @property
     def state(self) -> BoardState:
         return self.state_manager.current_state
@@ -28,16 +31,19 @@ class Game:
         self.initializer = GameInitializer()
 
     def start(self, player_count:int, player_colors:List[PlayerColor]):
+        self.replay_service = ReplayService(self.event_bus)
         self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors), self.event_bus)
+        logging.debug("STATE CREATED")
         self.action_space_generator = ActionSpaceGenerator(self.state_manager)
-        self.action_processor = ActionProcessor(self.state_manager)
+        self.action_processor = ActionProcessor(self.state_manager, self.event_bus)
         self.status = GameStatus.ONGOING
+        logging.debug("START SUCCESS")
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
         if state is None:
             state = self.state
         return PlayerState(
-            common_state=state.hide_state(),
+            state=state.hide_state(),
             your_color=color,
             your_hand={card.id: card for card in self.state.players[color].hand.values()}
         )
@@ -49,6 +55,7 @@ class Game:
         if isinstance(process_result, ActionProcessResult):
             if process_result.end_of_game:
                 self.status = GameStatus.COMPLETE
+                self.replay_service.save_replay(self.REPLAYS_PATH / game.id)
         return process_result
 
 if __name__ == '__main__':

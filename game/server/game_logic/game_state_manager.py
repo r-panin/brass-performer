@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from ...schema import ActionContext, BoardState, PlayerColor, MetaActions, CommitAction, BuildSelection, DevelopSelection, NetworkSelection, ParameterAction, ScoutSelection,SellSelection,EndOfTurnAction,ResolveShortfallAction
 from typing import List, Dict, get_args
-from .services.event_bus import EventBus, MetaActionEvent, CommitEvent
+from .services.event_bus import EventBus, MetaActionEvent, CommitEvent, InitialStateEvent
 from deepdiff import DeepDiff
 
 
@@ -54,6 +54,9 @@ class GameStateManager:
             phase=GamePhase.MAIN
         )
         self.event_bus = event_bus
+        self.event_bus.publish(InitialStateEvent(
+            state=initial_state
+        ))
     
     @property
     def current_state(self) -> BoardState:

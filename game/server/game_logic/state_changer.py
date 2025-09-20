@@ -1,5 +1,5 @@
 from .game_state_manager import GameStateManager
-from ...schema import ParameterAction, Player, ActionContext, CardType, ResourceAction, ResourceAmounts, ResolveShortfallAction, BuildSelection, SellSelection, NetworkSelection, DevelopSelection
+from ...schema import ParameterAction, Player, ActionContext, CardType, ResourceAction, ResourceAmounts, ResolveShortfallAction, BuildSelection, SellSelection, NetworkSelection, DevelopSelection, IndustryType, Building, ResourceType
 from collections import defaultdict
 from .services.event_bus import EventBus, StateChangeEvent
 from deepdiff import DeepDiff
@@ -17,7 +17,7 @@ class StateChanger:
     
     def apply_action(self, action:ParameterAction, player:Player):
         initial_state = deepcopy(self.state)
-        if action.card_id is not None:
+        if action.card_id is not None and isinstance(action.card_id, int):
             card = player.hand.pop(action.card_id)
             if card.value != 'wild':
                 self.state.discard.append(card)
@@ -98,12 +98,25 @@ class StateChanger:
             building = player.get_lowest_level_building(action.industry)
             building.slot_id = action.slot_id
             self.state.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
+            self._sell_to_market(building)
         
         diff = DeepDiff(initial_state.model_dump(), self.state.model_dump())
         self.event_bus.publish(StateChangeEvent(
             actor=player.color,
             diff=diff
         ))
+
+    def _sell_to_market(self, building:Building) -> None:
+        if building.industry_type not in (IndustryType.COAL, IndustryType.IRON):
+            return
+        if building.industry_type is IndustryType.COAL and not self.state.market_access_exists(self.state.get_building_slot(building.slot_id).city):
+            return
+        sold_amount = min(building.resource_count, self.state.market.sellable_amount(ResourceType(building.industry_type)))
+        if sold_amount <= 0 :
+            return
+        profit = self.state.market.sell_resource(ResourceType(building.industry_type), sold_amount)
+        self.state.players[building.owner].bank += profit
+        building.resource_count -= sold_amount
 
     def _award_merchant(self, city_name:str, player:Player) -> None:
         match city_name:

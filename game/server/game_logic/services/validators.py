@@ -16,8 +16,13 @@ def validate_card_in_hand(func):
     def wrapper(self:BaseValidator, action:ParameterAction, game_state:BoardState, player:Player):
         if game_state.subaction_count > 0:
             return func(self, action, game_state, player)
-        if action.card_id not in player.hand:
-            return ValidationResult(is_valid=False, message="Card not in player's hand")
+        if isinstance(action.card_id, int):
+            if action.card_id not in player.hand:
+                return ValidationResult(is_valid=False, message="Card not in player's hand")
+        elif isinstance(action.card_id, list):
+            for card in action.card_id:
+                if card not in player.hand:
+                    return ValidationResult(is_valid=False, message="Card not in player's hand")
         return func(self, action, game_state, player)
     return wrapper
 

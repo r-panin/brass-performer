@@ -5,6 +5,7 @@ from ..dependancies import get_connection_manager, get_game_manager
 from ..managers import ConnectionManager, GameManager
 from ...schema import PlayerColor, ActionType, Action, Request, GameStatus, ResolveShortfallAction, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart, ActionProcessResult
 from pydantic import ValidationError
+import logging
 
 router = APIRouter()
 
@@ -34,8 +35,10 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 # Получаем сообщение от клиента
                 action_data = await websocket.receive_json()
 
+                logging.debug(f'RECEIVED ACTION {action_data}')
                 # Парсим-парсим-парсим и сводит музыка с ума
                 action = parse_action(action_data)
+                logging.debug(f'PARSED AS {type(action)}')
                 
                 # Применяем действие к игровому состоянию
                 # Здесь будет метод для применения действия
@@ -72,8 +75,8 @@ def get_end_game_message(game) -> Dict:
 
 def parse_action(data: Dict[str, Any]) -> Action:
     # Сначала проверяем наличие уникальных полей для каждого типа действия
-    if len(data.get("card_id", [])) == 3:
-        return ScoutSelection(**data)
+    if "card_id" in data and isinstance(data["card_id"], list) and len(data["card_id"]) == 3:
+        return ScoutSelection(**data) 
     elif "link_id" in data:
         return NetworkSelection(**data)
     elif "slot_id" in data and "industry" in data:

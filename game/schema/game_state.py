@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Callable, Union, Iterator, ClassVar, Set
+from typing import List, Optional, Dict, Callable, Union, Iterator, ClassVar, Set, Any
 from collections import deque
 import math
 import json
@@ -154,6 +154,13 @@ class Market(BaseModel):
     def update_market_costs(self):
         self.coal_cost = self.COAL_MAX_COST - math.ceil(self.coal_count / 2)
         self.iron_cost = self.IRON_MAX_COST - math.ceil(self.iron_count / 2)
+
+    @property
+    def sellable_amount(self, resource_type:ResourceType):
+        if resource_type is ResourceType.IRON:
+            return self.IRON_MAX_COUNT - self.iron_count
+        elif resource_type is ResourceType.COAL:
+            return self.COAL_MAX_COST - self.coal_count
     
     def _calculate_resource_cost(
         self, 
@@ -203,6 +210,52 @@ class Market(BaseModel):
             
         self.update_market_costs()
         return total_cost
+    
+
+    def _calculate_resource_sale_price(
+        self, 
+        resource_type: ResourceType, 
+        amount: int
+    ) -> int:
+        if resource_type == ResourceType.COAL:
+            current_count = self.coal_count
+            max_cost = self.COAL_MAX_COST
+            max_count = self.COAL_MAX_COUNT
+        elif resource_type == ResourceType.IRON:
+            current_count = self.iron_count
+            max_cost = self.IRON_MAX_COST
+            max_count = self.IRON_MAX_COUNT
+        else:
+            raise ValueError("Market can only buy iron and coal")
+        
+        total_revenue = 0
+        temp_count = current_count
+        
+        for _ in range(amount):
+            if current_count >= max_count:
+                break
+            # Цена уменьшается по мере увеличения количества на рынке
+            current_price = max_cost - math.ceil((temp_count + 1) / 2)
+            current_price = max(0, current_price)  # Не может быть отрицательной
+            total_revenue += current_price
+            temp_count += 1  # Увеличиваем количество после продажи
+            
+        return total_revenue
+
+    def sell_resource(
+        self, 
+        resource_type: ResourceType, 
+        amount: int
+    ) -> int:
+        total_revenue = self._calculate_resource_sale_price(resource_type, amount)
+        
+        if resource_type == ResourceType.COAL:
+            self.coal_count += amount
+        elif resource_type == ResourceType.IRON:
+            self.iron_count += amount
+            
+        self.update_market_costs()
+        return total_revenue
 
 
 class CardType(StrEnum):
@@ -469,7 +522,7 @@ class BoardState(BaseModel):
                     out += building_slot.building_placed.resource_count
         return out
     
-    def get_player_network(self, player_color: PlayerColor) -> Set[City]:
+    def get_player_network(self, player_color: PlayerColor) -> Set[str]:
         slot_cities = {
             city.name for city in self.cities.values()
             if any(slot.building_placed and slot.building_placed.owner == player_color
@@ -507,25 +560,20 @@ class BoardState(BaseModel):
             return ResourceAmounts()
         return ResourceAmounts(iron=1)
 
-class PlayerState(BaseModel):
-    common_state: BoardStateExposed
-    your_hand: Dict[int, Card]
-    your_color: PlayerColor
-
 class OutputToPlayer(BaseModel):
     message: Optional[str] = None
+
+class PlayerState(OutputToPlayer):
+    state: BoardStateExposed
+    your_hand: Dict[int, Card]
+    your_color: PlayerColor
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool
 
-class ExecutionResult(OutputToPlayer):
-    executed: bool
-
-class ActionProcessResult(OutputToPlayer):
+class ActionProcessResult(PlayerState):
     processed: bool
     awaiting: Dict[str, List[str]]
-    provisional_state: Optional[BoardStateExposed] = None
-    hand: Dict[int, Card]
     end_of_turn: bool = False
     current_context: ActionContext
     end_of_game: bool = False
@@ -538,7 +586,7 @@ class TurnState(StrEnum):
 
 class RequestResult(OutputToPlayer):
     success: bool
-    result: None
+    result: List[Any]
 
 class StateRequestResult(RequestResult):
     result: PlayerState
