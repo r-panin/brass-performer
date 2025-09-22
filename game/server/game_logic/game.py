@@ -1,5 +1,5 @@
-from ...schema import BoardState, PlayerColor, IndustryType, GameStatus, PlayerState, ActionProcessResult, RequestResult
-from typing import List 
+from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType
+from typing import Dict, List 
 import random
 from uuid import uuid4
 import logging
@@ -11,6 +11,7 @@ from .action_processor import ActionProcessor
 from .services.event_bus import EventBus
 from .services.replay_service import ReplayService
 from pathlib import Path
+from collections import defaultdict
 
 
 
@@ -19,6 +20,29 @@ class Game:
     @property
     def state(self) -> BoardState:
         return self.state_manager.current_state
+
+    @classmethod
+    def from_partial_state(cls, partial_state:PlayerState):
+        game = cls()
+        game.start(len(partial_state.state.players), [player for player in partial_state.state.players])
+        game._determine_cards(partial_state)
+        return game
+    
+    def _determine_cards(self, partial_state:PlayerState) -> BoardState:
+        full_deck = self.initializer._build_initial_deck(len(partial_state.state.players))
+        known_card_ids = set(partial_state.state.discard) | set(partial_state.your_hand)
+        available_deck = [card for card in full_deck if card.id not in known_card_ids]
+        deal_to = [player for player in partial_state.state.players 
+              if player != partial_state.your_color]
+        player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
+        for player in deal_to:
+            cards_needed = 8 - len(player_hands.get(player, {}))
+            for _ in range(min(cards_needed, len(available_deck))):
+                card = available_deck.pop()
+                player_hands[player][card.id] = card
+        player_hands[partial_state.your_color] = partial_state.your_hand
+        self.state_manager = GameStateManager(BoardState.determine(partial_state.state, player_hands, available_deck), self.event_bus)
+            
 
     def __init__(self):
         self.id = str(uuid4())
@@ -62,20 +86,8 @@ class Game:
 if __name__ == '__main__':
     game = Game()
     game.start(4, ['white', 'red', 'yellow', 'purple'])
-    player = game.state.players[game.state.turn_order[0]]
-    for slot in game.state.iter_building_slots():
-        if 'brewery' in slot.industry_type_options:
-            slot.building_placed = next(building for building in player.available_buildings.values() if building.industry_type == IndustryType.BREWERY)
-            slot.building_placed.slot_id = slot.id
-        elif 'box' in slot.industry_type_options:
-            slot.building_placed = next(building for building in player.available_buildings.values() if building.industry_type == IndustryType.BOX)
-            slot.building_placed.slot_id = slot.id
-        elif 'cotton' in slot.industry_type_options:
-            slot.building_placed = next(building for building in player.available_buildings.values() if building.industry_type == IndustryType.COTTON)
-            slot.building_placed.slot_id = slot.id
-        elif 'pottery' in slot.industry_type_options:
-            slot.building_placed = next(building for building in player.available_buildings.values() if building.industry_type == IndustryType.POTTERY)
-            slot.building_placed.slot_id = slot.id
-    for link in game.state.links.values():
-            link.owner = player.color
-    print(len(game.get_valid_sell_actions(player)))
+    game_from_state = Game.from_partial_state(game.process_action(Request(request=RequestType.REQUEST_STATE), 'white'))
+    with open(r'G:\brass-performer\brass-performer\game\replays\main_game.json', 'w') as game_one_file:
+        game_one_file.write(game.state.model_dump_json())
+    with open(r'G:\brass-performer\brass-performer\game\replays\from_state.json', 'w') as game_two_file:
+        game_two_file.write(game_from_state.state.model_dump_json())

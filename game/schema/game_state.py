@@ -275,15 +275,16 @@ class PlayerExposed(BaseModel):
     income: int
     income_points: int
     victory_points: int
+    money_spent: int = 0
 
 class Player(BaseModel):
     hand: Dict[int, Card]
     available_buildings: Dict[int, Building]
     color: PlayerColor
-    bank: int = Field(ge=0)
+    bank: int 
     income: int = Field(ge=-10)
     income_points: int = Field(ge=-10)
-    victory_points: int = Field(ge=0)
+    victory_points: int
     money_spent: int = 0
 
     def hide_hand(self) -> PlayerExposed:
@@ -331,6 +332,9 @@ class BoardStateExposed(BaseModel):
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wilds: List[Card]
+    subaction_count: int = Field(default=0, exclude=True)
+    gloucester_develop: bool = Field(default=False, exclude=True)
+
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
@@ -346,6 +350,42 @@ class BoardState(BaseModel):
     subaction_count: int = Field(default=0, exclude=True)
     gloucester_develop: bool = Field(default=False, exclude=True)
 
+    @classmethod
+    def determine(
+        cls,
+        exposed_state: BoardStateExposed,
+        player_hands: Dict[PlayerColor, Dict[int, Card]],
+        deck: List[Card]
+    ) -> "BoardState":
+        # Восстанавливаем игроков с их картами
+        players = {}
+        for color, exposed_player in exposed_state.players.items():
+            # Создаем полного игрока, подставляя карты из player_hands
+            player_data = exposed_player.model_dump()
+            player_data.update({
+                "hand": player_hands[color],
+                "available_buildings": exposed_player.available_buildings,
+                "color": color,
+                "bank": exposed_player.bank,
+                "income": exposed_player.income,
+                "income_points": exposed_player.income_points,
+                "victory_points": exposed_player.victory_points,
+                "money_spent": exposed_player.money_spent
+            })
+            players[color] = Player(**player_data)
+
+        # Создаем данные для BoardState
+        state_data = exposed_state.model_dump()
+        state_data.update({
+            "players": players,
+            "deck": deck
+        })
+        
+        # Удаляем поле deck_size, которое есть только в exposed
+        del state_data["deck_size"]
+        
+        return cls(**state_data)
+    
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
         data["players"] = {color: player.hide_hand() for color, player in self.players.items()}
