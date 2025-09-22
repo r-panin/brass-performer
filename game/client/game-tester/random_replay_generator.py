@@ -232,7 +232,6 @@ class TestClient:
             if 'state' in state_data and 'turn_order' in state_data['state']:
                 print(f"Passing to {state_data['state']['turn_order'][0]}")
                 print(f"Full turn order: {state_data['state']['turn_order']}")
-                print(f"Current context: {state_data['current_context']}")
                 return state_data['state']['turn_order'][0]
             else:
                 print(f"Invalid state response: {state_data}")
@@ -254,7 +253,7 @@ class TestClient:
                     return None
 
             # Извлекаем контекст и порядок ходов
-            context = state_data.get('current_context')
+            context = state_data['state']['action_context']
             turn_order = state_data['state']['turn_order']
             # Если контекст shortfall, ищем следующего игрока с действиями
             if context == 'shortfall':

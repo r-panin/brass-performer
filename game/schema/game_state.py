@@ -334,6 +334,7 @@ class BoardStateExposed(BaseModel):
     wilds: List[Card]
     subaction_count: int = Field(default=0, exclude=True)
     gloucester_develop: bool = Field(default=False, exclude=True)
+    action_context: ActionContext
 
 
 class BoardState(BaseModel):
@@ -349,6 +350,7 @@ class BoardState(BaseModel):
     wilds: List[Card]
     subaction_count: int = Field(default=0, exclude=True)
     gloucester_develop: bool = Field(default=False, exclude=True)
+    action_context: ActionContext
 
     @classmethod
     def determine(
@@ -607,7 +609,6 @@ class PlayerState(OutputToPlayer):
     state: BoardStateExposed
     your_hand: Dict[int, Card]
     your_color: PlayerColor
-    current_context: ActionContext
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool

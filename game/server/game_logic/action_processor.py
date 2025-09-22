@@ -43,7 +43,6 @@ class ActionProcessor():
                 state=self.state_manager.public_state,
                 your_color=color,
                 your_hand=self.state_manager.current_state.players[color].hand,
-                current_context=self.state_manager.action_context
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
             actions = self.action_space_generator.get_action_space(color)
@@ -59,7 +58,6 @@ class ActionProcessor():
                 processed=False,
                 message=f"Attempted move by {color}, current turn is {self.state.turn_order[0]}",
                 awaiting={},
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 state=self.state_manager.get_provisional_state()
@@ -71,7 +69,6 @@ class ActionProcessor():
                 processed=False,
                 message=f"Attempted action {type(action)}, which current context {self.state_manager.action_context} forbids",
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 state=self.state_manager.get_provisional_state(),
@@ -93,7 +90,6 @@ class ActionProcessor():
                 processed=False, 
                 message="Unknown action type", 
                 awaiting={'W': ('T', 'F')}, 
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                     state=self.state_manager.get_provisional_state()
@@ -105,7 +101,6 @@ class ActionProcessor():
                 processed=False,
                 message="Cannot submit a meta action outside of main context",
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                     state=self.state_manager.get_provisional_state()
@@ -117,7 +112,6 @@ class ActionProcessor():
                 processed=True,
                 message=f"Entered {self.state_manager.action_context}",
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 state=self.state_manager.get_provisional_state(),
                 your_hand=self.state.players[color].hand,
                 your_color=color
@@ -127,7 +121,6 @@ class ActionProcessor():
                 processed=False,
                 message=str(e),
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                     state=self.state_manager.get_provisional_state()
@@ -139,7 +132,6 @@ class ActionProcessor():
                 processed=False,
                 message="No active transaction. Start with meta action",
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 state=self.state_manager.get_provisional_state()
@@ -160,7 +152,6 @@ class ActionProcessor():
                 processed=False,
                 message=validation_result.message,
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=player.hand,
                 your_color=color,
                 state=self.state_manager.get_provisional_state()
@@ -176,7 +167,6 @@ class ActionProcessor():
                 processed=True,
                 state=self.state_manager.get_provisional_state(),
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=player.hand,
                 your_color=color
             )
@@ -185,7 +175,6 @@ class ActionProcessor():
                 processed=False,
                 message=str(e),
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=player.hand,
                 your_color=color
             )
@@ -196,7 +185,6 @@ class ActionProcessor():
                 processed=False,
                 message="No active transaction to commit",
                 awaiting=self.state_manager.get_expected_params(color),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 state=self.state_manager.get_provisional_state()
@@ -208,7 +196,6 @@ class ActionProcessor():
                     processed=False,
                     message="No changes to state, nothing to commit",
                     awaiting=self.state_manager.get_expected_params(color),
-                    current_context=self.state_manager.action_context,
                     your_hand=self.state.players[color].hand,
                     your_color=color,
                     state=self.state_manager.get_provisional_state()
@@ -227,7 +214,6 @@ class ActionProcessor():
                         message="Changes committed",
                         state=self.state_manager.get_provisional_state(),
                         awaiting=self.state_manager.get_expected_params(color),
-                        current_context=self.state_manager.action_context,
                         your_color=color,
                         your_hand=self.state.players[color].hand
                     )
@@ -239,7 +225,6 @@ class ActionProcessor():
                         message="Changes committed, confirm end of turn",
                         state=self.state_manager.get_provisional_state(),
                         awaiting=self.state_manager.get_expected_params(color),
-                        current_context=self.state_manager.action_context,
                         your_color=color,
                         your_hand=self.state.players[color].hand,
                     )
@@ -248,7 +233,6 @@ class ActionProcessor():
                     processed=False,
                     message=str(e),
                     awaiting=self.state_manager.get_expected_params(color),
-                    current_context=self.state_manager.action_context,
                     your_color=color,
                     your_hand=self.state.players[color].hand,
                     state=self.state_manager.get_provisional_state()
@@ -262,7 +246,6 @@ class ActionProcessor():
                     message='Transaction rolled back',
                     state=self.state_manager.get_provisional_state(),
                     awaiting=self.state_manager.get_expected_params(color),
-                    current_context=self.state_manager.action_context,
                     your_color=color,
                     your_hand=self.state.players[color].hand,
                 )
@@ -271,7 +254,6 @@ class ActionProcessor():
                     processed=False,
                     message=str(e),
                     awaiting=self.state_manager.get_expected_params(color),
-                    current_context=self.state_manager.action_context,
                     your_color=color,
                     your_hand=self.state.players[color].hand,
                     state=self.state_manager.get_provisional_state()
@@ -300,7 +282,7 @@ class ActionProcessor():
                                        your_hand=self.state.players[color].hand,
                                        state=self.state_manager.get_provisional_state(),
                                        your_color=color,
-                                       current_context=self.state_manager.action_context)
+                                       )
         else:
             # Откатываемся к началу хода
             self.state_manager.rollback_turn()
@@ -309,7 +291,6 @@ class ActionProcessor():
                 message='Reverted to turn start', 
                 state=self.state_manager.get_provisional_state(), 
                 awaiting={}, 
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color
             )
@@ -320,7 +301,6 @@ class ActionProcessor():
                 processed=False,
                 awaiting=self.state_manager.get_expected_params(color),
                 state=self.state_manager.get_provisional_state(),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 message="Action is only allowed within shortfall context"
@@ -332,7 +312,6 @@ class ActionProcessor():
             return ActionProcessResult(
                 processed=False,
                 state=self.state_manager.get_provisional_state(),
-                current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
                 message=validation.message,
@@ -345,7 +324,6 @@ class ActionProcessor():
         return ActionProcessResult(
             processed=True,
             state=self.state_manager.get_provisional_state(),
-            current_context=self.state_manager.action_context,
             your_color=color,
             your_hand=self.state.players[color].hand,
             awaiting=self.state_manager.get_expected_params(color)

@@ -57,11 +57,9 @@ class Game:
     def start(self, player_count:int, player_colors:List[PlayerColor]):
         self.replay_service = ReplayService(self.event_bus)
         self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors), self.event_bus)
-        logging.debug("STATE CREATED")
         self.action_space_generator = ActionSpaceGenerator(self.state_manager)
         self.action_processor = ActionProcessor(self.state_manager, self.event_bus)
         self.status = GameStatus.ONGOING
-        logging.debug("START SUCCESS")
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
         if state is None:
@@ -70,7 +68,6 @@ class Game:
             state=state.hide_state(),
             your_color=color,
             your_hand={card.id: card for card in self.state.players[color].hand.values()},
-            current_context=self.state_manager.action_context
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:

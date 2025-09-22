@@ -1,14 +1,13 @@
-from ...schema import PlayerColor, BoardState, LinkType, Building, Player, Card, CardType, City, MerchantSlot, MerchantType, BuildingSlot, IndustryType, Link, Market
+from ...schema import PlayerColor, BoardState, LinkType, Building, Player, Card, CardType, City, MerchantSlot, MerchantType, BuildingSlot, IndustryType, Link, Market, ActionContext
 from pathlib import Path
 from typing import List, Dict
 import random
 import json
-import logging
 
 
 class GameInitializer():
 
-    RES_PATH = Path(r'game\server\res')
+    RES_PATH = Path(r'G:\brass-performer\brass-performer\game\server\res')
     BUILDING_ROSTER_PATH = Path(RES_PATH / 'building_table.json')
     CARD_LIST_PATH = Path(RES_PATH / 'card_list.json')
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
@@ -37,11 +36,13 @@ class GameInitializer():
 
         wilds = self._build_wild_deck()
 
+        context = ActionContext.MAIN
+
         #burn initial cards
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wilds=wilds, links=links)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wilds=wilds, links=links, action_context=context)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}
@@ -84,13 +85,11 @@ class GameInitializer():
             cards_data = json.load(cardfile)
         for card_data in cards_data:
             if card_data['player_count'] <= player_count:
-                logging.debug(f"processing card data {card_data}")
                 card = Card(
                     id=card_data["id"],
                     card_type=CardType(card_data["card_type"]),
                     value=card_data["value"]
                 )
-                logging.debug(f"appending card{card}")
                 out.append(card)
         random.shuffle(out)
         return out
@@ -118,8 +117,6 @@ class GameInitializer():
 
         for city_data in cities_data:
             city_name = city_data['name']
-            logging.debug(f'creating city {city_name}')
-            logging.debug(f'merchant player count: {city_data["player_count"]}') if 'player_count' in city_data.keys() else logging.debug('not a merchant')
             slots=[BuildingSlot(
                     id=slot['id'],
                     city=city_name,

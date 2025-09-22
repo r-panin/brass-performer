@@ -128,7 +128,7 @@ class BaseValidator(ActionValidator, ABC):
             if market_consumption != remaining_amount:
                 return ValidationResult(is_valid=False, message="whut?")
             
-        return ValidationResult(True)    
+        return ValidationResult(is_valid=True)    
     
     def _validate_base_action_cost(self) -> ValidationResult:
         raise ValueError("Must be defined for every resource action")
