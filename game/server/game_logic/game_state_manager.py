@@ -5,6 +5,7 @@ from ...schema import ActionContext, BoardState, PlayerColor, MetaActions, Commi
 from typing import List, Dict, get_args
 from .services.event_bus import EventBus, MetaActionEvent, CommitEvent, InitialStateEvent
 from deepdiff import DeepDiff
+import logging
 
 
 class GamePhase(Enum):
@@ -35,16 +36,16 @@ class GameStateManager:
     ACTION_CONTEXT_MAP = {
         ActionContext.MAIN: get_args(MetaActions),
         ActionContext.AWAITING_COMMIT: (CommitAction,),
-        ActionContext.BUILD: (BuildSelection,),
+        ActionContext.BUILD: (BuildSelection, CommitAction),
         ActionContext.DEVELOP: (DevelopSelection, CommitAction),
         ActionContext.NETWORK: (NetworkSelection, CommitAction),
-        ActionContext.PASS: (ParameterAction,),
-        ActionContext.SCOUT: (ScoutSelection,),
+        ActionContext.PASS: (ParameterAction, CommitAction),
+        ActionContext.SCOUT: (ScoutSelection, CommitAction),
         ActionContext.SELL: (SellSelection, CommitAction),
-        ActionContext.LOAN: (ParameterAction,),
-        ActionContext.END_OF_TURN: (EndOfTurnAction,),
+        ActionContext.LOAN: (ParameterAction, CommitAction),
+        ActionContext.END_OF_TURN: (EndOfTurnAction, CommitAction),
         ActionContext.SHORTFALL: (ResolveShortfallAction,),
-        ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection,)
+        ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection, CommitAction)
     }
     def __init__(self, initial_state:BoardState, event_bus:EventBus):
         self._state = GameState(
@@ -130,13 +131,15 @@ class GameStateManager:
         self._state.action_context = ActionContext.MAIN
         self._state.transaction_state = deepcopy(self._state.turn_state)
         self._state.transaction_state.subaction_count = 0
+        logging.debug(f"Rollback action, actions left {self.current_state.actions_left}")
 
     def rollback_turn(self) -> None:
         self._state.phase = GamePhase.MAIN
         self._state.action_context = ActionContext.MAIN
         self._state.turn_state = deepcopy(self._state._backup_state)
-        self._state.turn_state = deepcopy(self._state._backup_state)
+        self._state.transaction_state = deepcopy(self._state._backup_state)
         self._state.transaction_state.subaction_count = 0
+        logging.debug(f"Rollback turn, actions left = {self.current_state.actions_left}")
     
     def end_turn(self) -> None:
         """Переводит в состояние подтверждения завершения хода"""
@@ -148,23 +151,24 @@ class GameStateManager:
         self._state._backup_state = deepcopy(new_state)
         self._state.turn_state = deepcopy(new_state)
         self._state.transaction_state = deepcopy(new_state)
-        self._state.phase = GamePhase.MAIN
-        self._state.action_context = ActionContext.MAIN
+        if self.action_context is not ActionContext.SHORTFALL:
+            self._state.phase = GamePhase.MAIN
+            self._state.action_context = ActionContext.MAIN
         self._state.transaction_state.subaction_count = 0
         
-        if any(player.bank < 0 for player in self.current_state.players.values()):
-            self.enter_shortfall()
 
     def enter_shortfall(self):
-        self.action_context = ActionContext.SHORTFALL
-        self.phase = GamePhase.SHORTFALL
+        self._state.action_context = ActionContext.SHORTFALL
+        self._state.phase = GamePhase.SHORTFALL
 
     def exit_shortfall(self):
-        self.action_context = ActionContext.MAIN
-        self.phase = GamePhase.MAIN
+        self._state.action_context = ActionContext.MAIN
+        self._state.phase = GamePhase.MAIN
+        self._state._backup_state = deepcopy(self._state.transaction_state)
+        self._state.turn_state = deepcopy(self._state.transaction_state)
 
     def enter_gloucester_develop(self):
-        self.action_context = ActionContext.GLOUCESTER_DEVELOP
+        self._state.action_context = ActionContext.GLOUCESTER_DEVELOP
         self._state.transaction_state.gloucester_develop = True
         if self.subaction_count < 1:
             self.subaction_count = 1

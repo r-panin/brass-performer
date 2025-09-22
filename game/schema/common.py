@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, model_validator
-from typing import Optional, Literal
+from typing import Optional
 
 class ActionType(StrEnum):
     BUILD = 'build'
@@ -35,31 +35,12 @@ class ResourceSource(BaseModel):
             raise ValueError("Object may not be empty")
             
         return self
-        
-
-
-        
 
 class ResourceAmounts(BaseModel):
     iron: int = 0
     coal: int = 0
     beer: int = 0
     money: int = 0
-
-class ResourceStrategy(StrEnum):
-    MAXIMIZE_INCOME = 'maximize_income'
-    MAXIMIZE_VP = 'maximize_vp'
-    MERCHANT_FIRST = 'merchant_first'
-
-class AutoResourceSelection(BaseModel):
-    mode: Literal["auto"]
-    strategy: ResourceStrategy
-    then: Optional[ResourceStrategy] = None
-
-    @model_validator(mode='after')
-    def validate(self):
-        if self.strategy is ResourceStrategy.MERCHANT_FIRST and self.then is None:
-            raise ValueError(f"Strategy {self.strategy} requires a 'then' strategy")
 
 class IndustryType(StrEnum):
     COAL = "coal"

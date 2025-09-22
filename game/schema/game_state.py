@@ -6,6 +6,7 @@ import math
 import json
 import hashlib
 from .common import IndustryType, ResourceType, ResourceAmounts
+import logging
 
 
 class GameEntity(BaseModel):
@@ -63,18 +64,16 @@ class MerchantSlot(GameEntity):
     
     def buys(self) -> List[IndustryType]:
         out = set()
-        for slot in self.merchant_slots.values:
-            if slot.merchant_type is MerchantType.ANY:
-                out.add(IndustryType.BOX)
-                out.add(IndustryType.COTTON)
-                out.add(IndustryType.POTTERY)
-                break
-            elif slot.merchant_type is MerchantType.POTTERY:
-                out.add(IndustryType.POTTERY)
-            elif slot.merchant_type is MerchantType.BOX:
-                out.add(IndustryType.BOX)
-            elif slot.merchant_type is MerchantType.COTTON:
-                out.add(IndustryType.COTTON)
+        if self.merchant_type is MerchantType.ANY:
+            out.add(IndustryType.BOX)
+            out.add(IndustryType.COTTON)
+            out.add(IndustryType.POTTERY)
+        elif self.merchant_type is MerchantType.POTTERY:
+            out.add(IndustryType.POTTERY)
+        elif self.merchant_type is MerchantType.BOX:
+            out.add(IndustryType.BOX)
+        elif self.merchant_type is MerchantType.COTTON:
+            out.add(IndustryType.COTTON)
         return list(out)
 
 class LinkType(StrEnum):
@@ -155,7 +154,6 @@ class Market(BaseModel):
         self.coal_cost = self.COAL_MAX_COST - math.ceil(self.coal_count / 2)
         self.iron_cost = self.IRON_MAX_COST - math.ceil(self.iron_count / 2)
 
-    @property
     def sellable_amount(self, resource_type:ResourceType):
         if resource_type is ResourceType.IRON:
             return self.IRON_MAX_COUNT - self.iron_count
@@ -332,7 +330,7 @@ class BoardStateExposed(BaseModel):
     turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[Card]
+    wilds: List[Card]
 
 class BoardState(BaseModel):
     cities: Dict[str, City]
@@ -344,7 +342,7 @@ class BoardState(BaseModel):
     turn_order: List[PlayerColor]
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
-    wild_deck: List[Card]
+    wilds: List[Card]
     subaction_count: int = Field(default=0, exclude=True)
     gloucester_develop: bool = Field(default=False, exclude=True)
 
@@ -411,7 +409,7 @@ class BoardState(BaseModel):
                 if building.owner == color:
                     out.append(building)
                 else:
-                    city = self.get_building_slot(building.slot).city
+                    city = self.get_building_slot(building.slot_id).city
                     connected = self.find_paths(start=city_name, end=city, start_link_id=link_id)
                     if connected:
                         out.append(building)
@@ -507,12 +505,14 @@ class BoardState(BaseModel):
         for city in self.cities.values():
             if building_slot_id in city.slots:
                 return city.slots[building_slot_id]
+        logging.debug(f"Couldn't find building slot {building_slot_id}")
     
-    def get_merchant_slot(self, merchant_slot_id) -> MerchantSlot:
+    def get_merchant_slot(self, merchant_slot_id:int) -> MerchantSlot:
             for city in self.cities.values():
                 if city.merchant_slots is not None:
-                    if merchant_slot_id in city.slots:
+                    if merchant_slot_id in city.merchant_slots:
                         return city.merchant_slots[merchant_slot_id]
+            logging.debug(f"Couldn't find merchant slot {merchant_slot_id}")
 
     def get_resource_amount_in_city(self, city_name:str, resource_type:ResourceType) -> int:
         out = 0
@@ -535,8 +535,8 @@ class BoardState(BaseModel):
             for city in link.cities
         }
 
-        if not slot_cities and link_cities:
-            return set(self.cities.values())
+        if not slot_cities and not link_cities:
+            return set(self.cities)
         
         return slot_cities | link_cities 
 
@@ -567,6 +567,7 @@ class PlayerState(OutputToPlayer):
     state: BoardStateExposed
     your_hand: Dict[int, Card]
     your_color: PlayerColor
+    current_context: ActionContext
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool
@@ -575,7 +576,6 @@ class ActionProcessResult(PlayerState):
     processed: bool
     awaiting: Dict[str, List[str]]
     end_of_turn: bool = False
-    current_context: ActionContext
     end_of_game: bool = False
 
 class TurnState(StrEnum):
@@ -592,4 +592,4 @@ class StateRequestResult(RequestResult):
     result: PlayerState
 
 class ActionSpaceRequestResult(RequestResult):
-    result: Optional[Dict[str, List]] = None
+    result: Optional[Dict[str, List]] = []

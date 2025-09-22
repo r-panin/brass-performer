@@ -4,6 +4,16 @@ from .managers import GameManager
 from fastapi.middleware.cors import CORSMiddleware
 from .endpoints.game_management import router as game_router
 from .endpoints.websocket import router as websocket_router
+import logging
+import sys
+
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Уровень логирования
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
+    handlers=[logging.StreamHandler(sys.stdout)]  # Вывод в stdout
+)
+logging.getLogger().setLevel(logging.INFO)
 
 connection_manager = ConnectionManager()
 game_manager = GameManager()

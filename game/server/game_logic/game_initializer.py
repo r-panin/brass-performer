@@ -35,13 +35,13 @@ class GameInitializer():
 
         discard = []
 
-        wild_deck = self._build_wild_deck()
+        wilds = self._build_wild_deck()
 
         #burn initial cards
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wild_deck=wild_deck, links=links)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wilds=wilds, links=links)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}
@@ -96,14 +96,9 @@ class GameInitializer():
         return out
 
     def _build_wild_deck(self) -> List[Card]:
-        INDUSTRY_START_ID = 65
-        CITY_OFFSET = 4
-        NUM_WILD_CARDS = 4
-        out = []
-        for base_id in range(INDUSTRY_START_ID, INDUSTRY_START_ID + NUM_WILD_CARDS):
-            out.append(Card(id=base_id, card_type=CardType.INDUSTRY, value='wild'))
-            out.append(Card(id=base_id+CITY_OFFSET, card_type=CardType.CITY, value='wild'))
-        return out  
+        INDUSTRY_ID = 65
+        CITY_ID = 66
+        return [Card(card_type=CardType.INDUSTRY, id=INDUSTRY_ID, value='wild'), Card(card_type=CardType.CITY, id=CITY_ID, value='wild')]
 
     def _create_cities(self, player_count:int) -> Dict[str, City]:
         '''

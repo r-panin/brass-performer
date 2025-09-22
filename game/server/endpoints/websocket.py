@@ -35,10 +35,8 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_token: s
                 # Получаем сообщение от клиента
                 action_data = await websocket.receive_json()
 
-                logging.debug(f'RECEIVED ACTION {action_data}')
                 # Парсим-парсим-парсим и сводит музыка с ума
                 action = parse_action(action_data)
-                logging.debug(f'PARSED AS {type(action)}')
                 
                 # Применяем действие к игровому состоянию
                 # Здесь будет метод для применения действия
@@ -74,24 +72,6 @@ def get_end_game_message(game) -> Dict:
     return {"final scores": {player.color: player.victory_points for player in game.state.players}}
 
 def parse_action(data: Dict[str, Any]) -> Action:
-    # Сначала проверяем наличие уникальных полей для каждого типа действия
-    if "card_id" in data and isinstance(data["card_id"], list) and len(data["card_id"]) == 3:
-        return ScoutSelection(**data) 
-    elif "link_id" in data:
-        return NetworkSelection(**data)
-    elif "slot_id" in data and "industry" in data:
-        return BuildSelection(**data)
-    elif "slot_id" in data:
-        return SellSelection(**data)
-    elif "industry" in data:
-        return DevelopSelection(**data)
-    elif "card_id" in data:
-        return ParameterAction(**data)
-    elif "commit" in data:
-        return CommitAction(**data)
-    elif "end_turn" in data:
-        return EndOfTurnAction(**data)
-    
     # Затем проверяем действия Start
     action_type = data.get("action")
     if action_type == ActionType.LOAN:
@@ -109,7 +89,26 @@ def parse_action(data: Dict[str, Any]) -> Action:
     elif action_type == ActionType.NETWORK:
         return NetworkStart(**data)
     elif action_type == "shortfall":
+        logging.debug(f"Parsed shortfall as {ResolveShortfallAction(**data)}")
         return ResolveShortfallAction(**data)
+    
+    # Сначала проверяем наличие уникальных полей для каждого типа действия
+    if "card_id" in data and isinstance(data["card_id"], list) and len(data["card_id"]) == 3:
+        return ScoutSelection(**data) 
+    elif "link_id" in data:
+        return NetworkSelection(**data)
+    elif "slot_id" in data and "industry" in data:
+        return BuildSelection(**data)
+    elif "slot_id" in data:
+        return SellSelection(**data)
+    elif "industry" in data:
+        return DevelopSelection(**data)
+    elif "card_id" in data:
+        return ParameterAction(**data)
+    elif "commit" in data:
+        return CommitAction(**data)
+    elif "end_turn" in data:
+        return EndOfTurnAction(**data)
     
     elif 'request' in data:
         return Request(**data)

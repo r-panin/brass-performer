@@ -3,7 +3,7 @@ import websockets
 import json
 import random
 import asyncio
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 class TestClient:
     def __init__(self, num_players: int = 2):
@@ -44,98 +44,275 @@ class TestClient:
             print(f"WebSocket connected for token: {token}")
             state_msg = await ws.recv()
             state = json.loads(state_msg)
-            self.player_colors[ws] = state['your_color']
+            self.player_colors[state['your_color']] = ws
             print(f"Player color: {state['your_color']}")
-
-    async def game_loop(self):
-        print("Starting game loop...")
         
-        while True:
-            # Получаем текущее состояние от любого игрока
-            await self.connections[0].send(json.dumps({"request": "state"}))
-            state_msg = await self.connections[0].recv()
-            r = json.loads(state_msg)
-            
-            if 'error' in r.keys():
-                print(r['error'])
-            if 'result' in r.keys():
-                if not 'state' in r['result'].keys():
-                    continue
-                else:
-                    state = r['result']['state']
-            else:
-                state = r['state']
-            
-            if state.get('end_of_game', False):
-                print("Game over!")
-                break
+        active_player = state['state']['turn_order'][0]
+        return active_player
 
-            turn_order = state['turn_order']
-            current_player_color = turn_order[0]
+    async def game_loop(self, first_active: str):
+        print("Starting game loop...")
+        active_player = first_active
+        active_conn = self.player_colors[first_active]
+        
+        max_iterations = 10000
+        iteration_count = 0
+
+        while iteration_count < max_iterations:
+            iteration_count += 1
+            print(f"\n--- Turn {iteration_count}, active: {active_player} ---")
             
-            # Находим соединение для текущего игрока
-            current_player_conn = None
-            for conn, color in self.player_colors.items():
-                if color == current_player_color:
-                    current_player_conn = conn
+            # 1. Получаем доступные действия для текущего игрока
+            actions_response = await self._request_actions(active_conn)
+            if not actions_response:
+                print("Failed to get actions, trying to recover...")
+                success = await self._recover_from_error(active_conn)
+                if not success:
                     break
-            
-            if not current_player_conn:
-                print(f"Could not find connection for player {current_player_color}")
                 continue
 
-            # Запрашиваем возможные действия от текущего игрока
-            await current_player_conn.send(json.dumps({"request": "actions"}))
-            actions_msg = await current_player_conn.recv()
-            actions_data = json.loads(actions_msg)
-            
-            # Проверяем, не пришло ли состояние вместо действий
-            if 'state' in actions_data:
-                # Это состояние, а не действия - пропускаем ход
-                print("Received state instead of actions, skipping turn")
+            # 2. Если действий нет - передаем ход следующему игроку
+            if not actions_response.get('result'):
+                print("No actions available, passing turn")
+                print(actions_response['result'])
+                next_player = await self._pass_turn(active_conn)
+                if next_player:
+                    active_player = next_player
+                    active_conn = self.player_colors[active_player]
                 continue
-            if 'error' in actions_data:
-                print(actions_data['error'])
-                
-            print(f'KEYS IN ACTION DATA: {actions_data.keys()}')
-            if actions_data.get('end_of_game', False):
-                print("Game over!")
+
+            # 3. Выбираем и выполняем случайное действие
+            action_result = await self._perform_random_action(
+                active_conn, actions_response['result']
+            )
+            
+            if not action_result:
+                print("Action failed, trying to recover...")
+                success = await self._recover_from_error(active_conn)
+                if not success:
+                    break
+                continue
+
+            # 4. Обрабатываем результат действия
+            if action_result.get('end_of_game'):
+                print("Game over")
                 break
 
-            # Выбираем случайное действие
-            result = actions_data['result']
+            # 5. Определяем следующего игрока
+            next_player = await self._determine_next_player(
+                active_conn, action_result, active_player
+            )
+            
+            if not next_player:
+                print("Failed to determine next player")
+                break
+                
+            if next_player != active_player:
+                active_player = next_player
+                active_conn = self.player_colors[active_player]
 
-            if 'state' in result.keys():
-                continue
+        print("Game loop ended")
+
+    async def _get_state(self, conn) -> Optional[Dict]:
+        """Запрос текущего состояния игры"""
+        try:
+            await conn.send(json.dumps({"request": "state"}))
+            response = await conn.recv()
+            return json.loads(response)
+        except Exception as e:
+            print(f"Error getting state: {e}")
+            return None
+
+    async def _request_actions(self, conn) -> Optional[Dict]:
+        """Запрос доступных действий с очисткой буфера сообщений"""
+        try:
+            # Очищаем буфер от возможных предыдущих сообщений
+            await self._clear_message_buffer(conn)
             
-            # Проверяем, есть ли доступные действия
-            if not any(result.values()):
-                print("No available actions, skipping turn")
-                continue
+            # Отправляем запрос действий
+            await conn.send(json.dumps({"request": "actions"}))
+            response = await conn.recv()
+            actions_data = json.loads(response)
+            
+            # Проверяем структуру ответа
+            if "result" in actions_data:
+                return actions_data
+            else:
+                print(f"Invalid actions response: {actions_data}")
+                return None
                 
-            # Выбираем случайную категорию с действиями
-            available_categories = [cat for cat, actions in result.items() if actions]
-            print(f'CATEGORIES: {available_categories}')
-            if not available_categories:
-                print("No available action categories, skipping turn")
-                continue
+        except Exception as e:
+            print(f"Error requesting actions: {e}")
+            return None
+
+    async def _clear_message_buffer(self, conn):
+        """Очистка буфера сообщений с таймаутом"""
+        try:
+            while True:
+                # Пытаемся прочитать сообщение без блокировки
+                try:
+                    message = await asyncio.wait_for(conn.recv(), timeout=0.1)
+                    print(f"Cleared buffered message: {message[:100]}...")
+                except asyncio.TimeoutError:
+                    # Нет сообщений в буфере
+                    break
+                except Exception as e:
+                    print(f"Error clearing buffer: {e}")
+                    break
+        except Exception as e:
+            print(f"Error in buffer clearing: {e}")
+
+    def _choose_action(self, actions_dict: Dict[str, List]) -> Optional[Dict]:
+        """Выбор случайного действия с исключением commit: false при наличии альтернатив"""
+        available_categories = [
+            cat for cat, actions in actions_dict.items()
+            if actions and isinstance(actions, list) and len(actions) > 0
+        ]
+        
+        if not available_categories:
+            return None
+
+        # Собираем все действия кроме commit: false
+        preferred_actions = []
+        for category in available_categories:
+            for action in actions_dict[category]:
+                if not (category == "CommitAction" and action.get('commit') is False) or not (category == "EndOfTurnAction" and action.get('end_turn') is False):
+                    preferred_actions.append(action)
+        
+        # Если есть предпочтительные действия - выбираем из них
+        if preferred_actions:
+            return random.choice(preferred_actions)
+        
+        # Иначе используем commit: false как последний вариант
+        for action in actions_dict.get("CommitAction", []):
+            if action.get('commit') is False:
+                return action
+    
+        return None
+
+    async def _perform_random_action(self, conn, actions_dict: Dict) -> Optional[Dict]:
+        """Выполнение случайного действия с валидацией ответа"""
+        try:
+            # Выбираем действие
+            action = self._choose_action(actions_dict)
+            if not action:
+                return None
+
+            # Отправляем действие
+            await conn.send(json.dumps(action))
+            print(f"Perfoming action {action}")
+            response = await conn.recv()
+            result = json.loads(response)
+            
+            # Валидация ответа
+            if not self._validate_action_response(result):
+                print(f"Invalid action response: {result}")
+                return None
                 
-            random_category = random.choice(available_categories)
-            print(f'SELECTED CATEGORY: {random_category}')
-            random_action = random.choice(result[random_category])
-            print(f'SELECTED ACTION: {random_action}')
+            return result
             
-            # Отправляем действие и ожидаем ответ
-            await current_player_conn.send(json.dumps(random_action))
-            print(f"Player {current_player_color} sent action: {random_action}")
+        except Exception as e:
+            print(f"Error performing action: {e}")
+            return None
+
+    def _validate_action_response(self, response: Dict) -> bool:
+        """Проверка валидности ответа на действие"""
+        required_fields = ['state', 'processed', 'awaiting']
+        return all(field in response for field in required_fields)
+
+    async def _pass_turn(self, conn) -> Optional[str]:
+        """Явная передача хода следующему игроку"""
+        try:
+            # Запрашиваем текущее состояние
+            await conn.send(json.dumps({"request": "state"}))
+            response = await conn.recv()
+            state_data = json.loads(response)
             
-            # Ждем подтверждение действия или обновление состояния
-            response_msg = await current_player_conn.recv()
-            print(json.loads(response_msg).keys())
+            # Извлекаем следующего игрока из состояния
+            if 'state' in state_data and 'turn_order' in state_data['state']:
+                print(f"Passing to {state_data['state']['turn_order'][0]}")
+                print(f"Full turn order: {state_data['state']['turn_order']}")
+                print(f"Current context: {state_data['current_context']}")
+                return state_data['state']['turn_order'][0]
+            else:
+                print(f"Invalid state response: {state_data}")
+                return None
+                
+        except Exception as e:
+            print(f"Error passing turn: {e}")
+            return None
+
+    async def _determine_next_player(self, conn, action_result: Dict, active_player: str) -> Optional[str]:
+        """Определение следующего игрока на основе результата действия"""
+        try:
+            # Получаем состояние из ответа действия или запрашиваем отдельно
+            if action_result.get('processed', False) and 'state' in action_result:
+                state_data = action_result
+            else:
+                state_data = await self._get_state(conn)
+                if not state_data:
+                    return None
+
+            # Извлекаем контекст и порядок ходов
+            context = state_data.get('current_context')
+            turn_order = state_data['state']['turn_order']
+            # Если контекст shortfall, ищем следующего игрока с действиями
+            if context == 'shortfall':
+                next_player = await self._get_next_player_shortfall(active_player, turn_order)
+                return next_player if next_player else turn_order[0]
+            else:    
+                # Стандартная логика: первый игрок в turn_order
+                return turn_order[0]
+                
+        except Exception as e:
+            print(f"Error determining next player: {e}")
+            return None
+
+    async def _get_next_player_shortfall(self, current_player: str, turn_order: List[str]) -> Optional[str]:
+        """Поиск следующего игрока с действиями в контексте shortfall"""
+        current_index = turn_order.index(current_player)
+        next_index = (current_index + 1) % len(turn_order)
+        checked_players = 0
+
+        # Перебираем всех игроков по кругу
+        while checked_players < len(turn_order):
+            player = turn_order[next_index]
+            conn = self.player_colors[player]
             
+            # Запрашиваем действия для игрока
+            actions_response = await self._request_actions(conn)
+            if actions_response and actions_response.get('result'):
+                return player  # Нашли игрока с действиями
+            
+            # Переходим к следующему игроку
+            next_index = (next_index + 1) % len(turn_order)
+            checked_players += 1
+
+        return None  # Ни у кого нет действий
+
+    async def _recover_from_error(self, conn) -> bool:
+        """Попытка восстановления после ошибки"""
+        try:
+            # Очищаем буфер и запрашиваем состояние
+            await self._clear_message_buffer(conn)
+            await conn.send(json.dumps({"request": "state"}))
+            response = await conn.recv()
+            state_data = json.loads(response)
+            
+            if 'state' in state_data:
+                print("Recovered from error")
+                return True
+            else:
+                print("Failed to recover from error")
+                return False
+                
+        except Exception as e:
+            print(f"Error in recovery: {e}")
+            return False
+
     async def run(self):
-        await self.setup()
-        await self.game_loop()
+        first_active = await self.setup()
+        await self.game_loop(first_active)
         
         # Закрываем все соединения
         for conn in self.connections:

@@ -1,11 +1,10 @@
 from .services.validation_service import ActionValidationService
 from .services.event_bus import EventBus, TurnCommitEvent
-from ...schema import Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, StateRequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, AutoResourceSelection, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
+from ...schema import Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
 from .game_state_manager import GamePhase, GameStateManager
 from .turn_manager import TurnManager
 from .state_changer import StateChanger
 from .action_space_generator import ActionSpaceGenerator
-import logging
 
 
 class ActionProcessor():
@@ -13,7 +12,7 @@ class ActionProcessor():
     def __init__(self, state_manager:GameStateManager, event_bus:EventBus):
         self.state_manager = state_manager
         self.validation_service = ActionValidationService(event_bus)
-        self.turn_manager = TurnManager(event_bus)
+        self.turn_manager = TurnManager(event_bus, state_manager)
         self.state_changer = StateChanger(state_manager, event_bus)
         self.action_space_generator = ActionSpaceGenerator(state_manager)
         self.event_bus = event_bus
@@ -27,7 +26,7 @@ class ActionProcessor():
             is_allowed = isinstance(action, allowed_actions) if allowed_actions else False
             if not is_allowed:
                 return ValidationResult(is_valid=False,
-                                        message=f'Action is not appropriate for context {action_context}'),
+                                        message=f'Action is not appropriate for context {action_context}')
             return ValidationResult(is_valid=True)
 
     def process_incoming_message(self, message, color:PlayerColor):
@@ -40,13 +39,11 @@ class ActionProcessor():
     
     def _process_request(self, request:Request, color: PlayerColor) -> RequestResult:
         if request.request is RequestType.REQUEST_STATE:
-            return StateRequestResult(
-                success=True,
-                result=PlayerState(
-                    state=self.state_manager.public_state,
-                    your_color=color,
-                    your_hand=self.state_manager.current_state.players[color].hand
-                )
+           return PlayerState(
+                state=self.state_manager.public_state,
+                your_color=color,
+                your_hand=self.state_manager.current_state.players[color].hand,
+                current_context=self.state_manager.action_context
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
             actions = self.action_space_generator.get_action_space(color)
@@ -145,14 +142,10 @@ class ActionProcessor():
                 current_context=self.state_manager.action_context,
                 your_hand=self.state.players[color].hand,
                 your_color=color,
-                    state=self.state_manager.get_provisional_state()
+                state=self.state_manager.get_provisional_state()
             )
         
         player = self.state.players[color]
-        
-        # Автоматический выбор ресурсов, если нужно
-        if isinstance(action, ResourceAction) and action.resources_used is AutoResourceSelection:
-            action.resources_used = self._select_resources(action, player)
         
         # Валидация действия
         validation_result = self.validation_service.validate_action(
@@ -170,6 +163,7 @@ class ActionProcessor():
                 current_context=self.state_manager.action_context,
                 your_hand=player.hand,
                 your_color=color,
+                state=self.state_manager.get_provisional_state()
             )
         
         # Применяем действие
@@ -221,10 +215,10 @@ class ActionProcessor():
                 )
             
             try:
+                self.state.actions_left -= 1
                 self.state_manager.commit_transaction()
                 
                 # Обновляем количество оставшихся действий
-                self.state.actions_left -= 1
                 
                 if self.state.actions_left > 0:
                     # Продолжаем ход
@@ -333,7 +327,7 @@ class ActionProcessor():
             )
         
         player = self.state.players[color]
-        validation = self._validate_shortfall_action(self, action, player)
+        validation = self._validate_shortfall_action(action, player)
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
@@ -348,6 +342,14 @@ class ActionProcessor():
         self.state_changer.resolve_shortfall(action, player)
         if not self._in_shortfall():
             self.state_manager.exit_shortfall()
+        return ActionProcessResult(
+            processed=True,
+            state=self.state_manager.get_provisional_state(),
+            current_context=self.state_manager.action_context,
+            your_color=color,
+            your_hand=self.state.players[color].hand,
+            awaiting=self.state_manager.get_expected_params(color)
+        )
      
     def _validate_shortfall_action(self, action:ResolveShortfallAction, player:Player) -> ValidationResult:
         if player.bank >= 0:

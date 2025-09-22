@@ -45,7 +45,8 @@ class Game:
         return PlayerState(
             state=state.hide_state(),
             your_color=color,
-            your_hand={card.id: card for card in self.state.players[color].hand.values()}
+            your_hand={card.id: card for card in self.state.players[color].hand.values()},
+            current_context=self.state_manager.action_context
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:

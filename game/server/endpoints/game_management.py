@@ -56,7 +56,7 @@ async def get_game(game_id: str, game_manager:GameManager=Depends(get_game_manag
     
     return GameResponseDetail(
         id=game.id,
-        state=state,
+        state=state.hide_state(),
         status=game.status,
         players=game_manager.list_game_player_colors(game.id)
     )

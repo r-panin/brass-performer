@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, List, Union, Optional
 from collections import defaultdict
-from .common import ActionType, ResourceSource, AutoResourceSelection, ResourceAmounts, ResourceType, IndustryType
+from .common import ActionType, ResourceSource, ResourceAmounts, ResourceType, IndustryType
 from enum import StrEnum
 
 '''
@@ -16,14 +16,9 @@ class ParameterAction(BaseModel):
     model_config = ConfigDict(extra='forbid')  
 
 class ResourceAction(BaseModel):
-    resources_used: Optional[Union[List[ResourceSource], AutoResourceSelection]] = []
-
-    def is_auto_resource_selection(self):
-        return isinstance(self.resources_used, AutoResourceSelection)
+    resources_used: Optional[List[ResourceSource]] = []
 
     def get_resource_amounts(self) -> ResourceAmounts:
-        if self.resources_used is AutoResourceSelection:
-            raise ValueError("Can't normalize resources before assigning them")
         
         amounts = defaultdict(int)
         for resource in self.resources_used:

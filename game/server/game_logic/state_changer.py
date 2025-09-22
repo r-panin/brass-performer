@@ -4,6 +4,7 @@ from collections import defaultdict
 from .services.event_bus import EventBus, StateChangeEvent
 from deepdiff import DeepDiff
 from copy import deepcopy
+import logging
 
 class StateChanger:
 
@@ -19,10 +20,9 @@ class StateChanger:
         initial_state = deepcopy(self.state)
         if action.card_id is not None and isinstance(action.card_id, int):
             card = player.hand.pop(action.card_id)
+            logging.debug(f'Player {player.color} removed a card {action.card_id} during the actions {type(action)}')
             if card.value != 'wild':
                 self.state.discard.append(card)
-            else:
-                self.state.wild_deck.append(card)
 
         if isinstance(action, ResourceAction):
             market_amounts = defaultdict(int)
@@ -61,13 +61,20 @@ class StateChanger:
             return
 
         elif self.state_manager.action_context is ActionContext.SCOUT:
+            logging.debug(f'Pre-scout player hand === {player.hand}')
             for card_id in action.card_id:
                 self.state.discard.append(player.hand[card_id])
                 player.hand.pop(card_id)
-            city_joker = next(j for j in self.state.wild_deck if j.card_type == CardType.CITY)
-            ind_joker = next(j for j in self.state.wild_deck if j.card_type == CardType.INDUSTRY)
+                logging.debug(f'Player {player.color} removed a card {card_id} during the actions {type(action)}')
+            city_joker = next(j for j in self.state.wilds if j.card_type == CardType.CITY)
+            ind_joker = next(j for j in self.state.wilds if j.card_type == CardType.INDUSTRY)
+            logging.debug(ind_joker)
+
+            logging.debug(f'Post-scout removal player hand === {player.hand}')
             player.hand[city_joker.id] = city_joker
+            logging.debug(f'Post-append city joker player hand === {player.hand}')
             player.hand[ind_joker.id] = ind_joker
+            logging.debug(f'Post-scout player hand === {player.hand}')
             return
         
         elif self.state_manager.action_context is ActionContext.DEVELOP:
@@ -111,7 +118,8 @@ class StateChanger:
             return
         if building.industry_type is IndustryType.COAL and not self.state.market_access_exists(self.state.get_building_slot(building.slot_id).city):
             return
-        sold_amount = min(building.resource_count, self.state.market.sellable_amount(ResourceType(building.industry_type)))
+        rt = ResourceType(building.industry_type)
+        sold_amount = min(building.resource_count, self.state.market.sellable_amount(rt))
         if sold_amount <= 0 :
             return
         profit = self.state.market.sell_resource(ResourceType(building.industry_type), sold_amount)
@@ -135,19 +143,22 @@ class StateChanger:
     def resolve_shortfall(self, action:ResolveShortfallAction, player:Player) -> None:
         initial_state = deepcopy(self.state)
         if action.slot_id:
+            logging.info("Manual shortfall resolution")
             slot = self.state.get_building_slot(action.slot_id)
             rebate = slot.building_placed.cost['money'] // 2
             player.bank += rebate
             slot.building_placed = None
         else:
+            logging.info("Automatic shortfall resolution")
+            logging.info(f"BEFORE CHANGE: Player vp: {player.victory_points}, bank: {player.bank}")
             player.victory_points += player.bank
             player.bank = 0
+            logging.info(f"AFTER CHANGE: Player vp: {player.victory_points}, bank: {player.bank}")
         diff = DeepDiff(initial_state.model_dump(), self.state.model_dump())
         self.event_bus.publish(StateChangeEvent(
             actor=player.color,
             diff=diff
         ))
-        return
     
     def get_resource_amounts(self, action:ResourceAction, player:Player) -> ResourceAmounts:
         if isinstance(action, BuildSelection):
