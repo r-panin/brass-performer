@@ -1,4 +1,4 @@
-from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType
+from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType, LinkType
 from typing import Dict, List 
 import random
 from uuid import uuid4
@@ -22,7 +22,7 @@ class Game:
         game.event_bus = EventBus()
         game.state = game._determine_cards(partial_state)
         
-        game.action_processor = ActionProcessor(game.event_bus)
+        game.action_processor = ActionProcessor(game.state, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
         return game
@@ -40,6 +40,9 @@ class Game:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
         player_hands[partial_state.your_color] = partial_state.your_hand
+        if partial_state.state.era is LinkType.CANAL:
+            for _ in range(4):
+                available_deck.pop()
         return BoardState.determine(partial_state.state, player_hands, available_deck)
             
 
@@ -72,11 +75,14 @@ class Game:
         if self.status is not GameStatus.ONGOING:
             raise ValueError(f'Cannot submit actions to a game in {self.status}')
         process_result = self.action_processor.process_incoming_message(action, color)
-        if isinstance(process_result, ActionProcessResult):
-            if process_result.end_of_game:
-                self.status = GameStatus.COMPLETE
-                self.replay_service.save_replay(self.REPLAYS_PATH / game.id)
+        if self.concluded():
+            self.status = GameStatus.COMPLETE
+            self.replay_service.save_replay(self.REPLAYS_PATH / self.id)
+            process_result.end_of_game = True
         return process_result
+
+    def concluded(self):
+        return len(self.state.deck) == 0 and all(not player.hand for player in self.state.players.values())
 
 if __name__ == '__main__':
     game = Game()

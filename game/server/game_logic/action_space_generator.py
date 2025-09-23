@@ -2,8 +2,8 @@ from ...schema import BoardState, PlayerColor, Action, ShortfallAction, LoanActi
 from typing import Dict, List
 from collections import defaultdict
 import itertools
-import logging
 from .action_cat_provider import ActionsCatProvider
+from functools import lru_cache
 
 
 class ActionSpaceGenerator():
@@ -41,11 +41,9 @@ class ActionSpaceGenerator():
                 case "CommitAction":
                     out.extend(self.get_valid_commit_actions(state))
                 case "ShortfallAction":
-                    out.extend(self.get_valid_shortfall_actions(player))
-        logging.debug(f"Generator returns a list of actions: {out}")
+                    out.extend(self.get_valid_shortfall_actions(state, player))
         return out
                 
-
     def get_valid_build_actions(self, state:BoardState, player: Player) -> List[BuildAction]: # oh boy
         out = []
         cards = player.hand.values()
@@ -65,6 +63,8 @@ class ActionSpaceGenerator():
 
         for card in cards:
             for slot in slots:
+                if slot.building_placed:
+                    continue
                 market_coal_available = state.market_access_exists(slot.city)
                 
                 # Получаем ВСЕ источники угля с приоритетами
@@ -101,10 +101,12 @@ class ActionSpaceGenerator():
                 secondary_coal_available = sum(secondary_coal_amounts.values())
 
                 for industry in industries:
-
+                    building = player.get_lowest_level_building(industry)
+                    if not building:
+                        continue
                     other_city_slots = [s for s in state.cities[slot.city].slots.values() if slot.id != s.id]
                     for s in other_city_slots:
-                        if (len(s.industry_type_options) < len(slot.industry_type_options)) and industry in s.industry_type_options:
+                        if (len(s.industry_type_options) < len(slot.industry_type_options)) and (industry in s.industry_type_options):
                             continue
 
                     if industry not in slot.industry_type_options:
@@ -122,7 +124,6 @@ class ActionSpaceGenerator():
                         if slot.city not in network:
                             continue
 
-                    building = player.get_lowest_level_building(industry)
                     coal_required = building.cost['coal']
                     iron_required = building.cost['iron']
                     
@@ -219,8 +220,7 @@ class ActionSpaceGenerator():
                             resources_used=resources_used
                         ))
         
-        data_strings = sorted(action.model_dump_json() for action in out)
-        return [BuildAction.model_validate_json(data) for data in data_strings]
+        return out
 
     def get_valid_sell_actions(self, state:BoardState, player:Player) -> List[SellAction]:
         out = []
@@ -240,7 +240,7 @@ class ActionSpaceGenerator():
             beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) for building in beer_buildings]
             merchant_sources = [ResourceSource(resource_type=ResourceType.BEER, merchant_slot_id=s.id)
                                 for s in state.iter_merchant_slots()
-                                if s.beer_available and s.merchant_type in (MerchantType.ANY, MerchantType(slot.building_placed.industry_type))]
+                                if s.beer_available and s.merchant_type in (MerchantType.ANY, MerchantType(slot.building_placed.industry_type) and state.find_paths(start=slot.city, end=s.city))]
             beer_sources += merchant_sources
             beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
             beer_required = slot.building_placed.sell_cost
@@ -279,8 +279,7 @@ class ActionSpaceGenerator():
                             card_id=card
                         ))
 
-        data_strings = sorted(action.model_dump_json() for action in out)
-        return [SellAction.model_validate_json(data) for data in data_strings]
+        return out
 
     def get_valid_network_actions(self, state:BoardState, player:Player) -> List[NetworkAction]:
         out = []
@@ -323,7 +322,7 @@ class ActionSpaceGenerator():
                 if not coal_sources:
                     if any(state.market_access_exists(city_name=city) for city in link.cities):
                         market_cost = state.market.calculate_coal_cost(base_cost.coal)
-                        coal_sources = [[ResourceSource(resource_type=ResourceType.COAL)]] # market coal
+                        coal_sources = [ResourceSource(resource_type=ResourceType.COAL)] # market coal
                     else:
                         continue
                 
@@ -334,22 +333,20 @@ class ActionSpaceGenerator():
                 beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=b.slot_id) for b in beer_buildings]
                 if state.subaction_count > 0:
                     for coal_source, beer_source in itertools.product(coal_sources, beer_sources):
-                        res = list(coal_source) + list(beer_source)
+                        res = [coal_source, beer_source]
                         out.append(NetworkAction(
                             resources_used=res,
                             link_id=link.id
                         ))
                 else:
                     for coal_source, card in itertools.product(coal_sources, cards):
-                        res = list(coal_source)
                         out.append(NetworkAction(
-                            resources_used=res,
+                            resources_used=[coal_source],
                             link_id=link.id,
                             card_id=card
                         ))
 
-        data_strings = sorted(action.model_dump_json() for action in out)
-        return [NetworkAction.model_validate_json(data) for data in data_strings]
+        return out
                         
     def get_valid_develop_actions(self, state:BoardState, player:Player, gloucester=False) -> List[DevelopAction]:
         out = []
@@ -365,24 +362,23 @@ class ActionSpaceGenerator():
                 cost = state.market.calculate_iron_cost(state.get_develop_cost().iron)
                 if cost > player.bank:
                     return []
-                iron_sources = [[ResourceSource(resource_type=ResourceType.IRON)]]
+                iron_sources = [ResourceSource(resource_type=ResourceType.IRON)]
         else:
-            iron_sources = [[]]
+            iron_sources = list()
         for industry in industries:
             building = player.get_lowest_level_building(industry)
-            if not building.is_developable:
-                continue
             if not building:
+                continue
+            if not building.is_developable:
                 continue
             if iron_sources:
                 for source in iron_sources:
                     if state.subaction_count > 0:
-                        out.append(DevelopAction(industry=industry, resources_used=source))
+                        out.append(DevelopAction(industry=industry, resources_used=[source]))
                     else:
                         for card in cards:
-                            out.append(DevelopAction(industry=industry, resources_used=source, card_id=card))
-        data_strings = sorted(action.model_dump_json() for action in out)
-        return [DevelopAction.model_validate_json(data) for data in data_strings]
+                            out.append(DevelopAction(industry=industry, resources_used=[source], card_id=card))
+        return out
 
     def get_valid_scout_actions(self, player:Player) -> List[ScoutAction]:
         cards = player.hand.values()
@@ -395,7 +391,7 @@ class ActionSpaceGenerator():
         for combo in itertools.combinations(ids, 3):
             out.append(ScoutAction(card_id=list(combo)))
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [ScoutAction.model_validate_json(data) for data in data_strings]
+        return out
 
     def get_valid_loan_actions(self, player:Player) -> List[LoanAction]:
         if player.income < -7:

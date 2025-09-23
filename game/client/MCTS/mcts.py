@@ -1,4 +1,4 @@
-from ...schema import PlayerState, Action, Request, RequestType, BoardState
+from ...schema import PlayerState, Action, Request, RequestType, BoardState, ActionContext
 from typing import List
 from ...server.game_logic.game import Game
 from ...server.game_logic.action_space_generator import ActionSpaceGenerator
@@ -9,7 +9,7 @@ import logging
 
 
 class Node:
-    def __init__(self, state:PlayerState, parent=None, action:Action=None, who_moved=None):
+    def __init__(self, state:BoardState, parent=None, action:Action=None, who_moved=None):
         self.state = state
         self.parent = parent
         self.action = action
@@ -23,11 +23,14 @@ class Node:
         return len(self.untried_actions) == 0 and len(self.children) > 0
     
     def is_terminal(self):
-        return self.state.state.deck_size == 0 and not any(player.hand for player in self.state.players.values())
+        return self.state.is_terminal()
 
 class RandomActionSelector:
-    def select_action(self, legal_actions:List[Action]) -> Action:
-        return random.choice(legal_actions)
+    def select_action(self, legal_actions:List[Action], state) -> Action:
+        try:
+            return random.choice(legal_actions)
+        except IndexError:
+            logging.critical(f'Failed to select an action')
 
 class MCTS:
     def __init__(self, simulations:int=100, exploration:float=1.41, depth:int=1000):
@@ -36,12 +39,13 @@ class MCTS:
         self.max_depth = depth
         self.action_selector = RandomActionSelector()
         self.action_space_generator = ActionSpaceGenerator()
-        self.state_changer = StateChanger(event_bus=None)
 
     def search(self, initial_state:PlayerState):
-        root = Node(initial_state)
-
         for _ in range(self.simulations):
+            determined_state = Game.from_partial_state(initial_state).state
+            self.state_changer = StateChanger(determined_state, event_bus=None)
+            root = Node(determined_state)
+
             logging.info(f"Running simulation {_}")
             node = self._select(root)
 
@@ -87,7 +91,7 @@ class MCTS:
         if node.untried_actions:
             action = random.choice(node.untried_actions)
             node.untried_actions.remove(action)
-            who_moved = node.state.state.turn_order[0]
+            who_moved = node.state.turn_order[0]
             new_state = self._apply_action(node.state, action)
             child_node = Node(new_state, parent=node, action=action, who_moved=who_moved)
             node.children.append(child_node)
@@ -97,22 +101,16 @@ class MCTS:
     
     def _apply_action(self, state:BoardState, action:Action):
         logging.debug(f'Applying action {action}')
-        self.state_changer.apply_action(action,) # Здесь надо понять как совершать мета- и коммит- действия
-        return game.process_action(Request(request=RequestType.REQUEST_STATE), state.state.turn_order[0])
+        active_player = state.get_active_player()
+        self.state_changer.apply_action(action, state, active_player) # Пошли нахуй мета и коммит действия!
+        return state
         
     def _get_legal_actions(self, state: BoardState):
-        actions_dict = self.action_space_generator.get_action_space(state, state.turn_order[0])
-        out = []
-        for actions in actions_dict.values():
-            out.extend(actions)
-        logging.debug(f'Legal actions: {out}')
-        if not out:
-            raise ValueError(f"No legal actions in state {state}")
-        return out 
+        actions_list = self.action_space_generator.get_action_space(state, state.get_active_player().color)
+        return actions_list
 
     def _simulate(self, node:Node) -> dict:
-        game = Game.from_partial_state(node.state)
-        current_state = game.process_action(Request(request=RequestType.GOD_MODE))
+        current_state = node.state
         depth = 0
         # while depth < self.max_depth and not self._is_terminal_state(current_state):
         while not self._is_terminal_state(current_state):
@@ -123,14 +121,13 @@ class MCTS:
 
         return self._evaluate_state(current_state)
     
-    def _is_terminal_state(self, state:PlayerState):
-        game = Game.from_partial_state(state)
-        return not game.state.deck and not any(player.hand for player in game.state.players.values())
+    def _is_terminal_state(self, state:BoardState):
+        return state.is_terminal()
 
-    def _evaluate_state(self, state: PlayerState) -> dict:
+    def _evaluate_state(self, state: BoardState) -> dict:
         if self._is_terminal_state(state):
             players = sorted(
-                state.state.players.values(), 
+                state.players.values(), 
                 key=lambda p: p.victory_points, 
                 reverse=True
             )
@@ -143,7 +140,7 @@ class MCTS:
             
             return results
         else:
-            return {player: random.random() for player in state.state.players}
+            return {player: random.random() for player in state.players}
 
     def _backpropagate(self, node:Node, results:dict):
         while node is not None:
@@ -155,7 +152,7 @@ class MCTS:
     
     def _select_action(self, state:PlayerState) -> Action:
         legal_actions = self._get_legal_actions(state)
-        return self.action_selector.select_action(legal_actions)
+        return self.action_selector.select_action(legal_actions, state)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ import logging
 
 class StateChanger:
 
-    SINGULAR_ACTION_TYPES = (ActionType.BUILD, ActionType.COMMIT, ActionType.LOAN, ActionType.PASS, ActionType.SCOUT)
+    SINGULAR_ACTION_TYPES = (ActionType.BUILD, ActionType.LOAN, ActionType.PASS, ActionType.SCOUT)
     DOUBLE_ACTION_TYPES = (ActionType.DEVELOP, ActionType.NETWORK)
     MULTIPLE_ACTION_TYPES = (ActionType.SELL, ActionType.SHORTFALL)
 
@@ -18,13 +18,16 @@ class StateChanger:
 
     def apply_action(self, action:Action, state:BoardState, player:Player):
         # Готовимся слать дифф
+        logging.debug(f"=============================================")
+        logging.debug(f"Action start action count: {state.actions_left}")
+        logging.debug(f'Received action {action} from player {player.color}')
         if self.event_bus:
-            initial_state = deepcopy(self.state)
+            initial_state = deepcopy(state)
 
         # Убираем карту если есть
         if action.card_id is not None and isinstance(action.card_id, int):
             card = player.hand.pop(action.card_id)
-            logging.debug(f'Player {player.color} removed a card {action.card_id} during the actions {type(action)}')
+            logging.debug(f'Player {player.color} removed a card {action.card_id} during the action {type(action)} during turn {self.turn_manager.round_count}')
             if card.value != 'wild':
                 state.discard.append(card)
 
@@ -68,6 +71,7 @@ class StateChanger:
         elif action.action is ActionType.SCOUT:
             for card_id in action.card_id:
                 state.discard.append(player.hand[card_id])
+                logging.debug(f'Player {player.color} removed a card {action.card_id} during the action {type(action)} during turn {self.turn_manager.round_count}')
                 player.hand.pop(card_id)
             city_joker = next(j for j in state.wilds if j.card_type == CardType.CITY)
             ind_joker = next(j for j in state.wilds if j.card_type == CardType.INDUSTRY)
@@ -104,28 +108,30 @@ class StateChanger:
             self._sell_to_market(state, building)
 
         elif action.action is ActionType.SHORTFALL:
+            logging.debug('Entering shortfall')
             if action.slot_id:
                 logging.info("Manual shortfall resolution")
                 slot = state.get_building_slot(action.slot_id)
                 rebate = slot.building_placed.cost['money'] // 2
                 player.bank += rebate
                 slot.building_placed = None
+                logging.info(f"AFTER CHANGE: Player vp: {player.victory_points}, bank: {player.bank}")
             else:
                 logging.info("Automatic shortfall resolution")
                 logging.info(f"BEFORE CHANGE: Player vp: {player.victory_points}, bank: {player.bank}")
                 player.victory_points += player.bank
                 player.bank = 0
                 logging.info(f"AFTER CHANGE: Player vp: {player.victory_points}, bank: {player.bank}")
-            if state.in_shortfall:
+            if state.in_shortfall():
                 state.action_context = ActionContext.SHORTFALL
             else:
                 state.action_context = ActionContext.MAIN
             
-        elif action.action is ActionType.COMMIT:
-            self._commit_action(state)
-
         if not action.action is ActionType.SHORTFALL:
             state.subaction_count += 1
+        
+        if action.action is ActionType.COMMIT:
+            self._commit_action(state)
 
         logging.debug(f"Subaction count: {state.subaction_count}")
         # определяем actioncontext
@@ -146,8 +152,11 @@ class StateChanger:
                 actor=player.color,
                 diff=diff
             ))
+        logging.debug(f"Action end action count: {state.actions_left}")
+        logging.debug(f"=============================================")
 
     def _commit_action(self, state:BoardState):
+        logging.debug(f"Committing action")
         state.action_context = ActionContext.MAIN
         state.actions_left -= 1
         state.subaction_count = 0

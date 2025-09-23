@@ -162,39 +162,15 @@ class TestClient:
         except Exception as e:
             print(f"Error in buffer clearing: {e}")
 
-    def _choose_action(self, actions_dict: Dict[str, List]) -> Optional[Dict]:
+    def _choose_action(self, actions_list: List) -> Optional[Dict]:
         """Выбор случайного действия с исключением commit: false при наличии альтернатив"""
-        available_categories = [
-            cat for cat, actions in actions_dict.items()
-            if actions and isinstance(actions, list) and len(actions) > 0
-        ]
-        
-        if not available_categories:
-            return None
+        return random.choice(actions_list) if actions_list else None
 
-        # Собираем все действия кроме commit: false
-        preferred_actions = []
-        for category in available_categories:
-            for action in actions_dict[category]:
-                if not (category == "CommitAction" and action.get('commit') is False) or not (category == "EndOfTurnAction" and action.get('end_turn') is False):
-                    preferred_actions.append(action)
-        
-        # Если есть предпочтительные действия - выбираем из них
-        if preferred_actions:
-            return random.choice(preferred_actions)
-        
-        # Иначе используем commit: false как последний вариант
-        for action in actions_dict.get("CommitAction", []):
-            if action.get('commit') is False:
-                return action
-    
-        return None
-
-    async def _perform_random_action(self, conn, actions_dict: Dict) -> Optional[Dict]:
+    async def _perform_random_action(self, conn, actions_list: List) -> Optional[Dict]:
         """Выполнение случайного действия с валидацией ответа"""
         try:
             # Выбираем действие
-            action = self._choose_action(actions_dict)
+            action = self._choose_action(actions_list)
             if not action:
                 return None
 

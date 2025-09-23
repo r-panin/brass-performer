@@ -15,6 +15,8 @@ class TurnManager:
         self.previous_turn_order = starting_state.turn_order 
 
     def prepare_next_turn(self, state:BoardState) -> BoardState:
+        for player in state.players.values():
+            logging.info(f"Remaining card count for {player.color}: {len(player.hand)} before drawing")
         if self.event_bus:
             initial_state = deepcopy(state)
         state.turn_order.pop(0)
@@ -30,11 +32,12 @@ class TurnManager:
                 diff=diff
             ))
         state.subaction_count = 0
-        logging.debug(f"Remaining card count: {[len(player.hand) for player in state.players.values()]}")
-        logging.debug(f"Current action count = {state.actions_left}")
+        for player in state.players.values():
+            logging.info(f"Remaining card count for {player.color}: {len(player.hand)} after drawing")
         return state
 
     def _prepare_next_round(self, state:BoardState) -> BoardState:
+        logging.debug(f"Deck size before drawing {len(state.deck)}")
         rank = {color: idx for color, idx in enumerate(self.previous_turn_order)}
         state.turn_order = sorted(state.players, key=lambda k: (state.players[k].money_spent, rank.get(k)))
         self.previous_turn_order = state.turn_order
@@ -82,6 +85,10 @@ class TurnManager:
 
         state.era = LinkType.RAIL
 
+        logging.info(f'Canal era concluded. Player stats: ')
+        for player in state.players.values():
+            logging.info(f'Player {player.color} income: {player.income}, victory points: {player.victory_points}')
+
         return state
 
     def _conclude_game(self, state:BoardState) -> BoardState:
@@ -95,5 +102,8 @@ class TurnManager:
         for building in state.iter_placed_buildings():
             if building.flipped:
                 state.players[building.owner].victory_points += building.victory_points
+        logging.critical(f'Canal era concluded. Player stats: ')
+        for player in state.players.values():
+            logging.critical(f'Player {player.color} income: {player.income}, victory points: {player.victory_points}')
         
         return state 

@@ -299,9 +299,9 @@ class BuildValidator(BaseValidator):
             if (len(s.industry_type_options) < len(slot.industry_type_options)) and action.industry in s.industry_type_options:
                 return ValidationResult(is_valid=False, message=f"Can't build in slot {slot.id} when {s.id} has priority for this industry")
             if s.building_placed is not None:
-                if slot.id == action.slot_id:
+                if s.id == action.slot_id:
                     return ValidationResult(is_valid=False, message=f"Slot {slot.id} already occupied")
-                if slot.building_placed.owner == player.color and game_state.era == LinkType.CANAL:
+                if s.building_placed.owner == player.color and game_state.era == LinkType.CANAL:
                     return ValidationResult(is_valid=False, message=f"Can't build two buildings in one city during canal era")
         
         # Overbuilding validation
@@ -401,7 +401,7 @@ class ShortfallValidator(BaseValidator):
         if player.bank >= 0:
             return ValidationResult(is_valid=False, message=f'Player {player.color} is not in shortfall')
         if not action.slot_id:
-            for building in self.state.iter_placed_buildings():
+            for building in game_state.iter_placed_buildings():
                 if building.owner == player.color:
                     return ValidationResult(is_valid=False, message=f'Player {player.color} has building in slot {building.slot_id}, sell it first')
         return ValidationResult(is_valid=True)

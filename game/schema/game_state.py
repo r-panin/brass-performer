@@ -7,6 +7,8 @@ import json
 import hashlib
 from .common import IndustryType, ResourceType, ResourceAmounts
 import logging
+import random
+from functools import lru_cache
 
 
 class GameEntity(BaseModel):
@@ -605,10 +607,19 @@ class BoardState(BaseModel):
         return self.subaction_count > 0
     
     def in_shortfall(self):
-        if any(player.bank < 0 for player in self.state.players.values()):
+        if any(player.bank < 0 for player in self.players.values()):
             return True
         return False
+    
+    def is_terminal(self):
+        return len(self.deck) == 0 and all(not player.hand for player in self.players.values())
 
+    def get_active_player(self) -> Player:
+        if self.action_context is not ActionContext.SHORTFALL:
+            return self.players[self.turn_order[0]]
+        else:
+            players_in_shortfall = [player for player in self.players.values() if player.bank < 0]
+            return random.choice(players_in_shortfall)
 
 class OutputToPlayer(BaseModel):
     message: Optional[str] = None

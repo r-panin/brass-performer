@@ -12,7 +12,7 @@ class ActionProcessor():
     def __init__(self, state:BoardState, event_bus:EventBus=None):
         self.state = state
         self.validation_service = ActionValidationService(event_bus)
-        self.state_changer = StateChanger(self.state)
+        self.state_changer = StateChanger(self.state, event_bus)
         self.action_space_generator = ActionSpaceGenerator()
         self.event_bus = event_bus
         self.ac_provider = ActionsCatProvider()
@@ -55,7 +55,6 @@ class ActionProcessor():
 
         player = self.state.players[color]
         validation = self.validation_service.validate_action(action, self.state, player)
-        logging.debug(f"self.state is not None: {self.state is not None}")
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,

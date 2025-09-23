@@ -45,7 +45,7 @@ class ReplayGenerator(ABC):
 
 class RawReplayGenerator(ReplayGenerator):
     def generate(self, events):
-        return events
+        return [event.model_dump_json() for event in events]
     
 class TurnwiseReplayGenerator(ReplayGenerator):
     def generate(self, events:List[Event]):
