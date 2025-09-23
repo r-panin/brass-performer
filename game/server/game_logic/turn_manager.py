@@ -15,7 +15,8 @@ class TurnManager:
         self.previous_turn_order = starting_state.turn_order 
 
     def prepare_next_turn(self, state:BoardState) -> BoardState:
-        initial_state = deepcopy(state)
+        if self.event_bus:
+            initial_state = deepcopy(state)
         state.turn_order.pop(0)
         if not state.turn_order:
             state = self._prepare_next_round(state)
@@ -23,10 +24,11 @@ class TurnManager:
             state.actions_left = 2
         else:
             state.actions_left = 1
-        diff = DeepDiff(initial_state.model_dump(), state.model_dump())
-        self.event_bus.publish(InterturnEvent(
-            diff=diff
-        ))
+        if self.event_bus:
+            diff = DeepDiff(initial_state.model_dump(), state.model_dump())
+            self.event_bus.publish(InterturnEvent(
+                diff=diff
+            ))
         state.subaction_count = 0
         logging.debug(f"Remaining card count: {[len(player.hand) for player in state.players.values()]}")
         logging.debug(f"Current action count = {state.actions_left}")

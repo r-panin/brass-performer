@@ -13,7 +13,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
     handlers=[logging.StreamHandler(sys.stdout)]  # Вывод в stdout
 )
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 
 connection_manager = ConnectionManager()
 game_manager = GameManager()

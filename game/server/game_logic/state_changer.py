@@ -127,6 +127,7 @@ class StateChanger:
         if not action.action is ActionType.SHORTFALL:
             state.subaction_count += 1
 
+        logging.debug(f"Subaction count: {state.subaction_count}")
         # определяем actioncontext
         if action.action in self.SINGULAR_ACTION_TYPES:
             self._commit_action(state)
@@ -135,6 +136,9 @@ class StateChanger:
                 state.action_context = ActionContext.SELL
             else:
                 self._commit_action(state)
+
+        if state.actions_left == 0:
+            state = self.turn_manager.prepare_next_turn(state)
         
         if self.event_bus:
             diff = DeepDiff(initial_state.model_dump(), state.model_dump())

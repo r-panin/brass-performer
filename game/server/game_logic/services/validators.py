@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ....schema import BoardState, CardType, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
+from ....schema import BoardState, CardType, PassAction, LoanAction, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
 from typing import List
 from collections import defaultdict
 
@@ -190,7 +190,7 @@ class BaseValidator(ActionValidator, ABC):
 
 class PassValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action, game_state:BoardState, player:Player):
+    def validate(self, action:PassAction, game_state:BoardState, player:Player):
         return ValidationResult(is_valid=True)
     
 class ScoutValidator(BaseValidator):
@@ -203,7 +203,7 @@ class ScoutValidator(BaseValidator):
 
 class LoanValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action, game_state:BoardState, player:Player):
+    def validate(self, action:LoanAction, game_state:BoardState, player:Player):
         if player.income_points < 3:
             return ValidationResult(is_valid=False, message="Income cannot fall below -10")
         return ValidationResult(is_valid=True)

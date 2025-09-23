@@ -38,8 +38,8 @@ class ActionValidationService():
         return result
     
     def _validate_action_context(self, action_context, action) -> ValidationResult:
-            allowed_actions = self.context_map.get(action_context)
-            is_allowed = action.action in allowed_actions
+            allowed_actions = self.context_map[action_context]
+            is_allowed = isinstance(action, allowed_actions)
             if not is_allowed:
                 return ValidationResult(is_valid=False,
                                         message=f'Action is not appropriate for context {action_context}')

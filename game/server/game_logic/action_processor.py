@@ -4,6 +4,7 @@ from ...schema import BoardState, Action, PlayerColor, ActionProcessResult, Requ
 from .state_changer import StateChanger
 from .action_space_generator import ActionSpaceGenerator
 from .action_cat_provider import ActionsCatProvider
+import logging
 
 
 class ActionProcessor():
@@ -14,7 +15,7 @@ class ActionProcessor():
         self.state_changer = StateChanger(self.state)
         self.action_space_generator = ActionSpaceGenerator()
         self.event_bus = event_bus
-        self.ac_provider = ActionsCatProvider
+        self.ac_provider = ActionsCatProvider()
 
     def process_incoming_message(self, message, color:PlayerColor):
         if isinstance(message, Request):
@@ -54,6 +55,7 @@ class ActionProcessor():
 
         player = self.state.players[color]
         validation = self.validation_service.validate_action(action, self.state, player)
+        logging.debug(f"self.state is not None: {self.state is not None}")
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
@@ -66,3 +68,11 @@ class ActionProcessor():
         
         # Обрабатываем действие в зависимости от типа
         self.state_changer.apply_action(action, self.state, player)
+
+        return ActionProcessResult(
+            processed=True,
+            awaiting=self.ac_provider.get_expected_params(self.state),
+            your_color=color,
+            your_hand=self.state.players[color].hand,
+            state=self.state.hide_state()
+        )
