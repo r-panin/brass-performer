@@ -1,26 +1,21 @@
 from .services.validation_service import ActionValidationService
-from .services.event_bus import EventBus, TurnCommitEvent
-from ...schema import BoardState, Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
-from .game_state_manager import GamePhase, GameStateManager
-from .turn_manager import TurnManager
+from .services.event_bus import EventBus
+from ...schema import BoardState, Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, PlayerState, ActionSpaceRequestResult
 from .state_changer import StateChanger
 from .action_space_generator import ActionSpaceGenerator
+from .action_cat_provider import ActionsCatProvider
 
 
 class ActionProcessor():
 
-    def __init__(self, state_manager:GameStateManager, event_bus:EventBus):
-        self.state_manager = state_manager
+    def __init__(self, state:BoardState, event_bus:EventBus=None):
+        self.state = state
         self.validation_service = ActionValidationService(event_bus)
-        self.turn_manager = TurnManager(event_bus, state_manager)
-        self.state_changer = StateChanger(state_manager, event_bus)
+        self.state_changer = StateChanger(self.state)
         self.action_space_generator = ActionSpaceGenerator()
         self.event_bus = event_bus
+        self.ac_provider = ActionsCatProvider
 
-    @property
-    def state(self):
-        return self.state_manager.current_state
-    
     def process_incoming_message(self, message, color:PlayerColor):
         if isinstance(message, Request):
             return self._process_request(message, color)
@@ -32,9 +27,9 @@ class ActionProcessor():
     def _process_request(self, request:Request, color: PlayerColor) -> RequestResult:
         if request.request is RequestType.REQUEST_STATE:
            return PlayerState(
-                state=self.state_manager.public_state,
+                state=self.state.hide_state(),
                 your_color=color,
-                your_hand=self.state_manager.current_state.players[color].hand,
+                your_hand=self.state.players[color].hand,
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
             actions = self.action_space_generator.get_action_space(self.state, color)
@@ -47,285 +42,27 @@ class ActionProcessor():
 
     def _process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
         # Проверяем, может ли игрок делать ход
-        if not self.state_manager.is_player_to_move(color):
+        if not self.state.is_player_to_move(color):
             return ActionProcessResult(
                 processed=False,
                 message=f"Attempted move by {color}, current turn is {self.state.turn_order[0]}",
                 awaiting={},
                 your_hand=self.state.players[color].hand,
                 your_color=color,
-                state=self.state_manager.get_provisional_state()
+                state=self.state.hide_state()
             )
 
-        context_validateion = self.validation_service.validate_action_context(self.state_manager.action_context, action)
-        if not context_validateion.is_valid:
-            return ActionProcessResult(
-                processed=False,
-                message=f"Attempted action {type(action)}, which current context {self.state_manager.action_context} forbids",
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                state=self.state_manager.get_provisional_state(),
-            )
-        
-        # Обрабатываем действие в зависимости от типа
-        if isinstance(action, MetaAction):
-            return self._process_meta_action(action, color)
-        elif isinstance(action, ParameterAction):
-            return self._process_parameter_action(action, color)
-        elif isinstance(action, CommitAction):
-            return self._process_commit_action(action, color)
-        elif isinstance(action, EndOfTurnAction):
-            return self._process_end_of_turn_action(action, color)
-        elif isinstance(action, ResolveShortfallAction):
-            return self._process_resolve_shortfall_action(action, color)
-        else:
-            return ActionProcessResult(
-                processed=False, 
-                message="Unknown action type", 
-                awaiting={'W': ('T', 'F')}, 
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                    state=self.state_manager.get_provisional_state()
-            )
-
-    def _process_meta_action(self, action: MetaAction, color: PlayerColor) -> ActionProcessResult:
-        if self.state_manager.phase != GamePhase.MAIN:
-            return ActionProcessResult(
-                processed=False,
-                message="Cannot submit a meta action outside of main context",
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                    state=self.state_manager.get_provisional_state()
-            )
-        
-        try:
-            self.state_manager.start_transaction(ActionContext(action.action))
-            return ActionProcessResult(
-                processed=True,
-                message=f"Entered {self.state_manager.action_context}",
-                awaiting=self.state_manager.get_expected_params(color),
-                state=self.state_manager.get_provisional_state(),
-                your_hand=self.state.players[color].hand,
-                your_color=color
-            )
-        except ValueError as e:
-            return ActionProcessResult(
-                processed=False,
-                message=str(e),
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                    state=self.state_manager.get_provisional_state()
-            )
-
-    def _process_parameter_action(self, action: ParameterAction, color: PlayerColor) -> ActionProcessResult:
-        if self.state_manager.phase != GamePhase.TRANSACTION:
-            return ActionProcessResult(
-                processed=False,
-                message="No active transaction. Start with meta action",
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                state=self.state_manager.get_provisional_state()
-            )
-        
         player = self.state.players[color]
-        
-        # Валидация действия
-        validation_result = self.validation_service.validate_action(
-            action, 
-            self.state, 
-            player,
-            self.state_manager.action_context
-        )
-        
-        if not validation_result.is_valid:
-            return ActionProcessResult(
-                processed=False,
-                message=validation_result.message,
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=player.hand,
-                your_color=color,
-                state=self.state_manager.get_provisional_state()
-            )
-        
-        # Применяем действие
-        self.state_changer.apply_action(action, self.state, player)
-        
-        # Обновляем состояние
-        try:
-            self.state_manager.add_subaction()
-            return ActionProcessResult(
-                processed=True,
-                state=self.state_manager.get_provisional_state(),
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=player.hand,
-                your_color=color
-            )
-        except ValueError as e:
-            return ActionProcessResult(
-                processed=False,
-                message=str(e),
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=player.hand,
-                your_color=color
-            )
-
-    def _process_commit_action(self, action: CommitAction, color: PlayerColor) -> ActionProcessResult:
-        if self.state_manager.phase not in (GamePhase.TRANSACTION, GamePhase.AWAITING_COMMIT):
-            return ActionProcessResult(
-                processed=False,
-                message="No active transaction to commit",
-                awaiting=self.state_manager.get_expected_params(color),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                state=self.state_manager.get_provisional_state()
-            )
-        
-        if action.commit:
-            if self.state_manager.subaction_count == 0:
-                return ActionProcessResult(
-                    processed=False,
-                    message="No changes to state, nothing to commit",
-                    awaiting=self.state_manager.get_expected_params(color),
-                    your_hand=self.state.players[color].hand,
-                    your_color=color,
-                    state=self.state_manager.get_provisional_state()
-                )
-            
-            try:
-                self.state.actions_left -= 1
-                self.state_manager.commit_transaction()
-                
-                # Обновляем количество оставшихся действий
-                
-                if self.state.actions_left > 0:
-                    # Продолжаем ход
-                    return ActionProcessResult(
-                        processed=True,
-                        message="Changes committed",
-                        state=self.state_manager.get_provisional_state(),
-                        awaiting=self.state_manager.get_expected_params(color),
-                        your_color=color,
-                        your_hand=self.state.players[color].hand
-                    )
-                else:
-                    # Завершаем ход
-                    self.state_manager.end_turn()
-                    return ActionProcessResult(
-                        processed=True,
-                        message="Changes committed, confirm end of turn",
-                        state=self.state_manager.get_provisional_state(),
-                        awaiting=self.state_manager.get_expected_params(color),
-                        your_color=color,
-                        your_hand=self.state.players[color].hand,
-                    )
-            except ValueError as e:
-                return ActionProcessResult(
-                    processed=False,
-                    message=str(e),
-                    awaiting=self.state_manager.get_expected_params(color),
-                    your_color=color,
-                    your_hand=self.state.players[color].hand,
-                    state=self.state_manager.get_provisional_state()
-                )
-        else:
-            # Откатываем транзакцию
-            try:
-                self.state_manager.rollback_transaction()
-                return ActionProcessResult(
-                    processed=True,
-                    message='Transaction rolled back',
-                    state=self.state_manager.get_provisional_state(),
-                    awaiting=self.state_manager.get_expected_params(color),
-                    your_color=color,
-                    your_hand=self.state.players[color].hand,
-                )
-            except ValueError as e:
-                return ActionProcessResult(
-                    processed=False,
-                    message=str(e),
-                    awaiting=self.state_manager.get_expected_params(color),
-                    your_color=color,
-                    your_hand=self.state.players[color].hand,
-                    state=self.state_manager.get_provisional_state()
-                )
-
-    def _process_end_of_turn_action(self, action: EndOfTurnAction, color: PlayerColor) -> ActionProcessResult:
-        if action.end_turn:
-            # Завершаем ход и переходим к следующему игроку
-            self.event_bus.publish(TurnCommitEvent(
-                diff=self.state_manager.get_turn_diff(),
-                actor=color
-            ))
-            next_state = self.turn_manager.prepare_next_turn(self.state)
-            if self.turn_manager.concluded:
-                return ActionProcessResult(processed=True,
-                                           end_of_turn=True,
-                                           awaiting={},
-                                           your_hand=self.state.players[color].hand,
-                                           your_color=color,
-                                            state=self.state_manager.get_provisional_state(),
-                                            end_of_game=True)
-            self.state_manager.start_new_turn(next_state)
-            return ActionProcessResult(processed=True,
-                                       end_of_turn=True,
-                                       awaiting={},
-                                       your_hand=self.state.players[color].hand,
-                                       state=self.state_manager.get_provisional_state(),
-                                       your_color=color,
-                                       )
-        else:
-            # Откатываемся к началу хода
-            self.state_manager.rollback_turn()
-            return ActionProcessResult(
-                processed=True, 
-                message='Reverted to turn start', 
-                state=self.state_manager.get_provisional_state(), 
-                awaiting={}, 
-                your_hand=self.state.players[color].hand,
-                your_color=color
-            )
-        
-    def _process_resolve_shortfall_action(self, action:ResolveShortfallAction, color: PlayerColor) -> ActionProcessResult:
-        if self.state_manager.phase is not GamePhase.SHORTFALL:
-            return ActionProcessResult(
-                processed=False,
-                awaiting=self.state_manager.get_expected_params(color),
-                state=self.state_manager.get_provisional_state(),
-                your_hand=self.state.players[color].hand,
-                your_color=color,
-                message="Action is only allowed within shortfall context"
-            )
-        
-        player = self.state.players[color]
-        validation = self.validation_service.validate_shortfall_action(action, player)
+        validation = self.validation_service.validate_action(action, self.state, player)
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
-                state=self.state_manager.get_provisional_state(),
+                message=validation.message,
+                awaiting=self.ac_provider.get_expected_params(self.state),
                 your_hand=self.state.players[color].hand,
                 your_color=color,
-                message=validation.message,
-                awaiting=self.state_manager.get_expected_params(color)
+                state=self.state.hide_state(),
             )
-
-        self.state_changer.resolve_shortfall(self.state, action, player)
-        if not self._in_shortfall():
-            self.state_manager.exit_shortfall()
-        return ActionProcessResult(
-            processed=True,
-            state=self.state_manager.get_provisional_state(),
-            your_color=color,
-            your_hand=self.state.players[color].hand,
-            awaiting=self.state_manager.get_expected_params(color)
-        )
-     
-    def _in_shortfall(self):
-        if any(player.bank < 0 for player in self.state.players.values()):
-            return True
-        return False
-
-    
+        
+        # Обрабатываем действие в зависимости от типа
+        self.state_changer.apply_action(action, self.state, player)

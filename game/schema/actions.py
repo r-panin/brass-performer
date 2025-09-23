@@ -9,9 +9,6 @@ Meta classes
 '''
 class MetaAction(BaseModel):
     action: ActionType
-    model_config = ConfigDict(extra='forbid')  
-
-class ParameterAction(BaseModel):
     card_id: Optional[int] = None
     model_config = ConfigDict(extra='forbid')  
 
@@ -38,90 +35,57 @@ class SlotAction(BaseModel):
     slot_id: int
 
 '''
-Action init classes
+Specific actions
 '''
-class BuildStart(MetaAction):
+
+class BuildAction(MetaAction, ResourceAction, IndustryAction, SlotAction):
     action: Literal[ActionType.BUILD] = ActionType.BUILD
+    card_id: int
+    pass
 
-class SellStart(MetaAction):
+class SellAction(MetaAction, ResourceAction, SlotAction):
     action: Literal[ActionType.SELL] = ActionType.SELL
-    
-class LoanStart(MetaAction):
-    action: Literal[ActionType.LOAN] = ActionType.LOAN
+    pass
 
-class ScoutStart(MetaAction):
+class ScoutAction(MetaAction):
     action: Literal[ActionType.SCOUT] = ActionType.SCOUT
-
-class DevelopStart(MetaAction):
-    action: Literal[ActionType.DEVELOP] = ActionType.DEVELOP
-
-class NetworkStart(MetaAction):
-    action: Literal[ActionType.NETWORK] = ActionType.NETWORK
-
-class PassStart(MetaAction):
-    action: Literal[ActionType.PASS] = ActionType.PASS
-
-'''
-Specific action selections
-'''
-class BuildSelection(ParameterAction, ResourceAction, IndustryAction, SlotAction):
-    pass
-
-class SellSelection(ParameterAction, ResourceAction, SlotAction):
-    pass
-
-class ScoutSelection(ParameterAction):
     card_id: List[int] = Field(min_length=3, max_length=3)
 
-class DevelopSelection(ParameterAction, ResourceAction, IndustryAction):
+class DevelopAction(MetaAction, ResourceAction, IndustryAction):
+    action: Literal[ActionType.DEVELOP] = ActionType.DEVELOP
     pass
 
-class NetworkSelection(ParameterAction, ResourceAction):
+class NetworkAction(MetaAction, ResourceAction):
+    action: Literal[ActionType.NETWORK] = ActionType.NETWORK
     link_id: int
 
-'''
-This ends the pain
-'''
+class LoanAction(MetaAction):
+    action: Literal[ActionType.LOAN] = ActionType.LOAN
+    card_id: int
 
-class CommitAction(BaseModel):
-    commit: bool
+class PassAction(MetaAction):
+    action: Literal[ActionType.PASS] = ActionType.PASS
+    card_id: int
+
+class CommitAction(MetaAction):
+    action: Literal[ActionType.COMMIT] = ActionType.COMMIT
     model_config = ConfigDict(extra='forbid')  
 
-class EndOfTurnAction(BaseModel):
-    end_turn: bool
-    model_config = ConfigDict(extra='forbid')  
-
-class ResolveShortfallAction(BaseModel):
-    action: Literal["shortfall"] = "shortfall"
+class ShortfallAction(MetaAction):
+    action: Literal[ActionType.SHORTFALL] = ActionType.SHORTFALL
     slot_id: Optional[int] = None
-
-MetaActions = Union[
-    LoanStart,
-    PassStart,
-    SellStart,
-    BuildStart,
-    ScoutStart,
-    DevelopStart,
-    NetworkStart,
-]
+    model_config = ConfigDict(extra='forbid')  
 
 Action = Union[
-    LoanStart,
-    PassStart,
-    SellStart,
-    BuildStart,
-    ScoutStart,
-    DevelopStart,
-    NetworkStart,
-    SellSelection,
-    BuildSelection,
-    ScoutSelection,
-    DevelopSelection,
-    NetworkSelection,
+    SellAction,
+    BuildAction,
+    ScoutAction,
+    DevelopAction,
+    NetworkAction,
+    LoanAction,
+    PassAction,
     CommitAction,
-    EndOfTurnAction,
-    ResolveShortfallAction,
-    ParameterAction
+    ShortfallAction,
 ]
 
 '''Requests'''

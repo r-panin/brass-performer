@@ -10,6 +10,8 @@ class ActionType(StrEnum):
     DEVELOP = 'develop'
     NETWORK = 'network'
     PASS = 'pass'
+    SHORTFALL = 'shortfall'
+    COMMIT = 'commit'
 
 class ResourceType(StrEnum):
     COAL = "coal"

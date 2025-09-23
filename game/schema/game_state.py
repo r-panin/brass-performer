@@ -27,16 +27,10 @@ class GameEntity(BaseModel):
 class ActionContext(StrEnum):
     GLOUCESTER_DEVELOP = 'gloucester_develop'
     SHORTFALL = 'shortfall'
-    END_OF_TURN = 'end_of_turn'
     MAIN = 'main'
-    BUILD = 'build'
     SELL = 'sell'
     NETWORK = 'network'
-    SCOUT = 'scout'
     DEVELOP = 'develop'
-    PASS = 'pass'
-    LOAN = 'loan'
-    AWAITING_COMMIT = 'awaiting_commit'
 
 class GameStatus(StrEnum):
     CREATED = 'created'
@@ -602,6 +596,20 @@ class BoardState(BaseModel):
             return ResourceAmounts()
         return ResourceAmounts(iron=1)
 
+    def is_player_to_move(self, color:PlayerColor) -> bool:
+        if not self.action_context is ActionContext.SHORTFALL:
+            return self.turn_order[0] is color
+        return self.players[color].bank < 0
+
+    def has_subaction(self) -> bool:
+        return self.subaction_count > 0
+    
+    def in_shortfall(self):
+        if any(player.bank < 0 for player in self.state.players.values()):
+            return True
+        return False
+
+
 class OutputToPlayer(BaseModel):
     message: Optional[str] = None
 
@@ -633,4 +641,4 @@ class StateRequestResult(RequestResult):
     result: PlayerState
 
 class ActionSpaceRequestResult(RequestResult):
-    result: Optional[Dict[str, List]] = []
+    result:List = []

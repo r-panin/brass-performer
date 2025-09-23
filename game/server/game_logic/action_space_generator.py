@@ -1,6 +1,6 @@
-from ...schema import BoardState, PlayerColor, Action, LoanStart, PassStart, SellStart, BuildStart, ScoutStart, DevelopStart,NetworkStart, SellSelection, BuildSelection, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, NetworkSelection, LinkType, DevelopSelection, ScoutSelection, ParameterAction, ActionContext, CommitAction, EndOfTurnAction, ResolveShortfallAction
+from ...schema import BoardState, PlayerColor, Action, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
 from typing import Dict, List
-from collections import Counter, defaultdict
+from collections import defaultdict
 import itertools
 import logging
 from .action_cat_provider import ActionsCatProvider
@@ -18,55 +18,35 @@ class ActionSpaceGenerator():
     def __init__(self):
         self.cat_getter = ActionsCatProvider()
 
-    def get_action_space(self, state:BoardState, color:PlayerColor) -> Dict[str, List[Action]]:
+    def get_action_space(self, state:BoardState, color:PlayerColor) -> List[Action]:
         player = state.players[color]
-        valid_action_types = self.cat_getter.get_expected_params(color)
-        out = defaultdict(list)
+        valid_action_types = self.cat_getter.get_expected_params(state)
+        out = []
         for action in valid_action_types:
             match action:
-                case "BuildStart":
-                    out[action].append(BuildStart())
-                case "SellStart":
-                    out[action].append(SellStart())
-                case "NetworkStart":
-                    out[action].append(NetworkStart())
-                case "DevelopStart":
-                    out[action].append(DevelopStart())
-                case "ScoutStart":
-                    out[action].append(ScoutStart())
-                case "LoanStart":
-                    out[action].append(LoanStart())
-                case "PassStart":
-                    out[action].append(PassStart())
-                case "BuildSelection":
-                    out[action] = self.get_valid_build_actions(state, player)
-                case "SellSelection":
-                    out[action] = self.get_valid_sell_actions(state, player)
-                case "NetworkSelection":
-                    out[action] = self.get_valid_network_actions(state, player)
-                case "DevelopSelection":
-                    gloucester = True if state.action_context is ActionContext.GLOUCESTER_DEVELOP else False
-                    out[action] = self.get_valid_develop_actions(state, player, gloucester)
-                case "ScoutSelection":
-                    out[action] = self.get_valid_scout_actions(player)
-                case "ParameterAction":
-                    if state.action_context is ActionContext.LOAN:
-                        out[action] = self.get_valid_loan_actions(player)
-                    elif state.action_context is ActionContext.PASS:
-                        out[action] = self.get_valid_pass_actions(player)
-                    else:
-                        out[action] = []
+                case "BuildAction":
+                    out.extend(self.get_valid_build_actions(state, player))
+                case "SellAction":
+                    out.extend(self.get_valid_sell_actions(state, player))
+                case "NetworkAction":
+                    out.extend(self.get_valid_network_actions(state, player))
+                case "DevelopAction":
+                    out.extend(self.get_valid_develop_actions(state, player))
+                case "ScoutAction":
+                    out.extend(self.get_valid_scout_actions(player))
+                case "LoanAction":
+                    out.extend(self.get_valid_loan_actions(player))
+                case "PassAction":
+                    out.extend(self.get_valid_pass_actions(player))
                 case "CommitAction":
-                    out[action] = self.get_valid_commit_actions()
-                case "EndOfTurnAction":
-                    out[action] = self.get_valid_end_of_turn_actions()
-                case "ResolveShortfallAction":
-                    out[action] = self.get_valid_shortfall_actions(player)
+                    out.extend(self.get_valid_commit_actions(state))
+                case "ShortfallAction":
+                    out.extend(self.get_valid_shortfall_actions(player))
         logging.debug(f"Generator returns a list of actions: {out}")
         return out
                 
 
-    def get_valid_build_actions(self, state:BoardState, player: Player) -> List[BuildSelection]: # oh boy
+    def get_valid_build_actions(self, state:BoardState, player: Player) -> List[BuildAction]: # oh boy
         out = []
         cards = player.hand.values()
         slots = [slot for city in state.cities.values() for slot in city.slots.values() if not slot.building_placed]
@@ -232,7 +212,7 @@ class ActionSpaceGenerator():
                         if player.bank < base_cost + coal_cost + iron_cost:
                             continue
                         
-                        out.append(BuildSelection(
+                        out.append(BuildAction(
                             slot_id=slot.id,
                             card_id=card.id,
                             industry=industry,
@@ -240,9 +220,9 @@ class ActionSpaceGenerator():
                         ))
         
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [BuildSelection.model_validate_json(data) for data in data_strings]
+        return [BuildAction.model_validate_json(data) for data in data_strings]
 
-    def get_valid_sell_actions(self, state:BoardState, player:Player) -> List[SellSelection]:
+    def get_valid_sell_actions(self, state:BoardState, player:Player) -> List[SellAction]:
         out = []
         cards = player.hand
         slots = [
@@ -288,22 +268,24 @@ class ActionSpaceGenerator():
                     continue
 
                 if state.subaction_count > 0:
-                    out.append(SellSelection(
+                    out.append(SellAction(
                         slot_id=slot.id,
                         resources_used=beer_combo))
                 else:
                     for card in cards:
-                        out.append(SellSelection(
+                        out.append(SellAction(
                             slot_id=slot.id,
                             resources_used=beer_combo,
                             card_id=card
                         ))
 
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [SellSelection.model_validate_json(data) for data in data_strings]
+        return [SellAction.model_validate_json(data) for data in data_strings]
 
-    def get_valid_network_actions(self, state:BoardState, player:Player) -> List[NetworkSelection]:
+    def get_valid_network_actions(self, state:BoardState, player:Player) -> List[NetworkAction]:
         out = []
+        if state.subaction_count > 1:
+            return out
         cards = player.hand
         network = state.get_player_network(player.color)
         links = [link for link in state.links.values() 
@@ -316,7 +298,7 @@ class ActionSpaceGenerator():
             if state.era == LinkType.CANAL:
                 if state.subaction_count == 0:
                     for card in cards:
-                        out.append(NetworkSelection(
+                        out.append(NetworkAction(
                             link_id=link.id,
                             card_id=card,
                             resources_used=[]
@@ -353,24 +335,26 @@ class ActionSpaceGenerator():
                 if state.subaction_count > 0:
                     for coal_source, beer_source in itertools.product(coal_sources, beer_sources):
                         res = list(coal_source) + list(beer_source)
-                        out.append(NetworkSelection(
+                        out.append(NetworkAction(
                             resources_used=res,
                             link_id=link.id
                         ))
                 else:
                     for coal_source, card in itertools.product(coal_sources, cards):
                         res = list(coal_source)
-                        out.append(NetworkSelection(
+                        out.append(NetworkAction(
                             resources_used=res,
                             link_id=link.id,
                             card_id=card
                         ))
 
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [NetworkSelection.model_validate_json(data) for data in data_strings]
+        return [NetworkAction.model_validate_json(data) for data in data_strings]
                         
-    def get_valid_develop_actions(self, state:BoardState, player:Player, gloucester=False) -> List[DevelopSelection]:
+    def get_valid_develop_actions(self, state:BoardState, player:Player, gloucester=False) -> List[DevelopAction]:
         out = []
+        if state.subaction_count > 1:
+            return out 
         industries = list(IndustryType)
         cards = player.hand
         iron_buildings = state.get_player_iron_sources()
@@ -386,19 +370,21 @@ class ActionSpaceGenerator():
             iron_sources = [[]]
         for industry in industries:
             building = player.get_lowest_level_building(industry)
+            if not building.is_developable:
+                continue
             if not building:
                 continue
             if iron_sources:
                 for source in iron_sources:
                     if state.subaction_count > 0:
-                        out.append(DevelopSelection(industry=industry, resources_used=source))
+                        out.append(DevelopAction(industry=industry, resources_used=source))
                     else:
                         for card in cards:
-                            out.append(DevelopSelection(industry=industry, resources_used=source, card_id=card))
+                            out.append(DevelopAction(industry=industry, resources_used=source, card_id=card))
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [DevelopSelection.model_validate_json(data) for data in data_strings]
+        return [DevelopAction.model_validate_json(data) for data in data_strings]
 
-    def get_valid_scout_actions(self, player:Player) -> List[ScoutSelection]:
+    def get_valid_scout_actions(self, player:Player) -> List[ScoutAction]:
         cards = player.hand.values()
         out = []
         if len(cards) < 3:
@@ -407,33 +393,30 @@ class ActionSpaceGenerator():
             return []
         ids = [card.id for card in cards]
         for combo in itertools.combinations(ids, 3):
-            out.append(ScoutSelection(card_id=list(combo)))
+            out.append(ScoutAction(card_id=list(combo)))
         data_strings = sorted(action.model_dump_json() for action in out)
-        return [ScoutSelection.model_validate_json(data) for data in data_strings]
+        return [ScoutAction.model_validate_json(data) for data in data_strings]
 
-    def get_valid_loan_actions(self, player:Player) -> List[ParameterAction]:
+    def get_valid_loan_actions(self, player:Player) -> List[LoanAction]:
         if player.income < -7:
             return []
-        return [ParameterAction(card_id=card) for card in player.hand]
+        return [LoanAction(card_id=card) for card in player.hand]
     
-    def get_valid_pass_actions(self, player:Player) -> List[ParameterAction]:
-        return [ParameterAction(card_id=card) for card in player.hand]
+    def get_valid_pass_actions(self, player:Player) -> List[PassAction]:
+        return [PassAction(card_id=card) for card in player.hand]
 
     def get_valid_commit_actions(self, state:BoardState):
         if state.subaction_count > 0:
-            return [CommitAction(commit=True), CommitAction(commit=False)]
+            return [CommitAction()]
         else:
-            return [CommitAction(commit=False)]
-
-    def get_valid_end_of_turn_actions(self):
-        return [EndOfTurnAction(end_turn=True), EndOfTurnAction(end_turn=False)]
+            return []
     
     def get_valid_shortfall_actions(self, state:BoardState, player:Player):
         buildings = [building for building in state.iter_placed_buildings() if building.owner is player.color]
         if buildings:
-            return [ResolveShortfallAction(action="shortfall", slot_id=building.slot_id) for building in buildings]
+            return [ShortfallAction(slot_id=building.slot_id) for building in buildings]
         else:
-            return [ResolveShortfallAction(action="shortfall")]
+            return [ShortfallAction()]
 
     def _remove_duplicates(self, lst):
         seen = set()

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ....schema import BoardState, CardType, ResourceAmounts, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ParameterAction, ScoutSelection, DevelopSelection, NetworkSelection, SellSelection, BuildSelection
+from ....schema import BoardState, CardType, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
 from typing import List
 from collections import defaultdict
 
@@ -9,11 +9,11 @@ class ActionValidator(ABC):
         super().__init__()
 
     @abstractmethod
-    def validate(self, action: ParameterAction, game_state:BoardState, player: Player) -> ValidationResult:
+    def validate(self, action, game_state:BoardState, player: Player) -> ValidationResult:
         pass
 
 def validate_card_in_hand(func):
-    def wrapper(self:BaseValidator, action:ParameterAction, game_state:BoardState, player:Player):
+    def wrapper(self:BaseValidator, action:MetaAction, game_state:BoardState, player:Player):
         if game_state.subaction_count > 0:
             return func(self, action, game_state, player)
         if isinstance(action.card_id, int):
@@ -41,10 +41,10 @@ def validate_resources(func):
         if not preference_validation.is_valid:
             return preference_validation
 
-        if isinstance(action, BuildSelection):
+        if isinstance(action, BuildAction):
             city_name = game_state.get_building_slot(action.slot_id).city
             link_id = None
-        elif isinstance(action, NetworkSelection):
+        elif isinstance(action, NetworkAction):
             city_name = None
             link_id = action.link_id
         
@@ -65,7 +65,7 @@ def validate_resources(func):
     return wrapper
 
 class BaseValidator(ActionValidator, ABC):
-    def validate(self, action:ParameterAction, game_state:BoardState, player:Player) -> True:
+    def validate(self, action, game_state:BoardState, player:Player) -> True:
         return ValidationResult(is_valid=True)
     
     def _validate_iron_preference(self, game_state:BoardState, resources: List[ResourceSource]) -> ValidationResult:
@@ -149,26 +149,26 @@ class BaseValidator(ActionValidator, ABC):
             if resource.resource_type is ResourceType.COAL:
                 if resource.building_slot_id is not None:
                     coal_city = game_state.get_building_slot(resource.building_slot_id).city
-                    if isinstance(action, BuildSelection):
-                        action:BuildSelection
+                    if isinstance(action, BuildAction):
+                        action:BuildAction
                         build_city = game_state.get_building_slot(action.slot_id).city
                         connected = game_state.find_paths(start=build_city, end=coal_city)
                         if not connected:
                             return ValidationResult(is_valid=False, message=f"Cities {build_city} and {coal_city} are not connected")
-                    elif isinstance(action, NetworkSelection):
-                        action:NetworkSelection
+                    elif isinstance(action, NetworkAction):
+                        action:NetworkAction
                         connected = game_state.find_paths(start_link_id=action.link_id, end=coal_city)
                         if not connected:
                             return ValidationResult(is_valid=False, message=f"Link {action.link_id} is not connected to city {coal_city}")
                 else:
-                    if isinstance(action, BuildSelection):
-                        action:BuildSelection
+                    if isinstance(action, BuildAction):
+                        action:BuildAction
                         build_city = game_state.get_building_slot(action.slot_id).city
                         connected = game_state.market_access_exists(build_city)
                         if not connected:
                             return ValidationResult(is_valid=False, message=f"Cities {build_city} is not connected to market")
-                    elif isinstance(action, NetworkSelection):
-                        action:NetworkSelection
+                    elif isinstance(action, NetworkAction):
+                        action:NetworkAction
                         link = game_state.links[action.link_id]
                         connected = any(game_state.market_access_exists(city) for city in link.cities)
                         if not connected:
@@ -190,22 +190,20 @@ class BaseValidator(ActionValidator, ABC):
 
 class PassValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action:ParameterAction, game_state:BoardState, player:Player):
+    def validate(self, action, game_state:BoardState, player:Player):
         return ValidationResult(is_valid=True)
     
 class ScoutValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action:ScoutSelection, game_state:BoardState, player:Player):
+    def validate(self, action:ScoutAction, game_state:BoardState, player:Player):
         for card in action.card_id:
-            if not card in player.hand:
-                return ValidationResult(is_valid=False, message="Smart guy, huh")
             if player.hand[card].value == "wild":
                 return ValidationResult(is_valid=False, message="Cannot scout with wild cards in hand")
         return ValidationResult(is_valid=True)
 
 class LoanValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action:ParameterAction, game_state:BoardState, player:Player):
+    def validate(self, action, game_state:BoardState, player:Player):
         if player.income_points < 3:
             return ValidationResult(is_valid=False, message="Income cannot fall below -10")
         return ValidationResult(is_valid=True)
@@ -213,10 +211,13 @@ class LoanValidator(BaseValidator):
 class DevelopValidator(BaseValidator): 
     @validate_card_in_hand
     @validate_resources
-    def validate(self, action:DevelopSelection, game_state:BoardState, player:Player):
+    def validate(self, action:DevelopAction, game_state:BoardState, player:Player):
+        building = player.get_lowest_level_building(action.industry)
+        if not building.is_developable:
+            return ValidationResult(is_valid=False, message=f"Next building in industry {action.industry} is not developable")
         return ValidationResult(is_valid=True)
     
-    def _validate_base_action_cost(self, action:DevelopSelection, game_state:BoardState, player):
+    def _validate_base_action_cost(self, action:DevelopAction, game_state:BoardState, player):
         if game_state.gloucester_develop:
             target_cost = game_state.get_develop_cost(glousecter=True)
         else:
@@ -228,7 +229,7 @@ class DevelopValidator(BaseValidator):
 class NetworkValidator(BaseValidator):
     @validate_card_in_hand
     @validate_resources
-    def validate(self, action:NetworkSelection, game_state:BoardState, player:Player):
+    def validate(self, action:NetworkAction, game_state:BoardState, player:Player):
         link = game_state.links.get(action.link_id)
         if not link:
             return ValidationResult(is_valid=False, message=f"Link {action.link_id} does not exist")
@@ -257,7 +258,7 @@ class NetworkValidator(BaseValidator):
         return ValidationResult(is_valid=True)
                         
 
-    def _validate_base_action_cost(self, action:NetworkSelection, game_state:BoardState, player):
+    def _validate_base_action_cost(self, action:NetworkAction, game_state:BoardState, player):
         base_link_cost = game_state.get_link_cost()
         base_link_cost.money = 0 # money is deducted automatically within game logic and shouldn't be validated here
         if base_link_cost != action.get_resource_amounts():
@@ -273,7 +274,7 @@ class BuildValidator(BaseValidator):
     
     @validate_card_in_hand
     @validate_resources
-    def validate(self, action:BuildSelection, game_state, player):
+    def validate(self, action:BuildAction, game_state, player):
         card = player.hand[action.card_id]
         building = player.get_lowest_level_building(action.industry)
         slot = game_state.get_building_slot(action.slot_id)
@@ -334,7 +335,7 @@ class BuildValidator(BaseValidator):
 
         return ValidationResult(is_valid=True)  
 
-    def _validate_base_action_cost(self, action:BuildSelection, game_state, player:Player):
+    def _validate_base_action_cost(self, action:BuildAction, game_state, player:Player):
         building = player.get_lowest_level_building(action.industry)
         moneyless_cost = building.get_cost()
         moneyless_cost.money = 0 # Money is calculated within game logic and shouldn't be checked here or pass within action
@@ -348,7 +349,7 @@ class BuildValidator(BaseValidator):
 
 class SellValidator(BaseValidator):
     @validate_card_in_hand
-    def validate(self, action:SellSelection, game_state:BoardState, player:Player):
+    def validate(self, action:SellAction, game_state:BoardState, player:Player):
         slot = game_state.get_building_slot(action.slot_id)
         if not slot.building_placed:
             return ValidationResult(is_valid=False, message=f"Slot {action.slot_id} does not contain a building")
@@ -389,4 +390,18 @@ class SellValidator(BaseValidator):
         required_amounts = ResourceAmounts(beer=slot.building_placed.sell_cost)
         if offered_amounts != required_amounts:
             return ValidationResult(is_valid=False, message=f"Action requires {required_amounts}, offered are {offered_amounts}")
+        return ValidationResult(is_valid=True)
+
+class CommitValidator(BaseValidator):
+    def validate(self, action, game_state, player):
+        return ValidationResult(is_valid=True)
+    
+class ShortfallValidator(BaseValidator):
+    def validate(self, action, game_state, player):
+        if player.bank >= 0:
+            return ValidationResult(is_valid=False, message=f'Player {player.color} is not in shortfall')
+        if not action.slot_id:
+            for building in self.state.iter_placed_buildings():
+                if building.owner == player.color:
+                    return ValidationResult(is_valid=False, message=f'Player {player.color} has building in slot {building.slot_id}, sell it first')
         return ValidationResult(is_valid=True)

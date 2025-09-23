@@ -1,33 +1,27 @@
 from typing import Dict, List, get_args
-from ...schema import ActionContext, MetaActions, CommitAction, BuildSelection, DevelopSelection, NetworkSelection,ParameterAction,SellSelection,ScoutSelection,EndOfTurnAction,ResolveShortfallAction
+from ...schema import ActionContext, BoardState, CommitAction, BuildAction, DevelopAction, NetworkAction,SellAction,ScoutAction,ShortfallAction, LoanAction, PassAction
 
 
 class ActionsCatProvider():
-    ACTION_CONTEXT_MAP = {
-        ActionContext.MAIN: get_args(MetaActions),
-        ActionContext.AWAITING_COMMIT: (CommitAction,),
-        ActionContext.BUILD: (BuildSelection, CommitAction),
-        ActionContext.DEVELOP: (DevelopSelection, CommitAction),
-        ActionContext.NETWORK: (NetworkSelection, CommitAction),
-        ActionContext.PASS: (ParameterAction, CommitAction),
-        ActionContext.SCOUT: (ScoutSelection, CommitAction),
-        ActionContext.SELL: (SellSelection, CommitAction),
-        ActionContext.LOAN: (ParameterAction, CommitAction),
-        ActionContext.END_OF_TURN: (EndOfTurnAction, CommitAction),
-        ActionContext.SHORTFALL: (ResolveShortfallAction,),
-        ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection, CommitAction)
+    ACTION_CONTEXT_MAP:Dict[ActionContext, tuple] = {
+        ActionContext.MAIN: (BuildAction, SellAction, NetworkAction,ScoutAction,DevelopAction,LoanAction, PassAction),
+        ActionContext.DEVELOP: (DevelopAction, CommitAction),
+        ActionContext.NETWORK: (NetworkAction, CommitAction),
+        ActionContext.SELL: (SellAction, CommitAction),
+        ActionContext.SHORTFALL: (ShortfallAction,),
+        ActionContext.GLOUCESTER_DEVELOP: (DevelopAction,)
     }
 
     def __init__(self):
         pass
 
-    def get_expected_params(self, action_context) -> Dict[str, List[str]]:
-        classes = self.ACTION_CONTEXT_MAP[action_context]
+    def get_expected_params(self, state:BoardState) -> Dict[str, List[str]]:
+        classes = self.ACTION_CONTEXT_MAP[state.action_context]
         out = {}
         for cls in classes:
             fields = list(cls.model_fields.keys())
-            if self.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
-                if self.has_subaction() and 'card_id' in fields:
+            if state.action_context is not ActionContext.MAIN:
+                if state.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
             out[cls.__name__] = fields
         return out

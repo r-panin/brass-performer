@@ -4,8 +4,6 @@ import random
 from uuid import uuid4
 import logging
 import copy
-from .game_state_manager import GameStateManager
-from .action_space_generator import ActionSpaceGenerator
 from .game_initializer import GameInitializer
 from .action_processor import ActionProcessor
 from .services.event_bus import EventBus
@@ -17,18 +15,14 @@ from collections import defaultdict
 
 class Game:
     REPLAYS_PATH = Path(r"game\replays")
-    @property
-    def state(self) -> BoardState:
-        return self.state_manager.current_state
 
     @classmethod
     def from_partial_state(cls, partial_state:PlayerState):
         game = cls()
         game.event_bus = EventBus()
-        state = game._determine_cards(partial_state)
+        game.state = game._determine_cards(partial_state)
         
-        game.state_manager = GameStateManager(state, game.event_bus)
-        game.action_processor = ActionProcessor(game.state_manager, game.event_bus)
+        game.action_processor = ActionProcessor(game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
         return game
@@ -61,8 +55,8 @@ class Game:
 
     def start(self, player_count:int, player_colors:List[PlayerColor]):
         self.replay_service = ReplayService(self.event_bus)
-        self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors), self.event_bus)
-        self.action_processor = ActionProcessor(self.state_manager, self.event_bus)
+        self.state = self.initializer.create_initial_state(player_count, player_colors)
+        self.action_processor = ActionProcessor(self.state, event_bus=self.event_bus)
         self.status = GameStatus.ONGOING
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:

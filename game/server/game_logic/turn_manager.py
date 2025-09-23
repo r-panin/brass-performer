@@ -1,20 +1,18 @@
-from ...schema import BoardState, LinkType
+from ...schema import BoardState, LinkType, ActionContext
 import random
 from copy import deepcopy
 from deepdiff import DeepDiff
 from .services.event_bus import EventBus, InterturnEvent
 import logging
 from .game_initializer import GameInitializer
-from .game_state_manager import GameStateManager
 
 class TurnManager:
-    def __init__(self, event_bus:EventBus, state_manager:GameStateManager):
+    def __init__(self, starting_state:BoardState, event_bus:EventBus):
         self.concluded = False
         self.event_bus = event_bus
         self.first_round = True
         self.round_count = 1
-        self.state_manager = state_manager
-        self.previous_turn_order = state_manager.current_state.turn_order 
+        self.previous_turn_order = starting_state.turn_order 
 
     def prepare_next_turn(self, state:BoardState) -> BoardState:
         initial_state = deepcopy(state)
@@ -29,6 +27,7 @@ class TurnManager:
         self.event_bus.publish(InterturnEvent(
             diff=diff
         ))
+        state.subaction_count = 0
         logging.debug(f"Remaining card count: {[len(player.hand) for player in state.players.values()]}")
         logging.debug(f"Current action count = {state.actions_left}")
         return state
@@ -54,7 +53,7 @@ class TurnManager:
 
         if any(player.bank < 0 for player in state.players.values()):
             logging.info("Entering shortfall")
-            self.state_manager.enter_shortfall()
+            state.action_context = ActionContext.SHORTFALL
 
         self.first_round = False
         self.round_count += 1

@@ -3,9 +3,8 @@ from fastapi import APIRouter, WebSocket, Depends, WebSocketDisconnect
 
 from ..dependancies import get_connection_manager, get_game_manager
 from ..managers import ConnectionManager, GameManager
-from ...schema import PlayerColor, ActionType, Action, Request, GameStatus, ResolveShortfallAction, EndOfTurnAction, ParameterAction, BuildSelection, BuildStart, CommitAction, DevelopSelection, DevelopStart, LoanStart, NetworkSelection, NetworkStart, PassStart, ScoutSelection, ScoutStart, SellSelection, SellStart, ActionProcessResult
+from ...schema import PlayerColor, ActionType, Action, Request, GameStatus, ShortfallAction, BuildAction, CommitAction, DevelopAction, LoanAction, NetworkAction, PassAction, ScoutAction, SellAction, ActionProcessResult
 from pydantic import ValidationError
-import logging
 
 router = APIRouter()
 
@@ -72,43 +71,26 @@ def get_end_game_message(game) -> Dict:
     return {"final scores": {player.color: player.victory_points for player in game.state.players}}
 
 def parse_action(data: Dict[str, Any]) -> Action:
-    # Затем проверяем действия Start
+    # Затем проверяем действия Action
     action_type = data.get("action")
     if action_type == ActionType.LOAN:
-        return LoanStart(**data)
+        return LoanAction(**data)
     elif action_type == ActionType.PASS:
-        return PassStart(**data)
+        return PassAction(**data)
     elif action_type == ActionType.SELL:
-        return SellStart(**data)
+        return SellAction(**data)
     elif action_type == ActionType.BUILD:
-        return BuildStart(**data)
+        return BuildAction(**data)
     elif action_type == ActionType.SCOUT:
-        return ScoutStart(**data)
+        return ScoutAction(**data)
     elif action_type == ActionType.DEVELOP:
-        return DevelopStart(**data)
+        return DevelopAction(**data)
     elif action_type == ActionType.NETWORK:
-        return NetworkStart(**data)
-    elif action_type == "shortfall":
-        logging.debug(f"Parsed shortfall as {ResolveShortfallAction(**data)}")
-        return ResolveShortfallAction(**data)
-    
-    # Сначала проверяем наличие уникальных полей для каждого типа действия
-    if "card_id" in data and isinstance(data["card_id"], list) and len(data["card_id"]) == 3:
-        return ScoutSelection(**data) 
-    elif "link_id" in data:
-        return NetworkSelection(**data)
-    elif "slot_id" in data and "industry" in data:
-        return BuildSelection(**data)
-    elif "slot_id" in data:
-        return SellSelection(**data)
-    elif "industry" in data:
-        return DevelopSelection(**data)
-    elif "card_id" in data:
-        return ParameterAction(**data)
-    elif "commit" in data:
+        return NetworkAction(**data)
+    elif action_type == ActionType.SHORTFALL:
+        return ShortfallAction(**data)
+    elif action_type == ActionType.COMMIT:
         return CommitAction(**data)
-    elif "end_turn" in data:
-        return EndOfTurnAction(**data)
     
     elif 'request' in data:
         return Request(**data)
