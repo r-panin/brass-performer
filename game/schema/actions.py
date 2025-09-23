@@ -129,6 +129,7 @@ Action = Union[
 class RequestType(StrEnum):
     REQUEST_STATE = 'state'
     REQUEST_ACTIONS = 'actions'
+    GOD_MODE = 'god_mode'
 
 class Request(BaseModel):
     request: RequestType

@@ -1,4 +1,4 @@
-from ....schema import ActionContext, ParameterAction, Player, ValidationResult, ActionType, BoardState
+from ....schema import ResolveShortfallAction, ActionContext, ParameterAction, Player, ValidationResult, ActionType, BoardState
 from typing import Dict
 from .validators import ActionValidator, PassValidator, ScoutValidator, LoanValidator, DevelopValidator, NetworkValidator, BuildValidator, SellValidator
 from .event_bus import EventBus, ValidationEvent
@@ -29,3 +29,19 @@ class ActionValidationService():
             ))
         return result
     
+    def validate_action_context(self, action_context, action) -> ValidationResult:
+            allowed_actions = self.state_manager.ACTION_CONTEXT_MAP.get(action_context)
+            is_allowed = isinstance(action, allowed_actions) if allowed_actions else False
+            if not is_allowed:
+                return ValidationResult(is_valid=False,
+                                        message=f'Action is not appropriate for context {action_context}')
+            return ValidationResult(is_valid=True)
+
+    def validate_shortfall_action(self, action:ResolveShortfallAction, player:Player) -> ValidationResult:
+        if player.bank >= 0:
+            return ValidationResult(is_valid=False, message=f'Player {player.color} is not in shortfall')
+        if not action.slot_id:
+            for building in self.state.iter_placed_buildings():
+                if building.owner == player.color:
+                    return ValidationResult(is_valid=False, message=f'Player {player.color} has building in slot {building.slot_id}, sell it first')
+        return ValidationResult(is_valid=True)

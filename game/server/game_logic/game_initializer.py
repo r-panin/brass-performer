@@ -3,11 +3,12 @@ from pathlib import Path
 from typing import List, Dict
 import random
 import json
+import logging
 
 
 class GameInitializer():
 
-    RES_PATH = Path(r'G:\brass-performer\brass-performer\game\server\res')
+    RES_PATH = Path(r'C:\brass\brass-performer\game\server\res')
     BUILDING_ROSTER_PATH = Path(RES_PATH / 'building_table.json')
     CARD_LIST_PATH = Path(RES_PATH / 'card_list.json')
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
@@ -28,7 +29,9 @@ class GameInitializer():
         market = self._create_starting_market()
 
         turn_order = player_colors
+        
         random.shuffle(turn_order)
+        logging.debug(f"Shuffled turn order{turn_order}")
 
         actions_left = 1
 

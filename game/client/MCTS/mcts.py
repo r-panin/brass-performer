@@ -1,6 +1,8 @@
-from ...schema import PlayerState, Action, Request, RequestType 
+from ...schema import PlayerState, Action, Request, RequestType, BoardState
 from typing import List
 from ...server.game_logic.game import Game
+from ...server.game_logic.action_space_generator import ActionSpaceGenerator
+from ...server.game_logic.state_changer import StateChanger
 import random
 import math
 import logging
@@ -33,11 +35,14 @@ class MCTS:
         self.exploration = exploration
         self.max_depth = depth
         self.action_selector = RandomActionSelector()
+        self.action_space_generator = ActionSpaceGenerator()
+        self.state_changer = StateChanger(event_bus=None)
 
     def search(self, initial_state:PlayerState):
         root = Node(initial_state)
 
         for _ in range(self.simulations):
+            logging.info(f"Running simulation {_}")
             node = self._select(root)
 
             if not node.is_terminal():
@@ -90,31 +95,28 @@ class MCTS:
         
         return node
     
-    def _apply_action(self, state:PlayerState, action:Action):
-        game = Game.from_partial_state(state)
+    def _apply_action(self, state:BoardState, action:Action):
         logging.debug(f'Applying action {action}')
-        game.process_action(action, state.state.turn_order[0])
+        self.state_changer.apply_action(action,) # Здесь надо понять как совершать мета- и коммит- действия
         return game.process_action(Request(request=RequestType.REQUEST_STATE), state.state.turn_order[0])
         
-    def _get_legal_actions(self, state: PlayerState):
-        game = Game.from_partial_state(state)
-        for player in game.state.players:
-            if game.state_manager.is_player_to_move(player):
-                active_player = game.state.turn_order[0]
-                break
-        request_result = game.process_action(Request(request=RequestType.REQUEST_ACTIONS), active_player).result
-        logging.debug(request_result)
+    def _get_legal_actions(self, state: BoardState):
+        actions_dict = self.action_space_generator.get_action_space(state, state.turn_order[0])
         out = []
-        for cat, actions in request_result.items():
+        for actions in actions_dict.values():
             out.extend(actions)
         logging.debug(f'Legal actions: {out}')
+        if not out:
+            raise ValueError(f"No legal actions in state {state}")
         return out 
 
-    def _simulate(self, node:Node) -> float:
-        current_state = node.state.model_copy()
+    def _simulate(self, node:Node) -> dict:
+        game = Game.from_partial_state(node.state)
+        current_state = game.process_action(Request(request=RequestType.GOD_MODE))
         depth = 0
-        #while depth < self.max_depth:
+        # while depth < self.max_depth and not self._is_terminal_state(current_state):
         while not self._is_terminal_state(current_state):
+            logging.info(f"Reached depth {depth}")
             action = self._select_action(current_state)
             current_state = self._apply_action(current_state, action)
             depth += 1
@@ -126,19 +128,22 @@ class MCTS:
         return not game.state.deck and not any(player.hand for player in game.state.players.values())
 
     def _evaluate_state(self, state: PlayerState) -> dict:
-        players = sorted(
-            state.state.players.values(), 
-            key=lambda p: p.victory_points, 
-            reverse=True
-        )
-        
-        results = {}
-        for idx, player in enumerate(players):
-            # Нормализованная оценка: 1.0 за первое место, 0.0 за последнее
-            normalized_score = 1.0 - (idx / (len(players) - 1)) if len(players) > 1 else 1.0
-            results[player.color] = normalized_score
-        
-        return results
+        if self._is_terminal_state(state):
+            players = sorted(
+                state.state.players.values(), 
+                key=lambda p: p.victory_points, 
+                reverse=True
+            )
+            
+            results = {}
+            for idx, player in enumerate(players):
+                # Нормализованная оценка: 1.0 за первое место, 0.0 за последнее
+                normalized_score = 1.0 - (idx / (len(players) - 1)) if len(players) > 1 else 1.0
+                results[player.color] = normalized_score
+            
+            return results
+        else:
+            return {player: random.random() for player in state.state.players}
 
     def _backpropagate(self, node:Node, results:dict):
         while node is not None:

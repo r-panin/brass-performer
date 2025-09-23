@@ -24,8 +24,13 @@ class Game:
     @classmethod
     def from_partial_state(cls, partial_state:PlayerState):
         game = cls()
-        game.start(len(partial_state.state.players), [player for player in partial_state.state.players])
-        game._determine_cards(partial_state)
+        game.event_bus = EventBus()
+        state = game._determine_cards(partial_state)
+        
+        game.state_manager = GameStateManager(state, game.event_bus)
+        game.action_processor = ActionProcessor(game.state_manager, game.event_bus)
+        game.status = GameStatus.ONGOING
+        game.replay_service = None
         return game
     
     def _determine_cards(self, partial_state:PlayerState) -> BoardState:
@@ -41,7 +46,7 @@ class Game:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
         player_hands[partial_state.your_color] = partial_state.your_hand
-        self.state_manager = GameStateManager(BoardState.determine(partial_state.state, player_hands, available_deck), self.event_bus)
+        return BoardState.determine(partial_state.state, player_hands, available_deck)
             
 
     def __init__(self):
@@ -57,7 +62,6 @@ class Game:
     def start(self, player_count:int, player_colors:List[PlayerColor]):
         self.replay_service = ReplayService(self.event_bus)
         self.state_manager = GameStateManager(self.initializer.create_initial_state(player_count, player_colors), self.event_bus)
-        self.action_space_generator = ActionSpaceGenerator(self.state_manager)
         self.action_processor = ActionProcessor(self.state_manager, self.event_bus)
         self.status = GameStatus.ONGOING
     

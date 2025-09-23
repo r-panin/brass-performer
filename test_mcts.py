@@ -5,11 +5,11 @@ import logging
 import sys
 
 logging.basicConfig(
-    level=logging.DEBUG,  # Уровень логирования
+    level=logging.INFO,  # Уровень логирования
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
     handlers=[logging.StreamHandler(sys.stdout)]  # Вывод в stdout
 )
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.INFO)
 
 mcts = MCTS(simulations=100, depth=10000)
 

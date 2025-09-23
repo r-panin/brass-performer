@@ -1,6 +1,6 @@
 from .services.validation_service import ActionValidationService
 from .services.event_bus import EventBus, TurnCommitEvent
-from ...schema import Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
+from ...schema import BoardState, Action, PlayerColor, ActionProcessResult, Request, RequestType, RequestResult, PlayerState, ActionSpaceRequestResult, MetaAction, ParameterAction, CommitAction, ActionContext, ResourceAction, EndOfTurnAction, ResolveShortfallAction, Player, ValidationResult
 from .game_state_manager import GamePhase, GameStateManager
 from .turn_manager import TurnManager
 from .state_changer import StateChanger
@@ -14,21 +14,13 @@ class ActionProcessor():
         self.validation_service = ActionValidationService(event_bus)
         self.turn_manager = TurnManager(event_bus, state_manager)
         self.state_changer = StateChanger(state_manager, event_bus)
-        self.action_space_generator = ActionSpaceGenerator(state_manager)
+        self.action_space_generator = ActionSpaceGenerator()
         self.event_bus = event_bus
 
     @property
     def state(self):
         return self.state_manager.current_state
     
-    def validate_action_context(self, action_context, action) -> ValidationResult:
-            allowed_actions = self.state_manager.ACTION_CONTEXT_MAP.get(action_context)
-            is_allowed = isinstance(action, allowed_actions) if allowed_actions else False
-            if not is_allowed:
-                return ValidationResult(is_valid=False,
-                                        message=f'Action is not appropriate for context {action_context}')
-            return ValidationResult(is_valid=True)
-
     def process_incoming_message(self, message, color:PlayerColor):
         if isinstance(message, Request):
             return self._process_request(message, color)
@@ -45,11 +37,13 @@ class ActionProcessor():
                 your_hand=self.state_manager.current_state.players[color].hand,
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
-            actions = self.action_space_generator.get_action_space(color)
+            actions = self.action_space_generator.get_action_space(self.state, color)
             return ActionSpaceRequestResult(
                 success=True,
                 result=actions
             )
+        elif request.request is RequestType.GOD_MODE:
+            return self.state
 
     def _process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
         # Проверяем, может ли игрок делать ход
@@ -63,7 +57,7 @@ class ActionProcessor():
                 state=self.state_manager.get_provisional_state()
             )
 
-        context_validateion = self.validate_action_context(self.state_manager.action_context, action)
+        context_validateion = self.validation_service.validate_action_context(self.state_manager.action_context, action)
         if not context_validateion.is_valid:
             return ActionProcessResult(
                 processed=False,
@@ -158,7 +152,7 @@ class ActionProcessor():
             )
         
         # Применяем действие
-        self.state_changer.apply_action(action, player)
+        self.state_changer.apply_action(action, self.state, player)
         
         # Обновляем состояние
         try:
@@ -307,7 +301,7 @@ class ActionProcessor():
             )
         
         player = self.state.players[color]
-        validation = self._validate_shortfall_action(action, player)
+        validation = self.validation_service.validate_shortfall_action(action, player)
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
@@ -318,7 +312,7 @@ class ActionProcessor():
                 awaiting=self.state_manager.get_expected_params(color)
             )
 
-        self.state_changer.resolve_shortfall(action, player)
+        self.state_changer.resolve_shortfall(self.state, action, player)
         if not self._in_shortfall():
             self.state_manager.exit_shortfall()
         return ActionProcessResult(
@@ -329,15 +323,6 @@ class ActionProcessor():
             awaiting=self.state_manager.get_expected_params(color)
         )
      
-    def _validate_shortfall_action(self, action:ResolveShortfallAction, player:Player) -> ValidationResult:
-        if player.bank >= 0:
-            return ValidationResult(is_valid=False, message=f'Player {player.color} is not in shortfall')
-        if not action.slot_id:
-            for building in self.state.iter_placed_buildings():
-                if building.owner == player.color:
-                    return ValidationResult(is_valid=False, message=f'Player {player.color} has building in slot {building.slot_id}, sell it first')
-        return ValidationResult(is_valid=True)
-
     def _in_shortfall(self):
         if any(player.bank < 0 for player in self.state.players.values()):
             return True

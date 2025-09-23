@@ -6,6 +6,7 @@ from typing import List, Dict, get_args
 from .services.event_bus import EventBus, MetaActionEvent, CommitEvent, InitialStateEvent
 from deepdiff import DeepDiff
 import logging
+from .action_cat_provider import ActionsCatProvider
 
 
 class GamePhase(Enum):
@@ -29,20 +30,6 @@ class GameState:
 class GameStateManager:
     SINGLE_ACTION_CONTEXTS = (ActionContext.BUILD, ActionContext.SCOUT, ActionContext.LOAN, ActionContext.PASS)
     DOUBLE_ACTION_CONTEXTS = (ActionContext.DEVELOP, ActionContext.NETWORK)
-    ACTION_CONTEXT_MAP = {
-        ActionContext.MAIN: get_args(MetaActions),
-        ActionContext.AWAITING_COMMIT: (CommitAction,),
-        ActionContext.BUILD: (BuildSelection, CommitAction),
-        ActionContext.DEVELOP: (DevelopSelection, CommitAction),
-        ActionContext.NETWORK: (NetworkSelection, CommitAction),
-        ActionContext.PASS: (ParameterAction, CommitAction),
-        ActionContext.SCOUT: (ScoutSelection, CommitAction),
-        ActionContext.SELL: (SellSelection, CommitAction),
-        ActionContext.LOAN: (ParameterAction, CommitAction),
-        ActionContext.END_OF_TURN: (EndOfTurnAction, CommitAction),
-        ActionContext.SHORTFALL: (ResolveShortfallAction,),
-        ActionContext.GLOUCESTER_DEVELOP: (DevelopSelection, CommitAction)
-    }
     def __init__(self, initial_state:BoardState, event_bus:EventBus):
         self._state = GameState(
             _backup_state=deepcopy(initial_state),
@@ -54,6 +41,7 @@ class GameStateManager:
         self.event_bus.publish(InitialStateEvent(
             state=initial_state
         ))
+        self.action_provider = ActionsCatProvider()
     
     @property
     def current_state(self) -> BoardState:
@@ -166,7 +154,7 @@ class GameStateManager:
             self.subaction_count = 1
 
     def exit_gloucester_develop(self):
-        self.action_context = ActionContext.SELL
+        self._state.transaction_state.action_context = ActionContext.SELL
         self._state.transaction_state.gloucester_develop = False
     
     def _get_max_actions(self) -> int:
@@ -190,15 +178,7 @@ class GameStateManager:
     def get_expected_params(self, color:PlayerColor) -> Dict[str, List[str]]:
         if not self.is_player_to_move(color):
             return {}
-        classes = self.ACTION_CONTEXT_MAP[self.action_context]
-        out = {}
-        for cls in classes:
-            fields = list(cls.model_fields.keys())
-            if self.action_context not in (ActionContext.MAIN, ActionContext.AWAITING_COMMIT, ActionContext.END_OF_TURN):
-                if self.has_subaction() and 'card_id' in fields:
-                    fields.remove('card_id')
-            out[cls.__name__] = fields
-        return out
+        return self.action_provider.get_expected_params(self.current_state.action_context)
     
     def is_player_to_move(self, color:PlayerColor):
         if self.action_context is ActionContext.SHORTFALL:
