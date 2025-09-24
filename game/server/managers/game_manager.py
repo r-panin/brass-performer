@@ -3,7 +3,6 @@ from ..game_logic.game import Game
 from ...schema import PlayerInfo, GameStatus
 import logging
 from uuid import uuid4
-import random
 
 class GameManager:
     MAX_PLAYERS = 4

@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Dict
 import random
 import json
-import logging
 
 
 class GameInitializer():
@@ -31,7 +30,6 @@ class GameInitializer():
         turn_order = player_colors
         
         random.shuffle(turn_order)
-        logging.debug(f"Shuffled turn order{turn_order}")
 
         actions_left = 1
 
@@ -167,5 +165,4 @@ class GameInitializer():
         coal_count = 13
         iron_count = 8
         market = Market(coal_count=coal_count, iron_count=iron_count, coal_cost=0, iron_cost=0)
-        market.update_market_costs()
         return market

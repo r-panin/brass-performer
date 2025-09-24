@@ -1,5 +1,6 @@
 from typing import Dict, List, get_args
-from ...schema import ActionContext, BoardState, CommitAction, BuildAction, DevelopAction, NetworkAction,SellAction,ScoutAction,ShortfallAction, LoanAction, PassAction
+from ...schema import ActionContext, CommitAction, BuildAction, DevelopAction, NetworkAction,SellAction,ScoutAction,ShortfallAction, LoanAction, PassAction
+from ...server.game_logic.services.board_state_service import BoardStateService
 
 
 class ActionsCatProvider():
@@ -15,13 +16,13 @@ class ActionsCatProvider():
     def __init__(self):
         pass
 
-    def get_expected_params(self, state:BoardState) -> Dict[str, List[str]]:
-        classes = self.ACTION_CONTEXT_MAP[state.action_context]
+    def get_expected_params(self, state_service:BoardStateService) -> Dict[str, List[str]]:
+        classes = self.ACTION_CONTEXT_MAP[state_service.state.action_context]
         out = {}
         for cls in classes:
             fields = list(cls.model_fields.keys())
-            if state.action_context is not ActionContext.MAIN:
-                if state.has_subaction() and 'card_id' in fields:
+            if state_service.state.action_context is not ActionContext.MAIN:
+                if state_service.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
             out[cls.__name__] = fields
         return out

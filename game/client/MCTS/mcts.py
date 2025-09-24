@@ -1,15 +1,15 @@
-from ...schema import PlayerState, Action, Request, RequestType, BoardState, ActionContext
+from ...schema import PlayerState, Action
 from typing import List
 from ...server.game_logic.game import Game
 from ...server.game_logic.action_space_generator import ActionSpaceGenerator
 from ...server.game_logic.state_changer import StateChanger
+from ...server.game_logic.services.board_state_service import BoardStateService
 import random
 import math
-import logging
 
 
 class Node:
-    def __init__(self, state:BoardState, parent=None, action:Action=None, who_moved=None):
+    def __init__(self, state:BoardStateService, parent=None, action:Action=None, who_moved=None):
         self.state = state
         self.parent = parent
         self.action = action
@@ -27,13 +27,10 @@ class Node:
 
 class RandomActionSelector:
     def select_action(self, legal_actions:List[Action], state) -> Action:
-        try:
-            return random.choice(legal_actions)
-        except IndexError:
-            logging.critical(f'Failed to select an action')
+        return random.choice(legal_actions)
 
 class MCTS:
-    def __init__(self, simulations:int=100, exploration:float=1.41, depth:int=1000):
+    def __init__(self, simulations:int, exploration:float=1.41, depth:int=1000):
         self.simulations = simulations
         self.exploration = exploration
         self.max_depth = depth
@@ -42,11 +39,10 @@ class MCTS:
 
     def search(self, initial_state:PlayerState):
         for _ in range(self.simulations):
-            determined_state = Game.from_partial_state(initial_state).state
+            determined_state = Game.from_partial_state(initial_state).state_service
             self.state_changer = StateChanger(determined_state, event_bus=None)
             root = Node(determined_state)
 
-            logging.info(f"Running simulation {_}")
             node = self._select(root)
 
             if not node.is_terminal():
@@ -91,7 +87,7 @@ class MCTS:
         if node.untried_actions:
             action = random.choice(node.untried_actions)
             node.untried_actions.remove(action)
-            who_moved = node.state.turn_order[0]
+            who_moved = node.state.get_active_player().color
             new_state = self._apply_action(node.state, action)
             child_node = Node(new_state, parent=node, action=action, who_moved=who_moved)
             node.children.append(child_node)
@@ -99,13 +95,12 @@ class MCTS:
         
         return node
     
-    def _apply_action(self, state:BoardState, action:Action):
-        logging.debug(f'Applying action {action}')
+    def _apply_action(self, state:BoardStateService, action:Action):
         active_player = state.get_active_player()
         self.state_changer.apply_action(action, state, active_player) # Пошли нахуй мета и коммит действия!
         return state
         
-    def _get_legal_actions(self, state: BoardState):
+    def _get_legal_actions(self, state: BoardStateService):
         actions_list = self.action_space_generator.get_action_space(state, state.get_active_player().color)
         return actions_list
 
@@ -114,20 +109,19 @@ class MCTS:
         depth = 0
         # while depth < self.max_depth and not self._is_terminal_state(current_state):
         while not self._is_terminal_state(current_state):
-            logging.info(f"Reached depth {depth}")
             action = self._select_action(current_state)
             current_state = self._apply_action(current_state, action)
             depth += 1
 
         return self._evaluate_state(current_state)
     
-    def _is_terminal_state(self, state:BoardState):
+    def _is_terminal_state(self, state:BoardStateService):
         return state.is_terminal()
 
-    def _evaluate_state(self, state: BoardState) -> dict:
+    def _evaluate_state(self, state: BoardStateService) -> dict:
         if self._is_terminal_state(state):
             players = sorted(
-                state.players.values(), 
+                state.state.players.values(), 
                 key=lambda p: p.victory_points, 
                 reverse=True
             )

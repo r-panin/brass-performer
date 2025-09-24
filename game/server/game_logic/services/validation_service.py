@@ -3,6 +3,7 @@ from typing import Dict
 from .validators import ActionValidator, PassValidator, ScoutValidator, LoanValidator, DevelopValidator, NetworkValidator, BuildValidator, SellValidator, CommitValidator, ShortfallValidator
 from .event_bus import EventBus, ValidationEvent
 from ..action_cat_provider import ActionsCatProvider
+from .board_state_service import BoardStateService
 
 
 class ActionValidationService():
@@ -21,8 +22,8 @@ class ActionValidationService():
         self.event_bus = event_bus
         self.context_map = ActionsCatProvider.ACTION_CONTEXT_MAP
 
-    def validate_action(self, action:Action, board_state:BoardState, player: Player) -> ValidationResult:
-        context_validation = self._validate_action_context(board_state.action_context, action)
+    def validate_action(self, action:Action, board_state:BoardStateService, player: Player) -> ValidationResult:
+        context_validation = self._validate_action_context(board_state.state.action_context, action)
         if not context_validation.is_valid:
             return ValidationResult(is_valid=False, message=f"Context {board_state.action_context} does not permit action type {action.action}")
         validator = self.validators.get(action.action)

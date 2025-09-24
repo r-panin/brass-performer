@@ -2,12 +2,12 @@ from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionPr
 from typing import Dict, List 
 import random
 from uuid import uuid4
-import logging
 import copy
 from .game_initializer import GameInitializer
 from .action_processor import ActionProcessor
 from .services.event_bus import EventBus
 from .services.replay_service import ReplayService
+from .services.board_state_service import BoardStateService
 from pathlib import Path
 from collections import defaultdict
 
@@ -20,9 +20,9 @@ class Game:
     def from_partial_state(cls, partial_state:PlayerState):
         game = cls()
         game.event_bus = EventBus()
-        game.state = game._determine_cards(partial_state)
+        game.state_service = BoardStateService(game._determine_cards(partial_state))
         
-        game.action_processor = ActionProcessor(game.state, game.event_bus)
+        game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
         return game
@@ -51,24 +51,23 @@ class Game:
         self.status = GameStatus.CREATED
         self.available_colors = copy.deepcopy(list(PlayerColor))
         random.shuffle(self.available_colors)
-        logging.basicConfig(level=logging.INFO)
 
         self.event_bus = EventBus()
         self.initializer = GameInitializer()
 
     def start(self, player_count:int, player_colors:List[PlayerColor]):
         self.replay_service = ReplayService(self.event_bus)
-        self.state = self.initializer.create_initial_state(player_count, player_colors)
-        self.action_processor = ActionProcessor(self.state, event_bus=self.event_bus)
+        self.state_service = BoardStateService(self.initializer.create_initial_state(player_count, player_colors))
+        self.action_processor = ActionProcessor(self.state_service, event_bus=self.event_bus)
         self.status = GameStatus.ONGOING
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
         if state is None:
-            state = self.state
+            state = self.state_service.state
         return PlayerState(
             state=state.hide_state(),
             your_color=color,
-            your_hand={card.id: card for card in self.state.players[color].hand.values()},
+            your_hand={card.id: card for card in self.state_service.state.players[color].hand.values()},
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:
@@ -82,7 +81,7 @@ class Game:
         return process_result
 
     def concluded(self):
-        return len(self.state.deck) == 0 and all(not player.hand for player in self.state.players.values())
+        return len(self.state_service.state.deck) == 0 and all(not player.hand for player in self.state_service.state.players.values())
 
 if __name__ == '__main__':
     game = Game()

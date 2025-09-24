@@ -4,15 +4,15 @@ from ...schema import BoardState, Action, PlayerColor, ActionProcessResult, Requ
 from .state_changer import StateChanger
 from .action_space_generator import ActionSpaceGenerator
 from .action_cat_provider import ActionsCatProvider
-import logging
+from .services.board_state_service import BoardStateService
 
 
 class ActionProcessor():
 
-    def __init__(self, state:BoardState, event_bus:EventBus=None):
-        self.state = state
+    def __init__(self, state_service:BoardStateService, event_bus:EventBus=None):
+        self.state_service = state_service
         self.validation_service = ActionValidationService(event_bus)
-        self.state_changer = StateChanger(self.state, event_bus)
+        self.state_changer = StateChanger(state_service, event_bus)
         self.action_space_generator = ActionSpaceGenerator()
         self.event_bus = event_bus
         self.ac_provider = ActionsCatProvider()
@@ -28,50 +28,50 @@ class ActionProcessor():
     def _process_request(self, request:Request, color: PlayerColor) -> RequestResult:
         if request.request is RequestType.REQUEST_STATE:
            return PlayerState(
-                state=self.state.hide_state(),
+                state=self.state_service.state.hide_state(),
                 your_color=color,
-                your_hand=self.state.players[color].hand,
+                your_hand=self.state_service.state.players[color].hand,
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
-            actions = self.action_space_generator.get_action_space(self.state, color)
+            actions = self.action_space_generator.get_action_space(self.state_service, color)
             return ActionSpaceRequestResult(
                 success=True,
                 result=actions
             )
         elif request.request is RequestType.GOD_MODE:
-            return self.state
+            return self.state_service.state
 
     def _process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
         # Проверяем, может ли игрок делать ход
-        if not self.state.is_player_to_move(color):
+        if not self.state_service.is_player_to_move(color):
             return ActionProcessResult(
                 processed=False,
-                message=f"Attempted move by {color}, current turn is {self.state.turn_order[0]}",
+                message=f"Attempted move by {color}, current turn is {self.state_service.state.turn_order[0]}",
                 awaiting={},
-                your_hand=self.state.players[color].hand,
+                your_hand=self.state_service.state.players[color].hand,
                 your_color=color,
-                state=self.state.hide_state()
+                state=self.state_service.state.hide_state()
             )
 
-        player = self.state.players[color]
-        validation = self.validation_service.validate_action(action, self.state, player)
+        player = self.state_service.state.players[color]
+        validation = self.validation_service.validate_action(action, self.state_service, player)
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
                 message=validation.message,
-                awaiting=self.ac_provider.get_expected_params(self.state),
-                your_hand=self.state.players[color].hand,
+                awaiting=self.ac_provider.get_expected_params(self.state_service),
+                your_hand=self.state_service.state.players[color].hand,
                 your_color=color,
-                state=self.state.hide_state(),
+                state=self.state_service.state.hide_state(),
             )
         
         # Обрабатываем действие в зависимости от типа
-        self.state_changer.apply_action(action, self.state, player)
+        self.state_changer.apply_action(action, self.state_service, player)
 
         return ActionProcessResult(
             processed=True,
-            awaiting=self.ac_provider.get_expected_params(self.state),
+            awaiting=self.ac_provider.get_expected_params(self.state_service),
             your_color=color,
-            your_hand=self.state.players[color].hand,
-            state=self.state.hide_state()
+            your_hand=self.state_service.state.players[color].hand,
+            state=self.state_service.state.hide_state()
         )
