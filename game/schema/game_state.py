@@ -1,8 +1,6 @@
 from enum import StrEnum
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Dict, Callable, Union, Iterator, ClassVar, Set, Any
-from collections import deque
-import math
+from typing import List, Optional, Dict, ClassVar, Set, Any
 import json
 import hashlib
 from .common import IndustryType, ResourceType, ResourceAmounts
@@ -150,37 +148,6 @@ class Player(BaseModel):
         data["hand_size"] = len(self.hand)
         del data["hand"]
         return PlayerExposed(**data)
-
-    def recalculate_income(self, keep_points=True):
-        if keep_points:
-            if self.income_points <= 10:
-                self.income = self.income_points - 10
-            elif self.income_points <= 30:
-                self.income = (self.income_points - 10) // 2
-            elif self.income_points <= 60:
-                self.income = (10 + self.income_points - 30) // 3
-            else:
-                self.income = (20 + self.income_points - 60) // 4
-        else:
-            if self.income <= 0:
-                self.income_points = self.income + 10
-            elif self.income <= 10:
-                self.income_points = 2 * self.income + 10
-            elif self.income <= 20:
-                self.income_points = 3 * self.income
-            else:
-                self.income_points = 3 * self.income + (self.income % 10)
-
-    def get_lowest_level_building(self, industry:IndustryType) -> Building:
-            if not hasattr(self, "_lowest_building_cache"):
-                self.update_lowest_buildings()
-            return self._lowest_building_cache[industry]
-
-    def update_lowest_buildings(self):
-        self._lowest_building_cache:Dict[IndustryType, Building] = {}
-        for industry in IndustryType:
-            buildings = [b for b in self.available_buildings.values() if b.industry_type is industry]
-            self._lowest_building_cache[industry] = min(buildings, key=lambda x: x.level, default=None)
 
 class BoardStateExposed(BaseModel):
     cities: Dict[str, City]

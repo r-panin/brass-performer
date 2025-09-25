@@ -238,7 +238,7 @@ class ActionSpaceGenerator():
                 valid_cities = network  # только города в сети
             
             for industry in industries:
-                building = player.get_lowest_level_building(industry)
+                building = state_service.get_lowest_level_building(player.color, industry)
                 if not building:
                     continue
                     
@@ -455,7 +455,7 @@ class ActionSpaceGenerator():
         else:
             iron_sources = list()
         for industry in industries:
-            building = player.get_lowest_level_building(industry)
+            building = state_service.get_lowest_level_building(player.color, industry)
             if not building:
                 continue
             if not building.is_developable:
@@ -479,7 +479,6 @@ class ActionSpaceGenerator():
         ids = [card.id for card in cards]
         for combo in itertools.combinations(ids, 3):
             out.append(ScoutAction(card_id=list(combo)))
-        data_strings = sorted(action.model_dump_json() for action in out)
         return out
 
     def get_valid_loan_actions(self, player:Player) -> List[LoanAction]:

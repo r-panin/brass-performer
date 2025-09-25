@@ -38,7 +38,7 @@ class StateChanger:
                         building.flipped = True
                         owner = state_service.state.players[building.owner]
                         owner.income_points += building.income
-                        owner.recalculate_income()
+                        state_service.recalculate_income(owner)
 
                 elif resource.merchant_slot_id is not None:
                     merchant = state_service.get_merchant_slot(resource.merchant_slot_id)
@@ -62,7 +62,7 @@ class StateChanger:
         elif action.action is ActionType.LOAN:
             player.income -= 3
             player.bank += 30
-            player.recalculate_income(keep_points=False)
+            state_service.recalculate_income(player, keep_points=False)
 
         elif action.action is ActionType.SCOUT:
             for card_id in action.card_id:
@@ -75,10 +75,10 @@ class StateChanger:
             player.hand[ind_joker.id] = ind_joker
         
         elif action.action is ActionType.DEVELOP:
-            building = player.get_lowest_level_building(action.industry)
+            building = state_service.get_lowest_level_building(player.color, action.industry)
             player.available_buildings.pop(building.id)
             state_service.state.action_context = ActionContext.DEVELOP
-            player.update_lowest_buildings()
+            state_service.update_lowest_buildings(player.color)
 
         elif action.action is ActionType.NETWORK:
             state_service.state.links[action.link_id].owner = player.color
@@ -96,15 +96,15 @@ class StateChanger:
                     slot = state_service.get_merchant_slot(resource.merchant_slot_id)
                     self._award_merchant(state_service, slot.city, player)
                     slot.beer_available = False
-            owner.recalculate_income()
+            state_service.recalculate_income(player)
             state_service.state.action_context = ActionContext.SELL
 
         elif action.action is ActionType.BUILD:
-            building = player.get_lowest_level_building(action.industry)
+            building = state_service.get_lowest_level_building(player.color, action.industry)
             building.slot_id = action.slot_id
             state_service.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
             self._sell_to_market(state_service, building)
-            player.update_lowest_buildings()
+            state_service.update_lowest_buildings(player.color)
             if building.industry_type is IndustryType.COAL:
                 state_service.invalidate_coal_cache()
             state_service.invalidate_networks_cache()
@@ -176,7 +176,7 @@ class StateChanger:
     
     def _get_resource_amounts(self, state_service:BoardStateService, action:ResourceAction, player:Player) -> ResourceAmounts:
         if isinstance(action, BuildAction):
-            building = player.get_lowest_level_building(action.industry)
+            building = state_service.get_lowest_level_building(player.color, action.industry)
             return building.get_cost()
         elif isinstance(action, SellAction):
             building = state_service.get_building_slot(action.slot_id).building_placed

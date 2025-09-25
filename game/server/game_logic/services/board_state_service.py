@@ -3,13 +3,10 @@ from typing import Callable, Iterator, List, Optional, Dict, Set, Union
 from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext
 import random
 import math
+from .i_state_service import IBoardStateService
 
 
-class BoardStateService:
-    COAL_MAX_COST:int = 8
-    IRON_MAX_COST:int = 6
-    COAL_MAX_COUNT:int = 14
-    IRON_MAX_COUNT:int = 10
+class BoardStateService(IBoardStateService):
     
     def __init__(self, board_state: BoardState):
         self.state = board_state
@@ -22,6 +19,7 @@ class BoardStateService:
         self._coal_cities_cache = None
         self._merchant_cities_cache = None
         self._networks_cache = None
+        self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
 
     def invalidate_connectivity_cache(self):
         """Вызывается при любом изменении графа связей"""
@@ -506,3 +504,35 @@ class BoardStateService:
                 if building.flipped:
                     out += building.victory_points
         return out
+    
+    def recalculate_income(self, player:Player, keep_points=True):
+        if keep_points:
+            if player.income_points <= 10:
+                player.income = player.income_points - 10
+            elif player.income_points <= 30:
+                player.income = (player.income_points - 10) // 2
+            elif player.income_points <= 60:
+                player.income = (10 + player.income_points - 30) // 3
+            else:
+                player.income = (20 + player.income_points - 60) // 4
+        else:
+            if player.income <= 0:
+                player.income_points = player.income + 10
+            elif player.income <= 10:
+                player.income_points = 2 * player.income + 10
+            elif player.income <= 20:
+                player.income_points = 3 * player.income
+            else:
+                player.income_points = 3 * player.income + (player.income % 10)
+
+    def get_lowest_level_building(self, color:PlayerColor, industry:IndustryType) -> Building:
+            if not color in self._lowest_building_cache:
+                self.update_lowest_buildings(color)
+            return self._lowest_building_cache[color][industry]
+
+    def update_lowest_buildings(self, color:PlayerColor):
+        player = self.state.players[color]
+        self._lowest_building_cache[color] = {}
+        for industry in IndustryType:
+            buildings = [b for b in player.available_buildings.values() if b.industry_type is industry]
+            self._lowest_building_cache[color][industry] = min(buildings, key=lambda x: x.level, default=None)

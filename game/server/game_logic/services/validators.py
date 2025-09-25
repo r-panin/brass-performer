@@ -214,7 +214,7 @@ class DevelopValidator(BaseValidator):
     @validate_card_in_hand
     @validate_resources
     def validate(self, action:DevelopAction, game_state:BoardStateService, player:Player):
-        building = player.get_lowest_level_building(action.industry)
+        building = game_state.get_lowest_level_building(player.color, action.industry)
         if not building.is_developable:
             return ValidationResult(is_valid=False, message=f"Next building in industry {action.industry} is not developable")
         return ValidationResult(is_valid=True)
@@ -278,7 +278,7 @@ class BuildValidator(BaseValidator):
     @validate_resources
     def validate(self, action:BuildAction, game_state, player):
         card = player.hand[action.card_id]
-        building = player.get_lowest_level_building(action.industry)
+        building = game_state.get_lowest_level_building(player.color, action.industry)
         slot = game_state.get_building_slot(action.slot_id)
         if card.card_type == CardType.INDUSTRY:
             if building.industry_type not in card.value and card.value != 'wild':
@@ -338,7 +338,7 @@ class BuildValidator(BaseValidator):
         return ValidationResult(is_valid=True)  
 
     def _validate_base_action_cost(self, action:BuildAction, game_state, player:Player):
-        building = player.get_lowest_level_building(action.industry)
+        building = game_state.get_lowest_level_building(player.color, action.industry)
         moneyless_cost = building.get_cost()
         moneyless_cost.money = 0 # Money is calculated within game logic and shouldn't be checked here or pass within action
         if moneyless_cost != action.get_resource_amounts():
@@ -346,7 +346,7 @@ class BuildValidator(BaseValidator):
         return ValidationResult(is_valid=True)
 
     def _get_base_money_cost(self, action, game_state, player) -> int:
-        building = player.get_lowest_level_building(action.industry)
+        building = game_state.get_lowest_level_building(player.color, action.industry)
         return building.get_cost().money
 
 class SellValidator(BaseValidator):

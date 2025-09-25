@@ -7,7 +7,7 @@ import json
 
 class GameInitializer():
 
-    RES_PATH = Path(r'G:\brass-performer\brass-performer\game\server\res')
+    RES_PATH = Path(r'C:\brass\brass-performer\game\server\res')
     BUILDING_ROSTER_PATH = Path(RES_PATH / 'building_table.json')
     CARD_LIST_PATH = Path(RES_PATH / 'card_list.json')
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
