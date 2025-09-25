@@ -3,10 +3,14 @@ from typing import Callable, Iterator, List, Optional, Dict, Set, Union
 from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext
 import random
 import math
-from .i_state_service import IBoardStateService
 
 
-class BoardStateService(IBoardStateService):
+class BoardStateService:
+    
+    COAL_MAX_COST:int = 8
+    IRON_MAX_COST:int = 6
+    COAL_MAX_COUNT:int = 14
+    IRON_MAX_COUNT:int = 10
     
     def __init__(self, board_state: BoardState):
         self.state = board_state
