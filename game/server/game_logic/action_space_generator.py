@@ -1,4 +1,4 @@
-from ...schema import BoardState, PlayerColor, Action, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
+from ...schema import ActionContext, PlayerColor, Action, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
 from typing import Dict, List
 from collections import defaultdict
 import itertools
@@ -31,7 +31,7 @@ class ActionSpaceGenerator():
                 case "NetworkAction":
                     out.extend(self.get_valid_network_actions(state_service, player))
                 case "DevelopAction":
-                    out.extend(self.get_valid_develop_actions(state_service, player))
+                    out.extend(self.get_valid_develop_actions(state_service, player, gloucester=state_service.state.action_context is ActionContext.GLOUCESTER_DEVELOP))
                 case "ScoutAction":
                     out.extend(self.get_valid_scout_actions(player))
                 case "LoanAction":
@@ -382,53 +382,50 @@ class ActionSpaceGenerator():
         if base_cost.money > player.bank:
             return out
         
+        if state_service.state.era == LinkType.CANAL:
+            if state_service.subaction_count == 0:
+                return [NetworkAction(link_id=link.id, card_id=card, resources_used=[]) 
+                   for link in links for card in player.hand]
+            return [] 
+        
         for link in links:
-            if state_service.state.era == LinkType.CANAL:
-                if state_service.subaction_count == 0:
-                    for card in cards:
-                        out.append(NetworkAction(
-                            link_id=link.id,
-                            card_id=card,
-                            resources_used=[]
-                        ))
-                else:
-                    return []
-            else: # gulp
-                coal_buildings = state_service.get_player_coal_sources(link_id=link.id)
-                coal_sources = []
-                first_priority = None
-                for building, priority in coal_buildings:
-                    if first_priority is None:
-                        first_priority = priority
+            coal_buildings = state_service.get_player_coal_sources(link_id=link.id)
+            coal_sources = []
+            first_priority = None
+            for building, priority in coal_buildings:
+                if first_priority is None:
+                    first_priority = priority
 
-                    if priority == first_priority:  # Primary sources
-                        coal_sources.append(
-                            ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
-                        )
-                    else:
-                        break
-                
-                if not coal_sources:
-                    if any(state_service.market_access_exists(city_name=city) for city in link.cities):
-                        market_cost = state_service.calculate_coal_cost(base_cost.coal)
-                        coal_sources = [ResourceSource(resource_type=ResourceType.COAL)] # market coal
-                    else:
-                        continue
-                
-                    if market_cost + base_cost.money > player.bank:
-                        continue
-                
-                beer_buildings = state_service.get_player_beer_sources(color=player.color, link_id=link.id)
-                beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=b.slot_id) for b in beer_buildings]
-                if state_service.subaction_count > 0:
-                    for coal_source, beer_source in itertools.product(coal_sources, beer_sources):
+                if priority == first_priority:  # Primary sources
+                    coal_sources.append(
+                        ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
+                    )
+                else:
+                    break
+            
+            if not coal_sources:
+                if any(state_service.market_access_exists(city_name=city) for city in link.cities):
+                    market_cost = state_service.calculate_coal_cost(base_cost.coal)
+                    coal_sources = [ResourceSource(resource_type=ResourceType.COAL)] # market coal
+                else:
+                    continue
+            
+                if market_cost + base_cost.money > player.bank:
+                    continue
+            
+            beer_buildings = state_service.get_player_beer_sources(color=player.color, link_id=link.id)
+            beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=b.slot_id) for b in beer_buildings]
+            if state_service.subaction_count > 0:
+                for coal_source in coal_sources:
+                    for beer_source in beer_sources:
                         res = [coal_source, beer_source]
                         out.append(NetworkAction(
                             resources_used=res,
                             link_id=link.id
                         ))
-                else:
-                    for coal_source, card in itertools.product(coal_sources, cards):
+            else:
+                for coal_source in coal_sources:
+                    for card in cards:
                         out.append(NetworkAction(
                             resources_used=[coal_source],
                             link_id=link.id,
@@ -438,10 +435,6 @@ class ActionSpaceGenerator():
         return out
                         
     def get_valid_develop_actions(self, state_service:BoardStateService, player:Player, gloucester=False) -> List[DevelopAction]:
-        out = []
-        if state_service.subaction_count > 1:
-            return out 
-        industries = list(IndustryType)
         cards = player.hand
         iron_buildings = state_service.get_player_iron_sources()
         if not gloucester:
@@ -454,20 +447,21 @@ class ActionSpaceGenerator():
                 iron_sources = [ResourceSource(resource_type=ResourceType.IRON)]
         else:
             iron_sources = list()
-        for industry in industries:
+        
+        industries = []
+        for industry in IndustryType:
             building = state_service.get_lowest_level_building(player.color, industry)
-            if not building:
-                continue
-            if not building.is_developable:
-                continue
-            if iron_sources:
-                for source in iron_sources:
-                    if state_service.subaction_count > 0:
-                        out.append(DevelopAction(industry=industry, resources_used=[source]))
-                    else:
-                        for card in cards:
-                            out.append(DevelopAction(industry=industry, resources_used=[source], card_id=card))
-        return out
+            if building and building.is_developable:
+                industries.append(industry)
+
+        if state_service.subaction_count > 0:
+            if gloucester:
+                return[DevelopAction(industry=industry, resources_used=[]) for industry in industries]
+            return [DevelopAction(industry=industry, resources_used=[source])
+                for industry in industries for source in iron_sources]
+        else:
+            return [DevelopAction(industry=industry, resources_used=[source], card_id=card)
+                for industry in industries for source in iron_sources for card in cards]
 
     def get_valid_scout_actions(self, player:Player) -> List[ScoutAction]:
         cards = player.hand.values()
