@@ -31,7 +31,6 @@ class BoardStateService:
         self._connectivity_cache = None
         self._graph_cache = None
         self._coal_cities_cache = None
-        self._merchant_cities_cache = None
         self._networks_cache = None
 
     def invalidate_networks_cache(self):
