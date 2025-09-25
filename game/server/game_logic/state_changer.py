@@ -31,10 +31,12 @@ class StateChanger:
             for resource in action.resources_used:
                 if resource.building_slot_id is not None:
                     building = state_service.get_building_slot(resource.building_slot_id).building_placed
+                    if building.industry_type is IndustryType.COAL:
+                        state_service.invalidate_coal_cache()
+                    elif building.industry_type is IndustryType.IRON:
+                        state_service.invalidate_iron_cache()
                     building.resource_count -= 1
                     if building.resource_count == 0:
-                        if building.industry_type is IndustryType.COAL:
-                            state_service.invalidate_coal_cache()
                         building.flipped = True
                         owner = state_service.state.players[building.owner]
                         owner.income_points += building.income
@@ -107,6 +109,8 @@ class StateChanger:
             state_service.update_lowest_buildings(player.color)
             if building.industry_type is IndustryType.COAL:
                 state_service.invalidate_coal_cache()
+            elif building.industry_type is IndustryType.IRON:
+                state_service.invalidate_iron_cache()
             state_service.invalidate_networks_cache()
 
         elif action.action is ActionType.SHORTFALL:

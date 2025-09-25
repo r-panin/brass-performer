@@ -24,6 +24,7 @@ class BoardStateService:
         self._merchant_cities_cache = None
         self._networks_cache = None
         self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
+        self._iron_cache = None
 
     def invalidate_connectivity_cache(self):
         """Вызывается при любом изменении графа связей"""
@@ -222,11 +223,17 @@ class BoardStateService:
                     yield slot
     
     def get_player_iron_sources(self) -> List[Building]:
+        if self._iron_cache:
+            return self._iron_cache
         out = []
         for building in self.iter_placed_buildings():
             if building.industry_type == IndustryType.IRON and building.resource_count > 0:
                 out.append(building)
+        self._iron_cache = out
         return out
+
+    def invalidate_iron_cache(self):
+        self._iron_cache = None
 
     def get_player_coal_locations(self, city_name: Optional[str] = None, link_id: Optional[int] = None) -> Dict[str, int]:
         '''Returns dict: city name, priority'''
