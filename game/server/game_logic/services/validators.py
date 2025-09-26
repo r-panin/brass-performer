@@ -57,7 +57,7 @@ def validate_resources(func):
         market_coal_amount = len(market_coal)
         market_iron = [resource for resource in action.resources_used if resource.building_slot_id is None and resource.resource_type == ResourceType.IRON]
         market_iron_amount = len(market_iron)
-        resource_expense = game_state.calculate_coal_cost(market_coal_amount) + game_state.state.market.calculate_iron_cost(market_iron_amount)
+        resource_expense = game_state.calculate_coal_cost(market_coal_amount) + game_state.calculate_iron_cost(market_iron_amount)
         base_expense = self._get_base_money_cost(action, game_state, player)
         total_expense = base_expense + resource_expense
         if total_expense > player.bank:

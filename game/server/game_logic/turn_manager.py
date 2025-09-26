@@ -5,6 +5,7 @@ from deepdiff import DeepDiff
 from .services.event_bus import EventBus, InterturnEvent
 from .game_initializer import GameInitializer
 from ...server.game_logic.services.board_state_service import BoardStateService
+import logging
 
 
 class TurnManager:
@@ -27,7 +28,7 @@ class TurnManager:
         return state_service
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
-        rank = {color: idx for color, idx in enumerate(self.previous_turn_order)}
+        rank = {player_color: idx for idx, player_color in enumerate(self.previous_turn_order)}
         state_service.state.turn_order = sorted(state_service.state.players, key=lambda k: (state_service.state.players[k].money_spent, rank.get(k)))
         self.previous_turn_order = state_service.state.turn_order
 
@@ -50,6 +51,10 @@ class TurnManager:
 
         self.first_round = False
         self.round_count += 1
+        logging.debug(f"Round {self.round_count}")
+        logging.debug(f"Remaining deck size {len(state_service.state.deck)}")
+        for player in state_service.state.players.values():
+            logging.debug(f"Player {player.color} hand size is {len(player.hand)}")
         return state_service
     
     def _prepare_next_era(self, state_service:BoardStateService) -> BoardStateService:

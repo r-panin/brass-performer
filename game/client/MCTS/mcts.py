@@ -6,6 +6,8 @@ from ...server.game_logic.state_changer import StateChanger
 from ...server.game_logic.services.board_state_service import BoardStateService
 import random
 import math
+import logging
+from copy import deepcopy
 
 
 class Node:
@@ -27,7 +29,10 @@ class Node:
 
 class RandomActionSelector:
     def select_action(self, legal_actions:List[Action], state) -> Action:
-        return random.choice(legal_actions)
+        try:
+            return random.choice(legal_actions)
+        except IndexError:
+            print(f"COULDN'T FIND AN ACTION IN STATE {state.state.model_dump()}")
 
 class MCTS:
     def __init__(self, simulations:int, exploration:float=1.41, depth:int=1000):
@@ -37,9 +42,12 @@ class MCTS:
         self.action_selector = RandomActionSelector()
         self.action_space_generator = ActionSpaceGenerator()
 
-    def search(self, initial_state:PlayerState):
+    def search(self, state:PlayerState):
+        initial_state = deepcopy(state)
         for _ in range(self.simulations):
+            logging.debug(f"Running simulation #{_}")
             determined_state = Game.from_partial_state(initial_state).state_service
+            logging.debug(f"Determined state: {determined_state.state.model_dump()}")
             self.state_changer = StateChanger(determined_state, event_bus=None)
             root = Node(determined_state)
 

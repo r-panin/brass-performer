@@ -1,4 +1,4 @@
-from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType, LinkType
+from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType, LinkType, CardType
 from typing import Dict, List 
 import random
 from uuid import uuid4
@@ -10,6 +10,7 @@ from .services.replay_service import ReplayService
 from .services.board_state_service import BoardStateService
 from pathlib import Path
 from collections import defaultdict
+import logging
 
 
 
@@ -18,6 +19,7 @@ class Game:
 
     @classmethod
     def from_partial_state(cls, partial_state:PlayerState):
+        logging.debug(f'Received turn order {partial_state.state.turn_order}')
         game = cls()
         game.event_bus = EventBus()
         game.state_service = BoardStateService(game._determine_cards(partial_state))
@@ -25,16 +27,23 @@ class Game:
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
+        logging.debug(f'Returned turn order {partial_state.state.turn_order}')
         return game
     
     def _determine_cards(self, partial_state:PlayerState) -> BoardState:
         full_deck = self.initializer._build_initial_deck(len(partial_state.state.players))
-        known_card_ids = set(partial_state.state.discard) | set(partial_state.your_hand)
+        known_card_ids = set([card.id for card in partial_state.state.discard]) | set(partial_state.your_hand)
         available_deck = [card for card in full_deck if card.id not in known_card_ids]
-        deal_to = [player for player in partial_state.state.players 
+        deal_to = [player for player in partial_state.state.turn_order 
               if player != partial_state.your_color]
         player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
+        city_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.CITY)
+        industry_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.INDUSTRY)
         for player in deal_to:
+            if partial_state.state.players[player].has_city_wild:
+                player_hands[player][city_wild.id] = city_wild
+            if partial_state.state.players[player].has_industry_wild:
+                player_hands[player][industry_wild.id] = industry_wild
             cards_needed = 8 - len(player_hands.get(player, {}))
             for _ in range(min(cards_needed, len(available_deck))):
                 card = available_deck.pop()

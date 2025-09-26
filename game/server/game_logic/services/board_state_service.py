@@ -546,3 +546,9 @@ class BoardStateService:
         for industry in IndustryType:
             buildings = [b for b in player.available_buildings.values() if b.industry_type is industry]
             self._lowest_building_cache[color][industry] = min(buildings, key=lambda x: x.level, default=None)
+
+    def check_wilds(self, color:PlayerColor) -> bool:
+        player = self.state.players[color]
+        if any(card.value == 'wild' for card in player.hand.values()):
+            return True
+        return False

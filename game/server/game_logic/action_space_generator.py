@@ -1,9 +1,10 @@
-from ...schema import ActionContext, PlayerColor, Action, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
+from ...schema import ActionContext, PlayerColor, Action, Building, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
 from typing import Dict, List
 from collections import defaultdict
 import itertools
 from .action_cat_provider import ActionsCatProvider
 from .services.board_state_service import BoardStateService
+import logging
 
 
 class ActionSpaceGenerator():
@@ -52,10 +53,9 @@ class ActionSpaceGenerator():
         slots_by_city = {}
         for city in state_service.state.cities.values():
             for slot in city.slots.values():
-                if not slot.building_placed:
-                    if slot.city not in slots_by_city:
-                        slots_by_city[slot.city] = []
-                    slots_by_city[slot.city].append(slot)
+                # Объединяем условия для пустого слота и возможности перестройки
+                if not slot.building_placed or self._overbuildable(slot.building_placed, player, state_service):
+                    slots_by_city.setdefault(slot.city, []).append(slot)
 
         industries = list(IndustryType)
 
@@ -227,6 +227,7 @@ class ActionSpaceGenerator():
         for card in cards:
             # Определяем допустимые города для этой карты
             valid_cities = set()
+            valid_industries = set()
             if card.card_type == CardType.CITY:
                 if card.value == 'wild':
                     valid_cities = set(slots_by_city.keys())
@@ -234,8 +235,16 @@ class ActionSpaceGenerator():
                     valid_cities = {card.value} if card.value in slots_by_city else set()
                 # Исключаем пивоварни для CITY карт
                 valid_cities = {city for city in valid_cities if "brewery" not in city}
+                valid_industries = {IndustryType}
             else:  # INDUSTRY карта
                 valid_cities = network  # только города в сети
+                if card.value == 'box-cotton':
+                    valid_industries.add(IndustryType.BOX)
+                    valid_industries.add(IndustryType.COTTON)
+                elif card.value == 'wild':
+                    valid_industries = set(IndustryType)
+                else:
+                    valid_industries.add(IndustryType(card.value)) 
             
             for industry in industries:
                 building = state_service.get_lowest_level_building(player.color, industry)
@@ -311,6 +320,31 @@ class ActionSpaceGenerator():
         
         return out 
     
+    def _overbuildable(self, to_overbuild: Building, player: Player, state_service: BoardStateService) -> bool:
+        # Проверяем уровень здания
+        if to_overbuild is None:
+            return True
+        overbuild_with = state_service.get_lowest_level_building(player.color, to_overbuild.industry_type)
+        if overbuild_with is None:
+            return False
+        if overbuild_with.level <= to_overbuild.level:
+            return False
+
+        # Если игрок не владелец - проверяем специальные условия
+        if player.color != to_overbuild.owner:
+            if to_overbuild.industry_type not in (IndustryType.COAL, IndustryType.IRON):
+                return False
+            
+            # Для угля и железа проверяем доступность ресурсов
+            resource_checks = {
+                IndustryType.COAL: state_service.state.market.coal_count,
+                IndustryType.IRON: state_service.state.market.iron_count
+            }
+            if resource_checks.get(to_overbuild.industry_type, 0) > 0:
+                return False
+
+        return True
+
     def get_valid_sell_actions(self, state_service:BoardStateService, player:Player) -> List[SellAction]:
         out = []
         cards = player.hand
@@ -484,6 +518,7 @@ class ActionSpaceGenerator():
         return [PassAction(card_id=card) for card in player.hand]
 
     def get_valid_commit_actions(self, state_service:BoardStateService):
+        logging.debug(f"Current subaction count is {state_service.subaction_count}")
         if state_service.subaction_count > 0:
             return [CommitAction()]
         else:

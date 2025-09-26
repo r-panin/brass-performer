@@ -132,6 +132,8 @@ class PlayerExposed(BaseModel):
     income_points: int
     victory_points: int
     money_spent: int = 0
+    has_city_wild: bool = False
+    has_industry_wild: bool = False
 
 class Player(BaseModel):
     hand: Dict[int, Card]
@@ -142,6 +144,8 @@ class Player(BaseModel):
     income_points: int = Field(ge=-10)
     victory_points: int
     money_spent: int = 0
+    has_city_wild: bool = False
+    has_industry_wild: bool = False
 
     def hide_hand(self) -> PlayerExposed:
         data = self.model_dump()

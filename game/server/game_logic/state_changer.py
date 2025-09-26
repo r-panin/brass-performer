@@ -5,6 +5,7 @@ from deepdiff import DeepDiff
 from copy import deepcopy
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
+import logging
 
 class StateChanger:
 
@@ -24,6 +25,11 @@ class StateChanger:
             card = player.hand.pop(action.card_id)
             if card.value != 'wild':
                 state_service.state.discard.append(card)
+            else:
+                if card.card_type is CardType.CITY:
+                    player.has_city_wild = False
+                elif card.card_type is CardType.INDUSTRY:
+                    player.has_industry_wild = False
 
         # Обрабатываем выбор ресурсов
         if isinstance(action, ResourceAction):
@@ -75,6 +81,8 @@ class StateChanger:
 
             player.hand[city_joker.id] = city_joker
             player.hand[ind_joker.id] = ind_joker
+            player.has_city_wild = True
+            player.has_city_wild = True
         
         elif action.action is ActionType.DEVELOP:
             building = state_service.get_lowest_level_building(player.color, action.industry)
@@ -143,7 +151,11 @@ class StateChanger:
                 self._commit_action(state_service)
 
         if state_service.state.actions_left == 0:
-            state = self.turn_manager.prepare_next_turn(state_service)
+            state_service = self.turn_manager.prepare_next_turn(state_service)
+
+        logging.debug(f"Player {player.color} executed action {action}")
+        
+        return state_service
         
 
     def _commit_action(self, state_service:BoardStateService):

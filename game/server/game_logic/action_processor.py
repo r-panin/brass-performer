@@ -66,7 +66,7 @@ class ActionProcessor():
             )
         
         # Обрабатываем действие в зависимости от типа
-        self.state_changer.apply_action(action, self.state_service, player)
+        self.state_service = self.state_changer.apply_action(action, self.state_service, player)
 
         return ActionProcessResult(
             processed=True,
