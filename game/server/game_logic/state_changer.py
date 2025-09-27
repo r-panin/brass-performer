@@ -1,8 +1,6 @@
 from ...schema import City, Action, Player, ActionType, ActionContext, CardType, ResourceAction, ResourceAmounts, BuildAction, SellAction, NetworkAction, DevelopAction, IndustryType, Building, ResourceType
 from collections import defaultdict
-from .services.event_bus import EventBus, StateChangeEvent
-from deepdiff import DeepDiff
-from copy import deepcopy
+from .services.event_bus import EventBus
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
 import logging
@@ -15,16 +13,17 @@ class StateChanger:
 
     def __init__(self, starting_state:BoardStateService, event_bus:EventBus=None):
         self.event_bus = event_bus
-        self.turn_manager = TurnManager(starting_state.state, event_bus)
+        self.turn_manager = TurnManager(starting_state.get_board_state(), event_bus)
 
     def apply_action(self, action:Action, state_service:BoardStateService, player:Player):
-        # Готовимся слать дифф
-        
         # Убираем карту если есть
         if action.card_id is not None and isinstance(action.card_id, int):
-            card = player.hand.pop(action.card_id)
+            try:
+                card = player.hand.pop(action.card_id)
+            except KeyError as k:
+                print(f"ATTEMPTED TO ACCESS CARD {k}, ACTIVE PLAYER HAND HAS: {state_service.get_active_player().hand}")
             if card.value != 'wild':
-                state_service.state.discard.append(card)
+                state_service.append_discard(card)
             else:
                 if card.card_type is CardType.CITY:
                     player.has_city_wild = False
@@ -44,7 +43,7 @@ class StateChanger:
                         elif building.industry_type is IndustryType.IRON:
                             state_service.invalidate_iron_cache()
                         building.flipped = True
-                        owner = state_service.state.players[building.owner]
+                        owner = state_service.get_player(building.owner)
                         owner.income_points += building.income
                         state_service.recalculate_income(owner)
 
@@ -74,32 +73,32 @@ class StateChanger:
 
         elif action.action is ActionType.SCOUT:
             for card_id in action.card_id:
-                state_service.state.discard.append(player.hand[card_id])
+                state_service.append_discard(player.hand[card_id])
                 player.hand.pop(card_id)
-            city_joker = next(j for j in state_service.state.wilds if j.card_type == CardType.CITY)
-            ind_joker = next(j for j in state_service.state.wilds if j.card_type == CardType.INDUSTRY)
+            city_joker = next(j for j in state_service.get_wild_cards() if j.card_type == CardType.CITY)
+            ind_joker = next(j for j in state_service.get_wild_cards() if j.card_type == CardType.INDUSTRY)
 
             player.hand[city_joker.id] = city_joker
             player.hand[ind_joker.id] = ind_joker
             player.has_city_wild = True
-            player.has_city_wild = True
+            player.has_industry_wild = True
         
         elif action.action is ActionType.DEVELOP:
             building = state_service.get_lowest_level_building(player.color, action.industry)
             player.available_buildings.pop(building.id)
-            state_service.state.action_context = ActionContext.DEVELOP
+            state_service.set_action_context(ActionContext.DEVELOP)
             state_service.update_lowest_buildings(player.color)
 
         elif action.action is ActionType.NETWORK:
-            state_service.state.links[action.link_id].owner = player.color
-            state_service.state.action_context = ActionContext.NETWORK
+            state_service.set_link_owner(action.link_id, player.color)
+            state_service.set_action_context(ActionContext.NETWORK)
             state_service.invalidate_connectivity_cache()
             state_service.invalidate_networks_cache()
 
         elif action.action is ActionType.SELL:
             building = state_service.get_building_slot(action.slot_id).building_placed
             building.flipped = True
-            owner = state_service.state.players[building.owner]
+            owner = state_service.get_player(building.owner)
             owner.income_points += building.income
             for resource in action.resources_used:
                 if resource.merchant_slot_id is not None:
@@ -107,7 +106,7 @@ class StateChanger:
                     self._award_merchant(state_service, slot.city, player)
                     slot.beer_available = False
             state_service.recalculate_income(player)
-            state_service.state.action_context = ActionContext.SELL
+            state_service.set_action_context(ActionContext.SELL)
 
         elif action.action is ActionType.BUILD:
             building = state_service.get_lowest_level_building(player.color, action.industry)
@@ -124,16 +123,16 @@ class StateChanger:
         elif action.action is ActionType.SHORTFALL:
             if action.slot_id:
                 slot = state_service.get_building_slot(action.slot_id)
-                rebate = slot.building_placed.cost['money'] // 2
+                rebate = slot.building_placed.get_cost().money // 2
                 player.bank += rebate
                 slot.building_placed = None
             else:
                 player.victory_points += player.bank
                 player.bank = 0
             if state_service.in_shortfall():
-                state_service.state.action_context = ActionContext.SHORTFALL
+                state_service.set_action_context(ActionContext.SHORTFALL)
             else:
-                state_service.state.action_context = ActionContext.MAIN
+                state_service.set_action_context(ActionContext.MAIN)
             
         if not action.action is ActionType.SHORTFALL:
             state_service.subaction_count += 1
@@ -145,12 +144,12 @@ class StateChanger:
         if action.action in self.SINGULAR_ACTION_TYPES:
             self._commit_action(state_service)
         elif action.action in self.DOUBLE_ACTION_TYPES and state_service.subaction_count > 1:
-            if state_service.state.action_context is ActionContext.GLOUCESTER_DEVELOP:
-                state_service.state.action_context = ActionContext.SELL
+            if state_service.get_action_context() is ActionContext.GLOUCESTER_DEVELOP:
+                state_service.set_action_context(ActionContext.SELL)
             else:
                 self._commit_action(state_service)
 
-        if state_service.state.actions_left == 0:
+        if state_service.get_actions_left() == 0:
             state_service = self.turn_manager.prepare_next_turn(state_service)
 
         logging.debug(f"Player {player.color} executed action {action}")
@@ -159,8 +158,8 @@ class StateChanger:
         
 
     def _commit_action(self, state_service:BoardStateService):
-        state_service.state.action_context = ActionContext.MAIN
-        state_service.state.actions_left -= 1
+        state_service.set_action_context(ActionContext.MAIN)
+        state_service.set_actions_left(state_service.get_actions_left() - 1)
         state_service.subaction_count = 0
 
     def _sell_to_market(self, state_service:BoardStateService, building:Building) -> None:
@@ -173,7 +172,7 @@ class StateChanger:
         if sold_amount <= 0 :
             return
         profit = state_service.sell_resource(ResourceType(building.industry_type), sold_amount)
-        state_service.state.players[building.owner].bank += profit
+        state_service.get_player(building.owner).bank += profit
         building.resource_count -= sold_amount
 
     def _award_merchant(self, state_service:BoardStateService, city_name:str, player:Player) -> None:
@@ -187,7 +186,7 @@ class StateChanger:
             case "Oxford":
                 player.income_points += 2
             case "Gloucester": # fug
-                state_service.state.action_context = ActionContext.GLOUCESTER_DEVELOP
+                state_service.set_action_context(ActionContext.GLOUCESTER_DEVELOP)
 
     
     def _get_resource_amounts(self, state_service:BoardStateService, action:ResourceAction, player:Player) -> ResourceAmounts:

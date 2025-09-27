@@ -1,4 +1,5 @@
 from ...schema import PlayerColor, BoardState, LinkType, Building, Player, Card, CardType, City, MerchantSlot, MerchantType, BuildingSlot, IndustryType, Link, Market, ActionContext
+from ...schema import ResourceAmounts, ResourceType
 from pathlib import Path
 from typing import List, Dict
 import random
@@ -7,7 +8,8 @@ import json
 
 class GameInitializer():
 
-    RES_PATH = Path(r'G:\brass-performer\brass-performer\game\server\res')
+    # Use project-relative paths instead of hardcoded absolute paths
+    RES_PATH = Path(__file__).resolve().parent.parent / 'res'
     BUILDING_ROSTER_PATH = Path(RES_PATH / 'building_table.json')
     CARD_LIST_PATH = Path(RES_PATH / 'card_list.json')
     CITIES_LIST_PATH = Path(RES_PATH / 'cities_list.json')
@@ -50,14 +52,21 @@ class GameInitializer():
         with open(self.BUILDING_ROSTER_PATH) as openfile:
             building_json:List[dict] = json.load(openfile)
         for building in building_json:
-            building = Building(
+            cost_json = building['cost']
+            cost = ResourceAmounts(
+                iron=cost_json.get('iron', cost_json.get(ResourceType.IRON, 0)),
+                coal=cost_json.get('coal', cost_json.get(ResourceType.COAL, 0)),
+                beer=cost_json.get('beer', cost_json.get(ResourceType.BEER, 0)),
+                money=cost_json.get('money', 0)
+            )
+            b = Building(
                 id=building['id'],
                 industry_type=building['industry'],
                 level=building['level'],
                 city=str(),
                 owner=player_color,
                 flipped=False,
-                cost=building['cost'],
+                cost=cost,
                 resource_count=building.get('resource_count', 0),
                 victory_points=building['vp'],
                 sell_cost=building.get('sell_cost'),
@@ -66,7 +75,7 @@ class GameInitializer():
                 era_exclusion=building.get('era_exclusion'),
                 income=building['income']
             )
-            out[building.id] = building
+            out[b.id] = b
         return out
 
     def _create_player(self, color:PlayerColor) -> Player:

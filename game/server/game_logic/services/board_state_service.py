@@ -1,6 +1,6 @@
 from collections import deque
 from typing import Callable, Iterator, List, Optional, Dict, Set, Union
-from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext
+from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext, Card, Link
 import random
 import math
 
@@ -26,6 +26,83 @@ class BoardStateService:
         self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
         self._iron_cache = None
 
+    # --- Encapsulated BoardState accessors/mutators (public API) ---
+    def get_board_state(self) -> BoardState:
+        return self.state
+
+    def get_exposed_state(self):
+        return self.state.hide_state()
+
+    def get_players(self) -> Dict[PlayerColor, Player]:
+        return self.state.players
+
+    def get_player(self, color: PlayerColor) -> Player:
+        return self.state.players[color]
+
+    def get_player_hand_dict(self, color: PlayerColor) -> Dict[int, Card]:
+        return self.state.players[color].hand
+
+    def get_turn_order(self) -> List[PlayerColor]:
+        return self.state.turn_order
+    
+    def set_turn_order(self, new_order: List[PlayerColor]) -> None:
+        self.state.turn_order = new_order
+
+    def advance_turn_order(self) -> PlayerColor:
+        """Remove and return the active player from the front of turn order."""
+        return self.state.turn_order.pop(0)
+
+    def get_actions_left(self) -> int:
+        return self.state.actions_left
+
+    def set_actions_left(self, value: int) -> None:
+        self.state.actions_left = value
+
+    def get_action_context(self) -> ActionContext:
+        return self.state.action_context
+
+    def set_action_context(self, ctx: ActionContext) -> None:
+        self.state.action_context = ctx
+
+    def get_deck(self) -> List[Card]:
+        return self.state.deck
+
+    def get_deck_size(self) -> int:
+        return len(self.state.deck)
+
+    def append_discard(self, card: 'Card') -> None:
+        self.state.discard.append(card)
+
+    def get_wild_cards(self) -> List['Card']:
+        return self.state.wilds
+
+    def get_cities(self) -> Dict[str, City]:
+        return self.state.cities
+
+    def get_city(self, name: str) -> City:
+        return self.state.cities[name]
+
+    def get_links(self) -> Dict[int, Link]:
+        return self.state.links
+
+    def iter_links(self):
+        return self.state.links.values()
+
+    def get_link(self, link_id: int) -> Link:
+        return self.state.links[link_id]
+
+    def set_link_owner(self, link_id: int, owner: PlayerColor) -> None:
+        self.state.links[link_id].owner = owner
+
+    def get_market_coal_count(self) -> int:
+        return self.state.market.coal_count
+
+    def get_market_iron_count(self) -> int:
+        return self.state.market.iron_count
+
+    def get_era(self) -> LinkType:
+        return self.state.era
+
     def invalidate_connectivity_cache(self):
         """Вызывается при любом изменении графа связей"""
         self._connectivity_cache = None
@@ -44,7 +121,7 @@ class BoardStateService:
         self._coal_cities_cache = set()
         self._merchant_cities_cache = set()
         
-        for city_name, city in self.state.cities.items():
+        for city_name, city in self.get_cities().items():
             # Кэш для угольных городов
             if any(slot.building_placed is not None and
                   slot.building_placed.industry_type == IndustryType.COAL and
@@ -62,10 +139,10 @@ class BoardStateService:
             return self._graph_cache
 
         graph = {}
-        for link in self.state.links.values():
+        for link in self.iter_links():
             if link.owner is None:
                 continue
-            cities_in_link = [city for city in link.cities if city in self.state.cities]
+            cities_in_link = [city for city in link.cities if city in self.get_cities()]
             
             for i, city1 in enumerate(cities_in_link):
                 if city1 not in graph:
@@ -133,15 +210,15 @@ class BoardStateService:
 
         # Обработка старта через связь
         if start_link_id is not None:
-            if start_link_id not in self.state.links:
+            if start_link_id not in self.get_links():
                 return {} if find_all else False
-            link = self.state.links[start_link_id]
+            link = self.get_link(start_link_id)
             start_cities = link.cities
-            valid_start_cities = [city for city in start_cities if city in self.state.cities]
+            valid_start_cities = [city for city in start_cities if city in self.get_cities()]
             if not valid_start_cities:
                 return {} if find_all else False
         else:
-            if start not in self.state.cities:
+            if start not in self.get_cities():
                 return {} if find_all else False
             valid_start_cities = [start]
 
@@ -204,19 +281,19 @@ class BoardStateService:
         return found_cities
     
     def iter_placed_buildings(self) -> Iterator[Building]:
-        for city in self.state.cities.values():
+        for city in self.get_cities().values():
             for slot in city.slots.values():
                 if slot.building_placed:
                     yield slot.building_placed
 
     def iter_merchant_slots(self) -> Iterator[MerchantSlot]:
-        for city in self.state.cities.values():
+        for city in self.get_cities().values():
             if city.merchant_slots:
                 for slot in city.merchant_slots.values():
                     yield slot
     
     def iter_building_slots(self) -> Iterator[BuildingSlot]:
-        for city in self.state.cities.values():
+        for city in self.get_cities().values():
             if city.slots:
                 for slot in city.slots.values():
                     yield slot
@@ -255,7 +332,7 @@ class BoardStateService:
         out = []
         coal_cities = self.get_player_coal_locations(city_name, link_id)
         for city, priority in coal_cities.items():
-            for slot in self.state.cities[city].slots.values():
+            for slot in self.get_city(city).slots.values():
                 if slot.building_placed is not None:
                     building = slot.building_placed
                     if building.industry_type == IndustryType.COAL and building.resource_count > 0:
@@ -275,7 +352,7 @@ class BoardStateService:
                     if city_name:
                         connected = self.are_connected(city_name, city)
                     elif link_id:
-                        link = self.state.links[link_id]
+                        link = self.get_link(link_id)
                         connected = any(self.are_connected(c, city) for c in link.cities)
                     else:
                         raise ValueError('Beer search requires either a city name or a link id')
@@ -298,19 +375,19 @@ class BoardStateService:
         )
 
     def get_building_slot(self, building_slot_id) -> BuildingSlot:
-        for city in self.state.cities.values():
+        for city in self.get_cities().values():
             if building_slot_id in city.slots:
                 return city.slots[building_slot_id]
     
     def get_merchant_slot(self, merchant_slot_id:int) -> MerchantSlot:
-            for city in self.state.cities.values():
+            for city in self.get_cities().values():
                 if city.merchant_slots is not None:
                     if merchant_slot_id in city.merchant_slots:
                         return city.merchant_slots[merchant_slot_id]
 
     def get_resource_amount_in_city(self, city_name:str, resource_type:ResourceType) -> int:
         out = 0
-        for building_slot in self.state.cities[city_name].slots.values():
+        for building_slot in self.get_city(city_name).slots.values():
             if building_slot.building_placed:
                 if building_slot.building_placed.industry_type == resource_type:
                     out += building_slot.building_placed.resource_count
@@ -328,33 +405,33 @@ class BoardStateService:
     
     def _build_player_network(self, player_color: PlayerColor) -> Set[str]:
         slot_cities = {
-            city.name for city in self.state.cities.values()
+            city.name for city in self.get_cities().values()
             if any(slot.building_placed and slot.building_placed.owner == player_color
                 for slot in city.slots.values())
         }
         
         link_cities = {
-            city for link in self.state.links.values()
+            city for link in self.iter_links()
             if link.owner == player_color
             for city in link.cities
         }
 
         if not slot_cities and not link_cities:
-            return set(self.state.cities)
+            return set(self.get_cities())
         
         return slot_cities | link_cities 
 
     def get_link_cost(self, subaction_count=0):
-        if self.state.era == LinkType.CANAL:
+        if self.get_era() == LinkType.CANAL:
             return ResourceAmounts(money=3)
-        elif self.state.era == LinkType.RAIL:
+        elif self.get_era() == LinkType.RAIL:
             if subaction_count == 0:
                 return ResourceAmounts(money=5, coal=1)
             else:
                 return ResourceAmounts(money=10, coal=1, beer=1)
     
     def can_sell(self, city_name:str, industry:IndustryType) -> bool:
-        eligible_merchants = [city for city in self.state.cities.values() if city.is_merchant and (any(slot.merchant_type in [MerchantType.ANY, MerchantType(industry)] for slot in city.merchant_slots.values()))]
+        eligible_merchants = [city for city in self.get_cities().values() if city.is_merchant and (any(slot.merchant_type in [MerchantType.ANY, MerchantType(industry)] for slot in city.merchant_slots.values()))]
         for merchant in eligible_merchants:
             if self.are_connected(city_name, merchant.name):
                 return True
@@ -365,37 +442,37 @@ class BoardStateService:
         return ResourceAmounts(iron=1)
 
     def is_player_to_move(self, color:PlayerColor) -> bool:
-        if not self.state.action_context is ActionContext.SHORTFALL:
-            return self.state.turn_order[0] is color
-        return self.state.players[color].bank < 0
+        if not self.get_action_context() is ActionContext.SHORTFALL:
+            return self.get_turn_order()[0] is color
+        return self.get_player(color).bank < 0
 
     def has_subaction(self) -> bool:
         return self.subaction_count > 0
     
     def in_shortfall(self):
-        if any(player.bank < 0 for player in self.state.players.values()):
+        if any(player.bank < 0 for player in self.get_players().values()):
             return True
         return False
     
     def is_terminal(self):
-        return len(self.state.deck) == 0 and all(not player.hand for player in self.state.players.values())
+        return self.get_deck_size() == 0 and all(not player.hand for player in self.get_players().values())
 
     def get_active_player(self) -> Player:
-        if self.state.action_context is not ActionContext.SHORTFALL:
-            return self.state.players[self.state.turn_order[0]]
+        if self.get_action_context() is not ActionContext.SHORTFALL:
+            return self.get_player(self.get_turn_order()[0])
         else:
-            players_in_shortfall = [player for player in self.state.players.values() if player.bank < 0]
+            players_in_shortfall = [player for player in self.get_players().values() if player.bank < 0]
             return random.choice(players_in_shortfall)
     
     def update_market_costs(self):
-        self.state.market.coal_cost = self.COAL_MAX_COST - math.ceil(self.state.market.coal_count / 2)
-        self.state.market.iron_cost = self.IRON_MAX_COST - math.ceil(self.state.market.iron_count / 2)
+        self.state.market.coal_cost = self.COAL_MAX_COST - math.ceil(self.get_market_coal_count() / 2)
+        self.state.market.iron_cost = self.IRON_MAX_COST - math.ceil(self.get_market_iron_count() / 2)
 
     def sellable_amount(self, resource_type:ResourceType):
         if resource_type is ResourceType.IRON:
-            return self.IRON_MAX_COUNT - self.state.market.iron_count
+            return self.IRON_MAX_COUNT - self.get_market_iron_count()
         elif resource_type is ResourceType.COAL:
-            return self.COAL_MAX_COST - self.state.market.coal_count
+            return self.COAL_MAX_COST - self.get_market_coal_count()
     
     def _calculate_resource_cost(
         self, 
@@ -403,10 +480,10 @@ class BoardStateService:
         amount: int
     ) -> int:
         if resource_type == ResourceType.COAL:
-            current_count = self.state.market.coal_count
+            current_count = self.get_market_coal_count()
             max_cost = self.COAL_MAX_COST
         elif resource_type == ResourceType.IRON:
-            current_count = self.state.market.iron_count
+            current_count = self.get_market_iron_count()
             max_cost = self.IRON_MAX_COST
         else:
             raise ValueError("Market can only sell iron and coal")
@@ -439,9 +516,9 @@ class BoardStateService:
         total_cost = self._calculate_resource_cost(resource_type, amount)
         
         if resource_type == ResourceType.COAL:
-            self.state.market.coal_count = max(0, self.state.market.coal_count - amount)
+            self.state.market.coal_count = max(0, self.get_market_coal_count() - amount)
         elif resource_type == ResourceType.IRON:
-            self.state.market.iron_count = max(0, self.state.market.iron_count - amount)
+            self.state.market.iron_count = max(0, self.get_market_iron_count() - amount)
             
         self.update_market_costs()
         return total_cost
@@ -453,11 +530,11 @@ class BoardStateService:
         amount: int
     ) -> int:
         if resource_type == ResourceType.COAL:
-            current_count = self.state.market.coal_count
+            current_count = self.get_market_coal_count()
             max_cost = self.COAL_MAX_COST
             max_count = self.COAL_MAX_COUNT
         elif resource_type == ResourceType.IRON:
-            current_count = self.state.market.iron_count
+            current_count = self.get_market_iron_count()
             max_cost = self.IRON_MAX_COST
             max_count = self.IRON_MAX_COUNT
         else:
@@ -541,14 +618,14 @@ class BoardStateService:
             return self._lowest_building_cache[color][industry]
 
     def update_lowest_buildings(self, color:PlayerColor):
-        player = self.state.players[color]
+        player = self.get_player(color)
         self._lowest_building_cache[color] = {}
         for industry in IndustryType:
             buildings = [b for b in player.available_buildings.values() if b.industry_type is industry]
             self._lowest_building_cache[color][industry] = min(buildings, key=lambda x: x.level, default=None)
 
     def check_wilds(self, color:PlayerColor) -> bool:
-        player = self.state.players[color]
+        player = self.get_player(color)
         if any(card.value == 'wild' for card in player.hand.values()):
             return True
         return False

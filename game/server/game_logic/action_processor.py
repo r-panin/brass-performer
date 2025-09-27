@@ -28,9 +28,9 @@ class ActionProcessor():
     def _process_request(self, request:Request, color: PlayerColor) -> RequestResult:
         if request.request is RequestType.REQUEST_STATE:
            return PlayerState(
-                state=self.state_service.state.hide_state(),
+                state=self.state_service.get_exposed_state(),
                 your_color=color,
-                your_hand=self.state_service.state.players[color].hand,
+                your_hand=self.state_service.get_player(color).hand,
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
             actions = self.action_space_generator.get_action_space(self.state_service, color)
@@ -39,30 +39,30 @@ class ActionProcessor():
                 result=actions
             )
         elif request.request is RequestType.GOD_MODE:
-            return self.state_service.state
+            return self.state_service.get_board_state()
 
     def _process_action(self, action: Action, color: PlayerColor) -> ActionProcessResult:
         # Проверяем, может ли игрок делать ход
         if not self.state_service.is_player_to_move(color):
             return ActionProcessResult(
                 processed=False,
-                message=f"Attempted move by {color}, current turn is {self.state_service.state.turn_order[0]}",
+                message=f"Attempted move by {color}, current turn is {self.state_service.get_turn_order()[0]}",
                 awaiting={},
-                your_hand=self.state_service.state.players[color].hand,
+                your_hand=self.state_service.get_player(color).hand,
                 your_color=color,
-                state=self.state_service.state.hide_state()
+                state=self.state_service.get_exposed_state()
             )
 
-        player = self.state_service.state.players[color]
+        player = self.state_service.get_player(color)
         validation = self.validation_service.validate_action(action, self.state_service, player)
         if not validation.is_valid:
             return ActionProcessResult(
                 processed=False,
                 message=validation.message,
                 awaiting=self.ac_provider.get_expected_params(self.state_service),
-                your_hand=self.state_service.state.players[color].hand,
+                your_hand=self.state_service.get_player(color).hand,
                 your_color=color,
-                state=self.state_service.state.hide_state(),
+                state=self.state_service.get_exposed_state(),
             )
         
         # Обрабатываем действие в зависимости от типа
@@ -72,6 +72,6 @@ class ActionProcessor():
             processed=True,
             awaiting=self.ac_provider.get_expected_params(self.state_service),
             your_color=color,
-            your_hand=self.state_service.state.players[color].hand,
-            state=self.state_service.state.hide_state()
+            your_hand=self.state_service.get_player(color).hand,
+            state=self.state_service.get_exposed_state()
         )

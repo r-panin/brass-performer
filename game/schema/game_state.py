@@ -64,10 +64,9 @@ class Building(GameEntity):
     level: int
     owner: PlayerColor
     flipped: bool
-    cost: Dict[ResourceType, int]
+    cost: ResourceAmounts
     resource_count: int = Field(ge=0)
     victory_points: int
-    cost: Dict[str, int]
     sell_cost: Optional[int]
     is_developable: bool
     link_victory_points: int
@@ -76,11 +75,7 @@ class Building(GameEntity):
     slot_id: Optional[int] = None
 
     def get_cost(self) -> ResourceAmounts:
-        return ResourceAmounts(
-            iron=self.cost[ResourceType.IRON],
-            coal=self.cost[ResourceType.COAL],
-            money=self.cost.get("money", 0)
-        )
+        return self.cost
 
     def is_sellable(self) -> bool:
         return self.industry_type in (IndustryType.BOX, IndustryType.COTTON, IndustryType.POTTERY)
@@ -100,7 +95,7 @@ class Link(GameEntity):
 
 class City(GameEntity):
     name: str
-    slots: Dict[int, BuildingSlot] = []
+    slots: Dict[int, BuildingSlot]
     is_merchant: bool
     merchant_slots: Optional[Dict[int, MerchantSlot]] = None
     merchant_min_players: Optional[int] = None
@@ -230,6 +225,7 @@ class PlayerState(OutputToPlayer):
     state: BoardStateExposed
     your_hand: Dict[int, Card]
     your_color: PlayerColor
+    subaction_count: int = 0
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool

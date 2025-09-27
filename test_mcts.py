@@ -27,10 +27,10 @@ def main():
     while not game.concluded():
         active_player = game.state_service.get_active_player().color
         print(f"Current active player: {active_player}")
-        print(f"Current turn order: {game.state_service.state.turn_order}")
-        print(f"Actions left: {game.state_service.state.actions_left}")
-        
-        test_state = game.get_player_state(active_player)
+
+        print(f"Main Game id: {id(game)}")        
+        test_state = game.get_player_state(active_player)        
+        logging.debug(f"NEW PLAYER STATE: {test_state}")
 
         best_action = mcts.search(test_state)
         print(f"Игрок {active_player} выбирает действие: {best_action}")

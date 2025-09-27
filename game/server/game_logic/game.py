@@ -1,5 +1,17 @@
-from ...schema import BoardState, PlayerColor, GameStatus, PlayerState, ActionProcessResult, RequestResult, PlayerState, Card, Request, RequestType, LinkType, CardType
-from typing import Dict, List 
+from ...schema import (
+    BoardState,
+    PlayerColor,
+    GameStatus,
+    PlayerState,
+    ActionProcessResult,
+    RequestResult,
+    Card,
+    Request,
+    RequestType,
+    LinkType,
+    CardType,
+)
+from typing import Dict, List
 import random
 from uuid import uuid4
 import copy
@@ -23,6 +35,8 @@ class Game:
         game = cls()
         game.event_bus = EventBus()
         game.state_service = BoardStateService(game._determine_cards(partial_state))
+        # Restore transient per-turn fields
+        game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
         
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
@@ -31,27 +45,39 @@ class Game:
         return game
     
     def _determine_cards(self, partial_state:PlayerState) -> BoardState:
-        full_deck = self.initializer._build_initial_deck(len(partial_state.state.players))
+        # Use a local initializer to avoid relying on instance attribute during reconstruction
+        initializer = getattr(self, 'initializer', None) or GameInitializer()
+        full_deck = initializer._build_initial_deck(len(partial_state.state.players))
         known_card_ids = set([card.id for card in partial_state.state.discard]) | set(partial_state.your_hand)
         available_deck = [card for card in full_deck if card.id not in known_card_ids]
-        deal_to = [player for player in partial_state.state.turn_order 
-              if player != partial_state.your_color]
+
+        deal_to = [player for player in partial_state.state.turn_order if player != partial_state.your_color]
         player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
+
         city_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.CITY)
         industry_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.INDUSTRY)
+
         for player in deal_to:
-            if partial_state.state.players[player].has_city_wild:
+            exposed_player = partial_state.state.players[player]
+            if exposed_player.has_city_wild:
                 player_hands[player][city_wild.id] = city_wild
-            if partial_state.state.players[player].has_industry_wild:
+            if exposed_player.has_industry_wild:
                 player_hands[player][industry_wild.id] = industry_wild
-            cards_needed = 8 - len(player_hands.get(player, {}))
-            for _ in range(min(cards_needed, len(available_deck))):
+            target_hand_size = exposed_player.hand_size
+            while len(player_hands[player]) < target_hand_size and len(available_deck) > 0:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
+
         player_hands[partial_state.your_color] = partial_state.your_hand
-        if partial_state.state.era is LinkType.CANAL:
-            for _ in range(4):
-                available_deck.pop()
+
+        # Do not apply any additional burns here; deck_size already reflects that in the exposed state
+        target_deck_size = partial_state.state.deck_size
+        excess = len(available_deck) - target_deck_size
+        for _ in range(max(0, excess)):
+            if not available_deck:
+                break
+            available_deck.pop()
+
         return BoardState.determine(partial_state.state, player_hands, available_deck)
             
 
@@ -72,11 +98,12 @@ class Game:
     
     def get_player_state(self, color:PlayerColor, state:BoardState=None) -> PlayerState:
         if state is None:
-            state = self.state_service.state
+            state = self.state_service.get_board_state()
         return PlayerState(
             state=state.hide_state(),
             your_color=color,
-            your_hand={card.id: card for card in self.state_service.state.players[color].hand.values()},
+            your_hand={card.id: card for card in self.state_service.get_player(color).hand.values()},
+            subaction_count=self.state_service.subaction_count,
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:
@@ -90,7 +117,7 @@ class Game:
         return process_result
 
     def concluded(self):
-        return len(self.state_service.state.deck) == 0 and all(not player.hand for player in self.state_service.state.players.values())
+        return self.state_service.get_deck_size() == 0 and all(not player.hand for player in self.state_service.get_players().values())
 
 if __name__ == '__main__':
     game = Game()

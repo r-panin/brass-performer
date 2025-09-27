@@ -68,7 +68,7 @@ def create_board_state_message(game):
     return board_state_generator
 
 def get_end_game_message(game) -> Dict:
-    return {"final scores": {player.color: player.victory_points for player in game.state.players}}
+    return {"final scores": {player.color: player.victory_points for player in game.state_service.get_players().values()}}
 
 def parse_action(data: Dict[str, Any]) -> Action:
     # Затем проверяем действия Action

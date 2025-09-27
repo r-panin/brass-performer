@@ -17,77 +17,77 @@ class TurnManager:
         self.previous_turn_order = starting_state.turn_order 
 
     def prepare_next_turn(self, state_service:BoardStateService) -> BoardStateService:
-        state_service.state.turn_order.pop(0)
-        if not state_service.state.turn_order:
+        state_service.advance_turn_order()
+        if not state_service.get_turn_order():
             state_service = self._prepare_next_round(state_service)
         if not self.first_round:
-            state_service.state.actions_left = 2
+            state_service.set_actions_left(2)
         else:
-            state_service.state.actions_left = 1
+            state_service.set_actions_left(1)
         state_service.subaction_count = 0
         return state_service
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
         rank = {player_color: idx for idx, player_color in enumerate(self.previous_turn_order)}
-        state_service.state.turn_order = sorted(state_service.state.players, key=lambda k: (state_service.state.players[k].money_spent, rank.get(k)))
-        self.previous_turn_order = state_service.state.turn_order
+        state_service.set_turn_order(sorted(state_service.get_players(), key=lambda k: (state_service.get_players()[k].money_spent, rank.get(k))))
+        self.previous_turn_order = state_service.get_turn_order()
 
-        if all(len(p.hand) == 0 for p in state_service.state.players.values()) and len(state_service.state.deck) == 0:
-            if state_service.state.era == LinkType.CANAL:
+        if all(len(p.hand) == 0 for p in state_service.get_players().values()) and state_service.get_deck_size() == 0:
+            if state_service.get_era() == LinkType.CANAL:
                 state_service = self._prepare_next_era(state_service)
-            elif state_service.state.era == LinkType.RAIL:
+            elif state_service.get_era() == LinkType.RAIL:
                 state_service = self._conclude_game(state_service)
 
-        for player in state_service.state.players.values():
+        for player in state_service.get_players().values():
             player.bank += player.income
             
-            if state_service.state.deck:
-                while len(player.hand) < 8 and len(state_service.state.deck) > 0:
-                    card = state_service.state.deck.pop()
+            if state_service.get_deck():
+                while len(player.hand) < 8 and state_service.get_deck_size() > 0:
+                    card = state_service.get_deck().pop()
                     player.hand[card.id] = card
 
-        if any(player.bank < 0 for player in state_service.state.players.values()):
-            state_service.state.action_context = ActionContext.SHORTFALL
+        if any(player.bank < 0 for player in state_service.get_players().values()):
+            state_service.set_action_context(ActionContext.SHORTFALL)
 
         self.first_round = False
         self.round_count += 1
         logging.debug(f"Round {self.round_count}")
-        logging.debug(f"Remaining deck size {len(state_service.state.deck)}")
-        for player in state_service.state.players.values():
+        logging.debug(f"Remaining deck size {state_service.get_deck_size()}")
+        for player in state_service.get_players().values():
             logging.debug(f"Player {player.color} hand size is {len(player.hand)}")
         return state_service
     
     def _prepare_next_era(self, state_service:BoardStateService) -> BoardStateService:
         initializer = GameInitializer()
-        state_service.state.deck = initializer._build_initial_deck(len(state_service.state.players))
+        state_service.get_board_state().deck = initializer._build_initial_deck(len(state_service.get_players()))
         del initializer
-        random.shuffle(state_service.state.deck)
+        random.shuffle(state_service.get_deck())
 
-        for link in state_service.state.links.values():
+        for link in state_service.iter_links():
             if link.owner is not None:
                 for city_name in link.cities:
-                    state_service.state.players[link.owner].victory_points += state_service.get_city_link_vps(state_service.state.cities[city_name])
+                    state_service.get_player(link.owner).victory_points += state_service.get_city_link_vps(state_service.get_city(city_name))
                 link.owner = None
 
         for building in state_service.iter_placed_buildings():
             if building.flipped:
-                state_service.state.players[building.owner].victory_points += building.victory_points
+                state_service.get_player(building.owner).victory_points += building.victory_points
             if building.level == 1:
                 state_service.get_building_slot(building.slot_id).building_placed = None
 
-        state_service.state.era = LinkType.RAIL
+        state_service.get_board_state().era = LinkType.RAIL
 
         return state_service
 
     def _conclude_game(self, state_service:BoardStateService) -> BoardStateService:
         self.concluded = True
-        for link in state_service.state.links.values():
+        for link in state_service.iter_links():
             if link.owner is not None:
                 for city_name in link.cities:
-                    state_service.state.players[link.owner].victory_points += state_service.get_city_link_vps(state_service.state.cities[city_name])
+                    state_service.get_player(link.owner).victory_points += state_service.get_city_link_vps(state_service.get_city(city_name))
 
         for building in state_service.iter_placed_buildings():
             if building.flipped:
-                state_service.state.players[building.owner].victory_points += building.victory_points
+                state_service.get_player(building.owner).victory_points += building.victory_points
         
         return state_service 

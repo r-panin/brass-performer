@@ -1,4 +1,25 @@
-from ...schema import ActionContext, PlayerColor, Action, Building, ShortfallAction, LoanAction, PassAction, SellAction, BuildAction, ScoutAction, DevelopAction,NetworkAction, SellAction, Player, IndustryType, ResourceType, ResourceSource, CardType, MerchantType, LinkType, CommitAction
+from ...schema import (
+    ActionContext,
+    PlayerColor,
+    Action,
+    Building,
+    ShortfallAction,
+    LoanAction,
+    PassAction,
+    SellAction,
+    BuildAction,
+    ScoutAction,
+    DevelopAction,
+    NetworkAction,
+    Player,
+    IndustryType,
+    ResourceType,
+    ResourceSource,
+    CardType,
+    MerchantType,
+    LinkType,
+    CommitAction,
+)
 from typing import Dict, List
 from collections import defaultdict
 import itertools
@@ -8,19 +29,11 @@ import logging
 
 
 class ActionSpaceGenerator():
-    INDUSTRY_RESOURCE_OPTIONS:Dict[IndustryType, set[tuple[ResourceType]]] = {
-        IndustryType.BOX: {(ResourceType.COAL), (ResourceType.IRON), (ResourceType.COAL, ResourceType.COAL), (), (ResourceType.COAL, ResourceType.IRON), (ResourceType.IRON, ResourceType.IRON)},
-        IndustryType.IRON: {(ResourceType.COAL)},
-        IndustryType.COAL: {(), (ResourceType.IRON)},
-        IndustryType.BREWERY: {(ResourceType.IRON)},
-        IndustryType.COTTON: {(), (ResourceType.COAL), (ResourceType.COAL, ResourceType.IRON)},
-        IndustryType.POTTERY: {(ResourceType.IRON), (ResourceType.COAL), (ResourceType.COAL, ResourceType.COAL)}
-    }
     def __init__(self):
         self.cat_getter = ActionsCatProvider()
 
     def get_action_space(self, state_service:BoardStateService, color:PlayerColor) -> List[Action]:
-        player = state_service.state.players[color]
+        player = state_service.get_player(color)
         valid_action_types = self.cat_getter.get_expected_params(state_service)
         out = []
         for action in valid_action_types:
@@ -32,7 +45,7 @@ class ActionSpaceGenerator():
                 case "NetworkAction":
                     out.extend(self.get_valid_network_actions(state_service, player))
                 case "DevelopAction":
-                    out.extend(self.get_valid_develop_actions(state_service, player, gloucester=state_service.state.action_context is ActionContext.GLOUCESTER_DEVELOP))
+                    out.extend(self.get_valid_develop_actions(state_service, player, gloucester=state_service.get_action_context() is ActionContext.GLOUCESTER_DEVELOP))
                 case "ScoutAction":
                     out.extend(self.get_valid_scout_actions(player))
                 case "LoanAction":
@@ -46,70 +59,69 @@ class ActionSpaceGenerator():
         return out
 
     def get_valid_build_actions(self, state_service: BoardStateService, player: Player) -> List[BuildAction]:
-        out = []
+        out: List[BuildAction] = []
+        append_out = out.append
+
         cards = player.hand.values()
-        
-        # Предварительно собираем все свободные слоты, группируя по городам
-        slots_by_city = {}
-        for city in state_service.state.cities.values():
-            for slot in city.slots.values():
-                # Объединяем условия для пустого слота и возможности перестройки
-                if not slot.building_placed or self._overbuildable(slot.building_placed, player, state_service):
+
+        # Собираем доступные для строительства или перестройки слоты по городам
+        slots_by_city: dict = {}
+        state = state_service.get_board_state()
+        for city in state.cities.values():
+            city_slots = city.slots.values()
+            for slot in city_slots:
+                if slot.building_placed is None or self._overbuildable(slot.building_placed, player, state_service):
                     slots_by_city.setdefault(slot.city, []).append(slot)
 
         industries = list(IndustryType)
 
-        # Предварительно вычисляем данные по железу (не зависят от города)
+        # Предварительные данные по железу (общие)
         iron_buildings = state_service.get_player_iron_sources()
-        iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=building.slot_id) for building in iron_buildings]
-        iron_amounts = {building.slot_id: building.resource_count for building in iron_buildings}
+        iron_sources = [ResourceSource(resource_type=ResourceType.IRON, building_slot_id=b.slot_id) for b in iron_buildings]
+        iron_amounts = {b.slot_id: b.resource_count for b in iron_buildings}
         total_iron_available = sum(iron_amounts.values())
         market_iron = ResourceSource(resource_type=ResourceType.IRON)
         market_coal = ResourceSource(resource_type=ResourceType.COAL)
 
         network = state_service.get_player_network(player.color)
 
-        # Кеш для данных по углю по городам (чтобы не вычислять многократно для одного города)
-        coal_data_cache = {}
+        # Кеш по углю на город
+        coal_data_cache: dict = {}
 
-        def get_coal_data_for_city(city_name):
-            if city_name in coal_data_cache:
-                return coal_data_cache[city_name]
-            
+        def get_coal_data_for_city(city_name: str):
+            cached = coal_data_cache.get(city_name)
+            if cached is not None:
+                return cached
+
             market_coal_available = state_service.market_access_exists(city_name)
             coal_buildings = state_service.get_player_coal_sources(city_name=city_name)
-            
+
             coal_sources = []
             coal_secondary_sources = []
             coal_amounts = {}
             secondary_coal_amounts = {}
             first_priority = None
             second_priority = None
-            
+
             for building, priority in coal_buildings:
                 if first_priority is None:
                     first_priority = priority
 
-                if priority == first_priority:  # Primary sources
-                    coal_sources.append(
-                        ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
-                    )
+                if priority == first_priority:
+                    coal_sources.append(ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id))
                     coal_amounts[building.slot_id] = building.resource_count
-                else:  # Secondary sources
+                else:
                     if second_priority is None:
                         second_priority = priority
-                    
                     if priority == second_priority:
-                        coal_secondary_sources.append(
-                            ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id)
-                        )
+                        coal_secondary_sources.append(ResourceSource(resource_type=ResourceType.COAL, building_slot_id=building.slot_id))
                         secondary_coal_amounts[building.slot_id] = building.resource_count
                     else:
-                        break  # Только первые два приоритета
+                        break
 
             primary_coal_available = sum(coal_amounts.values())
             secondary_coal_available = sum(secondary_coal_amounts.values())
-            
+
             data = {
                 'market_coal_available': market_coal_available,
                 'coal_sources': coal_sources,
@@ -117,208 +129,216 @@ class ActionSpaceGenerator():
                 'coal_amounts': coal_amounts,
                 'secondary_coal_amounts': secondary_coal_amounts,
                 'primary_coal_available': primary_coal_available,
-                'secondary_coal_available': secondary_coal_available
+                'secondary_coal_available': secondary_coal_available,
             }
-            
             coal_data_cache[city_name] = data
             return data
 
-        def generate_resource_combinations(coal_required, iron_required, coal_data, iron_data):
-            """Генерирует комбинации ресурсов с соблюдением приоритетов"""
+        # Предрасчет приоритета слотов по отраслям в каждом городе (min-слоты для индустрии)
+        min_len_per_city_industry: dict = {}
+        allowed_slots_per_city_industry: dict = {}
+        for city_name, city in state.cities.items():
+            # min len per industry
+            local_min = {}
+            # учитывать только слоты, доступные для строительства/перестройки
+            for slot in slots_by_city.get(city_name, []):
+                options_len = len(slot.industry_type_options)
+                for ind in slot.industry_type_options:
+                    prev = local_min.get(ind)
+                    if prev is None or options_len < prev:
+                        local_min[ind] = options_len
+            min_len_per_city_industry[city_name] = local_min
+
+            # allowed slots set per industry (only slots with minimal options_len for that industry)
+            per_industry = {ind: [] for ind in IndustryType}
+            for slot in slots_by_city.get(city_name, []):
+                options_len = len(slot.industry_type_options)
+                for ind in slot.industry_type_options:
+                    if local_min.get(ind, 10**9) == options_len:
+                        per_industry[ind].append(slot)
+            allowed_slots_per_city_industry[city_name] = per_industry
+
+        # Утилиты по ресурсам
+        def generate_resource_combinations(coal_required: int, iron_required: int, coal_data: dict):
             combinations = []
-            
-            # Формируем coal_options с соблюдением приоритетов
+
+            # Угольные опции с учетом приоритетов
             coal_options = []
             if coal_required > 0:
-                # 1. Primary sources всегда first
+                primary_avail = coal_data['primary_coal_available']
+                secondary_avail = coal_data['secondary_coal_available']
                 coal_options.extend(coal_data['coal_sources'])
-                
-                # 2. Secondary sources только если primary недостаточно
-                if coal_data['primary_coal_available'] < coal_required:
+                if primary_avail < coal_required:
                     coal_options.extend(coal_data['coal_secondary_sources'])
-                    
-                # 3. Market coal только если своих источников недостаточно
-                if (coal_data['primary_coal_available'] + coal_data['secondary_coal_available'] < coal_required 
-                    and coal_data['market_coal_available']):
+                # быстрый отсев невозможных случаев без рынка
+                if (primary_avail + secondary_avail < coal_required) and not coal_data['market_coal_available']:
+                    return []
+                if (primary_avail + secondary_avail < coal_required) and coal_data['market_coal_available']:
                     coal_options.append(market_coal)
-            
-            # Формируем iron_options (логика проще)
-            iron_options = []
+
+            # Железные опции
             if iron_required > 0:
-                iron_options.extend(iron_sources)
-                # Market iron если своего недостаточно или нет своих источников
-                if iron_data['total_iron_available'] < iron_required or not iron_sources:
+                iron_options = list(iron_sources)
+                if total_iron_available < iron_required or not iron_sources:
                     iron_options.append(market_iron)
-            
-            # Генерируем комбинации угля
-            coal_combinations = []
+            else:
+                iron_options = []
+
+            # Комбинации для угля (max 2)
             if coal_required == 0:
                 coal_combinations = [()]
             elif coal_required == 1:
                 coal_combinations = [(src,) for src in coal_options]
-            else:  # coal_required == 2
-                for i, src1 in enumerate(coal_options):
-                    for j, src2 in enumerate(coal_options[i:], i):
-                        coal_combinations.append((src1, src2))
-            
-            # Генерируем комбинации железа
-            iron_combinations = []
+            else:
+                coal_combinations = list(itertools.combinations_with_replacement(coal_options, 2))
+
+            # Комбинации для железа (max 2)
             if iron_required == 0:
                 iron_combinations = [()]
             elif iron_required == 1:
                 iron_combinations = [(src,) for src in iron_options]
-            else:  # iron_required == 2
-                for i, src1 in enumerate(iron_options):
-                    for j, src2 in enumerate(iron_options[i:], i):
-                        iron_combinations.append((src1, src2))
-            
-            # Комбинируем
-            for coal_comb in coal_combinations:
-                for iron_comb in iron_combinations:
-                    combinations.append((coal_comb, iron_comb))
-            
+            else:
+                iron_combinations = list(itertools.combinations_with_replacement(iron_options, 2))
+
+            for cc in coal_combinations:
+                for ic in iron_combinations:
+                    combinations.append((cc, ic))
             return combinations
 
-        def is_resource_combination_valid(coal_comb, iron_comb, coal_data, iron_data, coal_required, iron_required):
-            """Проверяет валидность комбинации ресурсов"""
-            resources_used = list(coal_comb) + list(iron_comb)
-            
-            coal_used = {}
-            iron_used = {}
+        def is_resource_combination_valid(coal_comb, iron_comb, coal_data, iron_amounts_map):
             market_coal_count = 0
             market_iron_count = 0
-            
-            for resource in resources_used:
-                if resource.resource_type == ResourceType.COAL:
-                    if resource.building_slot_id:
-                        # Проверяем как primary, так и secondary источники
-                        if resource.building_slot_id in coal_data['coal_amounts']:
-                            coal_used[resource.building_slot_id] = coal_used.get(resource.building_slot_id, 0) + 1
-                            if coal_used[resource.building_slot_id] > coal_data['coal_amounts'][resource.building_slot_id]:
-                                return False, None, None, None, None
-                        elif resource.building_slot_id in coal_data['secondary_coal_amounts']:
-                            coal_used[resource.building_slot_id] = coal_used.get(resource.building_slot_id, 0) + 1
-                            if coal_used[resource.building_slot_id] > coal_data['secondary_coal_amounts'][resource.building_slot_id]:
-                                return False, None, None, None, None
-                    else:
-                        market_coal_count += 1
-                        
-                elif resource.resource_type == ResourceType.IRON:
-                    if resource.building_slot_id:
-                        iron_used[resource.building_slot_id] = iron_used.get(resource.building_slot_id, 0) + 1
-                        if iron_used[resource.building_slot_id] > iron_data['iron_amounts'][resource.building_slot_id]:
-                            return False, None, None, None, None
-                    else:
-                        market_iron_count += 1
-            
-            # Проверка: должен быть использован хотя бы один primary источник угля если они есть
-            primary_coal_ids = set(coal_data['coal_amounts'].keys())
-            used_primary_coal_ids = {r.building_slot_id for r in resources_used if r.building_slot_id in primary_coal_ids}
-            if primary_coal_ids and not used_primary_coal_ids:
-                return False, None, None, None, None
-            
-            # Проверка доступности рыночного угля
-            if market_coal_count > 0 and not coal_data['market_coal_available']:
-                return False, None, None, None, None
-                
-            return True, resources_used, market_coal_count, market_iron_count, (coal_used, iron_used)
 
-        # Основные циклы оптимизированы: сначала по картам, затем по отраслям, потом по городам
+            # track usage per slot
+            coal_used = {}
+            iron_used = {}
+
+            # validate coal part
+            for r in coal_comb:
+                if r.building_slot_id is None:
+                    market_coal_count += 1
+                else:
+                    sid = r.building_slot_id
+                    # primary or secondary buckets
+                    if sid in coal_data['coal_amounts']:
+                        limit = coal_data['coal_amounts'][sid]
+                    else:
+                        limit = coal_data['secondary_coal_amounts'].get(sid, 0)
+                    used = coal_used.get(sid, 0) + 1
+                    if used > limit:
+                        return False, 0, 0
+                    coal_used[sid] = used
+
+            # must use at least one primary if any exist
+            if coal_data['coal_amounts'] and not any((sid in coal_data['coal_amounts']) for sid in coal_used.keys()):
+                return False, 0, 0
+
+            if market_coal_count > 0 and not coal_data['market_coal_available']:
+                return False, 0, 0
+
+            # validate iron part
+            for r in iron_comb:
+                if r.building_slot_id is None:
+                    market_iron_count += 1
+                else:
+                    sid = r.building_slot_id
+                    used = iron_used.get(sid, 0) + 1
+                    if used > iron_amounts_map.get(sid, 0):
+                        return False, 0, 0
+                    iron_used[sid] = used
+
+            return True, market_coal_count, market_iron_count
+
+        # Основные циклы: по картам → индустриям → городам/слотам
+        # кэши для комбо и рыночных стоимостей
+        resource_combo_cache: dict = {}
+        coal_cost_cache: dict[int, int] = {}
+        iron_cost_cache: dict[int, int] = {}
+        calculate_coal_cost = state_service.calculate_coal_cost
+        calculate_iron_cost = state_service.calculate_iron_cost
+        player_bank = player.bank
+
         for card in cards:
-            # Определяем допустимые города для этой карты
-            valid_cities = set()
-            valid_industries = set()
+            # Допустимые города для карты
             if card.card_type == CardType.CITY:
                 if card.value == 'wild':
                     valid_cities = set(slots_by_city.keys())
                 else:
                     valid_cities = {card.value} if card.value in slots_by_city else set()
-                # Исключаем пивоварни для CITY карт
-                valid_cities = {city for city in valid_cities if "brewery" not in city}
-                valid_industries = {IndustryType}
-            else:  # INDUSTRY карта
-                valid_cities = network  # только города в сети
-                if card.value == 'box-cotton':
-                    valid_industries.add(IndustryType.BOX)
-                    valid_industries.add(IndustryType.COTTON)
-                elif card.value == 'wild':
-                    valid_industries = set(IndustryType)
-                else:
-                    valid_industries.add(IndustryType(card.value)) 
-            
+            else:
+                valid_cities = network
+
+            if not valid_cities:
+                continue
+
             for industry in industries:
+                # Текущий нижний уровень здания данной индустрии
                 building = state_service.get_lowest_level_building(player.color, industry)
                 if not building:
                     continue
-                    
-                # Предварительно проверяем базовую стоимость
-                base_cost = building.cost['money']
-                if player.bank < base_cost:
+
+                cost = building.get_cost()
+                base_money = cost.money
+                if player_bank < base_money:
                     continue
-                    
-                coal_required = building.cost['coal']
-                iron_required = building.cost['iron']
-                
-                # Данные по железу не зависят от города
-                iron_data = {
-                    'iron_sources': iron_sources,
-                    'iron_amounts': iron_amounts,
-                    'total_iron_available': total_iron_available
-                }
-                
-                for city in valid_cities:
-                    if city not in slots_by_city:
+
+                coal_required = cost.coal
+                iron_required = cost.iron
+
+                for city_name in valid_cities:
+                    city_slots = slots_by_city.get(city_name)
+                    if not city_slots:
                         continue
-                        
-                    # Получаем данные по углю для города (с кешированием)
-                    coal_data = get_coal_data_for_city(city)
-                    
-                    for slot in slots_by_city[city]:
-                        # Проверяем допустимость отрасли для слота
-                        if industry not in slot.industry_type_options:
-                            continue
-                        
-                        # Проверка приоритета строительства в слоте
-                        can_build = True
-                        other_city_slots = [s for s in state_service.state.cities[slot.city].slots.values() if slot.id != s.id]
-                        for s in other_city_slots:
-                            if (len(s.industry_type_options) < len(slot.industry_type_options)) and (industry in s.industry_type_options):
-                                can_build = False
-                                break
-                        
-                        if not can_build:
-                            continue
-                        
-                        # Генерируем комбинации ресурсов
-                        resource_combinations = generate_resource_combinations(
-                            coal_required, iron_required, coal_data, iron_data
-                        )
-                        
-                        for coal_comb, iron_comb in resource_combinations:
-                            # Проверяем валидность комбинации
-                            valid, resources_used, market_coal_count, market_iron_count, _ = is_resource_combination_valid(
-                                coal_comb, iron_comb, coal_data, iron_data, coal_required, iron_required
+
+                    coal_data = get_coal_data_for_city(city_name)
+
+                    # Только слоты, допускаемые правилом приоритета для данной индустрии
+                    allowed_slots = allowed_slots_per_city_industry[city_name].get(industry, [])
+                    if not allowed_slots:
+                        continue
+
+                    # подготовить валидные комбинации ресурсов для города и требований
+                    cache_key = (city_name, coal_required, iron_required)
+                    combos = resource_combo_cache.get(cache_key)
+                    if combos is None:
+                        combos = []
+                        for coal_comb, iron_comb in generate_resource_combinations(coal_required, iron_required, coal_data):
+                            valid, market_coal_count, market_iron_count = is_resource_combination_valid(
+                                coal_comb, iron_comb, coal_data, iron_amounts
                             )
-                            
                             if not valid:
                                 continue
-                            
-                            # Проверяем конечную стоимость
-                            coal_cost = state_service.calculate_coal_cost(market_coal_count) if market_coal_count > 0 else 0
-                            iron_cost = state_service.calculate_iron_cost(market_iron_count) if market_iron_count > 0 else 0
-                            total_cost = base_cost + coal_cost + iron_cost
-                            
-                            if player.bank < total_cost:
+                            combos.append((coal_comb, iron_comb, market_coal_count, market_iron_count))
+                        resource_combo_cache[cache_key] = combos
+
+                    for slot in allowed_slots:
+                        # индустрия должна поддерживаться слотом
+                        if industry not in slot.industry_type_options:
+                            continue
+
+                        # Комбинации ресурсов и валидация
+                        for coal_comb, iron_comb, market_coal_count, market_iron_count in combos:
+                            coal_cost = coal_cost_cache.get(market_coal_count)
+                            if coal_cost is None:
+                                coal_cost = calculate_coal_cost(market_coal_count) if market_coal_count else 0
+                                coal_cost_cache[market_coal_count] = coal_cost
+                            iron_cost = iron_cost_cache.get(market_iron_count)
+                            if iron_cost is None:
+                                iron_cost = calculate_iron_cost(market_iron_count) if market_iron_count else 0
+                                iron_cost_cache[market_iron_count] = iron_cost
+                            total = base_money + coal_cost + iron_cost
+                            if player_bank < total:
                                 continue
-                            
-                            out.append(BuildAction(
+
+                            resources_used = list(coal_comb) + list(iron_comb)
+                            append_out(BuildAction(
                                 slot_id=slot.id,
                                 card_id=card.id,
                                 industry=industry,
                                 resources_used=resources_used
                             ))
-        
-        return out 
+
+        return out
     
     def _overbuildable(self, to_overbuild: Building, player: Player, state_service: BoardStateService) -> bool:
         # Проверяем уровень здания
@@ -337,8 +357,8 @@ class ActionSpaceGenerator():
             
             # Для угля и железа проверяем доступность ресурсов
             resource_checks = {
-                IndustryType.COAL: state_service.state.market.coal_count,
-                IndustryType.IRON: state_service.state.market.iron_count
+                IndustryType.COAL: state_service.get_market_coal_count(),
+                IndustryType.IRON: state_service.get_market_iron_count(),
             }
             if resource_checks.get(to_overbuild.industry_type, 0) > 0:
                 return False
@@ -350,27 +370,47 @@ class ActionSpaceGenerator():
         cards = player.hand
         slots = [
                 slot 
-                for city in state_service.state.cities.values() 
+                for city in state_service.get_cities().values() 
                 for slot in city.slots.values() 
                 if slot.building_placed is not None and slot.building_placed.is_sellable() and slot.building_placed.owner == player.color
             ] 
+
+        # Предрасчет купцов с пивом, доступных из города
+        connected_merchant_beer_by_city: dict[str, list[ResourceSource]] = {}
+        for city in state_service.get_cities().values():
+            city_name = city.name
+            sources: list[ResourceSource] = []
+            for s in state_service.iter_merchant_slots():
+                if not s.beer_available:
+                    continue
+                if not state_service.are_connected(city_name, s.city):
+                    continue
+                # тип соответствия проверим позже по индустрии строения
+                sources.append(ResourceSource(resource_type=ResourceType.BEER, merchant_slot_id=s.id))
+            connected_merchant_beer_by_city[city_name] = sources
 
         for slot in slots:
             if not state_service.can_sell(slot.city, slot.building_placed.industry_type):
                 continue
 
-            beer_buildings = state_service.get_player_beer_sources(player.color, city_name=slot.city)
-            beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) for building in beer_buildings]
-            merchant_sources = [ResourceSource(resource_type=ResourceType.BEER, merchant_slot_id=s.id)
-                                for s in state_service.iter_merchant_slots()
-                                if s.beer_available and s.merchant_type in (MerchantType.ANY, MerchantType(slot.building_placed.industry_type) and state_service.are_connected(slot.city, s.city))]
-            beer_sources += merchant_sources
-            beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
             beer_required = slot.building_placed.sell_cost
-            if beer_required:
-                beer_combinations = itertools.combinations_with_replacement(beer_sources, beer_required)
-            else:
+            if not beer_required:
+                beer_buildings = []
+                beer_sources = []
+                beer_amounts = {}
                 beer_combinations = [()]
+            else:
+                beer_buildings = state_service.get_player_beer_sources(player.color, city_name=slot.city)
+                beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) for building in beer_buildings]
+                # купцы: тип соответствует индустрии ИЛИ ANY
+                merchant_sources = []
+                for src in connected_merchant_beer_by_city.get(slot.city, []):
+                    s = state_service.get_merchant_slot(src.merchant_slot_id)
+                    if s.merchant_type is MerchantType.ANY or s.merchant_type == MerchantType(slot.building_placed.industry_type):
+                        merchant_sources.append(src)
+                beer_sources.extend(merchant_sources)
+                beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
+                beer_combinations = itertools.combinations_with_replacement(beer_sources, beer_required)
             for beer_combo in beer_combinations:
                 beer_used = defaultdict(int)
                 merchant_beer_used = False
@@ -410,13 +450,13 @@ class ActionSpaceGenerator():
             return out
         cards = player.hand
         network = state_service.get_player_network(player.color)
-        links = [link for link in state_service.state.links.values() 
-            if link.owner is None and not network.isdisjoint(link.cities) and state_service.state.era in link.type]
+        links = [link for link in state_service.iter_links()
+            if link.owner is None and not network.isdisjoint(link.cities) and state_service.get_era() in link.type]
         base_cost = state_service.get_link_cost(state_service.subaction_count)
         if base_cost.money > player.bank:
             return out
         
-        if state_service.state.era == LinkType.CANAL:
+        if state_service.get_era() == LinkType.CANAL:
             if state_service.subaction_count == 0:
                 return [NetworkAction(link_id=link.id, card_id=card, resources_used=[]) 
                    for link in links for card in player.hand]
@@ -440,11 +480,10 @@ class ActionSpaceGenerator():
             if not coal_sources:
                 if any(state_service.market_access_exists(city_name=city) for city in link.cities):
                     market_cost = state_service.calculate_coal_cost(base_cost.coal)
-                    coal_sources = [ResourceSource(resource_type=ResourceType.COAL)] # market coal
+                    if market_cost + base_cost.money > player.bank:
+                        continue
+                    coal_sources = [ResourceSource(resource_type=ResourceType.COAL)]  # market coal
                 else:
-                    continue
-            
-                if market_cost + base_cost.money > player.bank:
                     continue
             
             beer_buildings = state_service.get_player_beer_sources(color=player.color, link_id=link.id)

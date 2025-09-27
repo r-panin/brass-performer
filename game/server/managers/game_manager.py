@@ -8,7 +8,6 @@ class GameManager:
     MAX_PLAYERS = 4
     MIN_PLAYERS = 2
     def __init__(self):
-        logging.basicConfig(level=logging.DEBUG)
         self.games: Dict[str, Game] = {}
         self.players: Dict[str, PlayerInfo] = {}
         self.game_players: Dict[str, List[str]] = {} # {game_id: [PlayerInfo1, PlayerInfo2]}

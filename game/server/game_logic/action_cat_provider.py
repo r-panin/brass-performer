@@ -17,11 +17,11 @@ class ActionsCatProvider():
         pass
 
     def get_expected_params(self, state_service:BoardStateService) -> Dict[str, List[str]]:
-        classes = self.ACTION_CONTEXT_MAP[state_service.state.action_context]
+        classes = self.ACTION_CONTEXT_MAP[state_service.get_action_context()]
         out = {}
         for cls in classes:
             fields = list(cls.model_fields.keys())
-            if state_service.state.action_context is not ActionContext.MAIN:
+            if state_service.get_action_context() is not ActionContext.MAIN:
                 if state_service.has_subaction() and 'card_id' in fields:
                     fields.remove('card_id')
             out[cls.__name__] = fields

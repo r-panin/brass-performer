@@ -23,9 +23,9 @@ class ActionValidationService():
         self.context_map = ActionsCatProvider.ACTION_CONTEXT_MAP
 
     def validate_action(self, action:Action, board_state:BoardStateService, player: Player) -> ValidationResult:
-        context_validation = self._validate_action_context(board_state.state.action_context, action)
+        context_validation = self._validate_action_context(board_state.get_action_context(), action)
         if not context_validation.is_valid:
-            return ValidationResult(is_valid=False, message=f"Context {board_state.action_context} does not permit action type {action.action}")
+            return ValidationResult(is_valid=False, message=f"Context {board_state.get_action_context()} does not permit action type {action.action}")
         validator = self.validators.get(action.action)
         if not validator:
             return ValidationResult(is_valid=False, message=f"No validator for action type {action.action_type}") 

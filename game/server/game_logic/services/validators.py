@@ -158,7 +158,7 @@ class BaseValidator(ActionValidator, ABC):
                             return ValidationResult(is_valid=False, message=f"Cities {build_city} and {coal_city} are not connected")
                     elif isinstance(action, NetworkAction):
                         action:NetworkAction
-                        link = game_state.state.links[action.link_id]
+                        link = game_state.get_link(action.link_id)
                         connected = any(game_state.are_connected(city, coal_city) for city in link.cities)
                         if not connected:
                             return ValidationResult(is_valid=False, message=f"Link {action.link_id} is not connected to city {coal_city}")
@@ -171,7 +171,7 @@ class BaseValidator(ActionValidator, ABC):
                             return ValidationResult(is_valid=False, message=f"Cities {build_city} is not connected to market")
                     elif isinstance(action, NetworkAction):
                         action:NetworkAction
-                        link = game_state.state.links[action.link_id]
+                        link = game_state.get_link(action.link_id)
                         connected = any(game_state.market_access_exists(city) for city in link.cities)
                         if not connected:
                             return ValidationResult(is_valid=False, message=f"Link {action.link_id} is not connected to city {coal_city}")
@@ -232,15 +232,15 @@ class NetworkValidator(BaseValidator):
     @validate_card_in_hand
     @validate_resources
     def validate(self, action:NetworkAction, game_state:BoardStateService, player:Player):
-        link = game_state.state.links.get(action.link_id)
+        link = game_state.get_links().get(action.link_id)
         if not link:
             return ValidationResult(is_valid=False, message=f"Link {action.link_id} does not exist")
         
         if link.owner is not None:
             return ValidationResult(is_valid=False, message=f"Link {link.id} is already owned by {link.owner}")
         
-        if game_state.state.era not in link.type:
-            return ValidationResult(is_valid=False, message=f"Link {link.id} doesn't support transport type {game_state.era}")
+        if game_state.get_era() not in link.type:
+            return ValidationResult(is_valid=False, message=f"Link {link.id} doesn't support transport type {game_state.get_era()}")
         
         network = game_state.get_player_network(player.color)
         if not network:
@@ -296,7 +296,7 @@ class BuildValidator(BaseValidator):
         if action.industry not in slot.industry_type_options:
             return ValidationResult(is_valid=False, message=f"Can't build {building.industry_type} in a slot that supports {slot.industry_type_options}")
 
-        city = game_state.state.cities[slot.city]
+        city = game_state.get_city(slot.city)
         for s in city.slots.values():
             if (len(s.industry_type_options) < len(slot.industry_type_options)) and action.industry in s.industry_type_options:
                 return ValidationResult(is_valid=False, message=f"Can't build in slot {slot.id} when {s.id} has priority for this industry")
