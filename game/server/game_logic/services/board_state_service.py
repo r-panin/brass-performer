@@ -3,7 +3,7 @@ from typing import Callable, Iterator, List, Optional, Dict, Set, Union
 from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext, Card, Link
 import random
 import math
-
+import logging
 
 class BoardStateService:
     
@@ -25,6 +25,7 @@ class BoardStateService:
         self._networks_cache = None
         self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
         self._iron_cache = None
+        self.round_count = 1
 
     # --- Encapsulated BoardState accessors/mutators (public API) ---
     def get_board_state(self) -> BoardState:
@@ -50,6 +51,7 @@ class BoardStateService:
 
     def advance_turn_order(self) -> PlayerColor:
         """Remove and return the active player from the front of turn order."""
+        logging.debug(f"Turn order before advancing {self.state.turn_order}, removing {self.state.turn_order[0]}")
         return self.state.turn_order.pop(0)
 
     def get_actions_left(self) -> int:
@@ -455,14 +457,14 @@ class BoardStateService:
         return False
     
     def is_terminal(self):
-        return self.get_deck_size() == 0 and all(not player.hand for player in self.get_players().values())
+        return self.get_deck_size() == 0 and all(not player.hand for player in self.get_players().values()) and self.get_era() is LinkType.RAIL
 
     def get_active_player(self) -> Player:
         if self.get_action_context() is not ActionContext.SHORTFALL:
             return self.get_player(self.get_turn_order()[0])
         else:
             players_in_shortfall = [player for player in self.get_players().values() if player.bank < 0]
-            return random.choice(players_in_shortfall)
+            return players_in_shortfall[0]
     
     def update_market_costs(self):
         self.state.market.coal_cost = self.COAL_MAX_COST - math.ceil(self.get_market_coal_count() / 2)
@@ -629,3 +631,9 @@ class BoardStateService:
         if any(card.value == 'wild' for card in player.hand.values()):
             return True
         return False
+
+    def get_current_round(self):
+        return self.round_count
+    
+    def advance_round_count(self):
+        self.round_count += 1

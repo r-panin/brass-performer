@@ -12,15 +12,14 @@ class TurnManager:
     def __init__(self, starting_state:BoardState, event_bus:EventBus):
         self.concluded = False
         self.event_bus = event_bus
-        self.first_round = True
-        self.round_count = 1
         self.previous_turn_order = starting_state.turn_order 
 
     def prepare_next_turn(self, state_service:BoardStateService) -> BoardStateService:
         state_service.advance_turn_order()
         if not state_service.get_turn_order():
             state_service = self._prepare_next_round(state_service)
-        if not self.first_round:
+        first_round = state_service.get_current_round() == 1
+        if not first_round:
             state_service.set_actions_left(2)
         else:
             state_service.set_actions_left(1)
@@ -49,10 +48,10 @@ class TurnManager:
         if any(player.bank < 0 for player in state_service.get_players().values()):
             state_service.set_action_context(ActionContext.SHORTFALL)
 
-        self.first_round = False
-        self.round_count += 1
-        logging.debug(f"Round {self.round_count}")
+        state_service.advance_round_count()
+        logging.debug(f"Round {state_service.get_current_round()}")
         logging.debug(f"Remaining deck size {state_service.get_deck_size()}")
+
         for player in state_service.get_players().values():
             logging.debug(f"Player {player.color} hand size is {len(player.hand)}")
         return state_service

@@ -37,6 +37,7 @@ class Game:
         game.state_service = BoardStateService(game._determine_cards(partial_state))
         # Restore transient per-turn fields
         game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
+        game.state_service.round_count = getattr(partial_state, 'current_round', 1)
         
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
@@ -104,6 +105,7 @@ class Game:
             your_color=color,
             your_hand={card.id: card for card in self.state_service.get_player(color).hand.values()},
             subaction_count=self.state_service.subaction_count,
+            current_round=self.state_service.get_current_round()
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:

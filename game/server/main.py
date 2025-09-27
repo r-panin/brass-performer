@@ -11,7 +11,7 @@ import sys
 logging.basicConfig(
     level=logging.DEBUG,  # Уровень логирования
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
-    handlers=[logging.StreamHandler(sys.stdout)]  # Вывод в stdout
+    handlers=[logging.FileHandler(r'G:\brass-performer\brass-performer\game\server.log')] 
 )
 logging.getLogger().setLevel(logging.DEBUG)
 

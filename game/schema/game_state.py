@@ -226,6 +226,7 @@ class PlayerState(OutputToPlayer):
     your_hand: Dict[int, Card]
     your_color: PlayerColor
     subaction_count: int = 0
+    current_round: int
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool
