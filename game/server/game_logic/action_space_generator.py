@@ -135,20 +135,11 @@ class ActionSpaceGenerator():
             return data
 
         # Предрасчет приоритета слотов по отраслям в каждом городе (min-слоты для индустрии)
-        min_len_per_city_industry: dict = {}
         allowed_slots_per_city_industry: dict = {}
         for city_name, city in state.cities.items():
+            
             # min len per industry
             local_min = {}
-            # учитывать только слоты, доступные для строительства/перестройки
-            for slot in slots_by_city.get(city_name, []):
-                options_len = len(slot.industry_type_options)
-                for ind in slot.industry_type_options:
-                    prev = local_min.get(ind)
-                    if prev is None or options_len < prev:
-                        local_min[ind] = options_len
-            min_len_per_city_industry[city_name] = local_min
-
             # allowed slots set per industry (only slots with minimal options_len for that industry)
             per_industry = {ind: [] for ind in IndustryType}
             for slot in slots_by_city.get(city_name, []):
@@ -156,7 +147,21 @@ class ActionSpaceGenerator():
                 for ind in slot.industry_type_options:
                     if local_min.get(ind, 10**9) == options_len:
                         per_industry[ind].append(slot)
+                
             allowed_slots_per_city_industry[city_name] = per_industry
+        
+        allowed_industry_for_card: dict = {}
+        for card in cards:
+            if card.card_type is CardType.CITY:
+                allowed_industry_for_card[card.id] = set(IndustryType)
+            else:
+                if card.value == 'box-cotton':
+                    allowed_industry_for_card[card.id] = {IndustryType.BOX, IndustryType.COTTON}
+                elif card.value == 'wild':
+                    allowed_industry_for_card[card.id] = set(IndustryType)
+                else:
+                    allowed_industry_for_card[card.id] = {IndustryType(card.value)}
+
 
         # Утилиты по ресурсам
         def generate_resource_combinations(coal_required: int, iron_required: int, coal_data: dict):
@@ -272,6 +277,9 @@ class ActionSpaceGenerator():
                 continue
 
             for industry in industries:
+                # check card-industry compatibility
+                if not industry in allowed_industry_for_card[card.id]:
+                    continue
                 # Текущий нижний уровень здания данной индустрии
                 building = state_service.get_lowest_level_building(player.color, industry)
                 if not building:

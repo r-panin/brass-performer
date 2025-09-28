@@ -47,7 +47,11 @@ class Game:
             for action in history:
                 active_player = transient_state_service.get_active_player()
                 if hasattr(action, 'card_id'):
-                    transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
+                    if isinstance(action.card_id, int):
+                        transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
+                    elif isinstance(action.card_id, list):
+                        for card_id in action.card_id:
+                            transient_state_service.give_player_a_card(active_player.color, card_dict[card_id])
                 state_changer.apply_action(action, transient_state_service, active_player)
                 transient_state_service.wipe_hands()
                 hidden_state = transient_state_service.state.hide_state()
@@ -66,7 +70,7 @@ class Game:
         game.status = GameStatus.ONGOING
         game.replay_service = None
 
-        logging.debug(f'Returned turn order {partial_state.state.turn_order}')
+        logging.debug(f'Returned turn order {game.state_service.get_turn_order()}')
         logging.debug(f"DECK SIZE AFTER DETERMINIZING: {game.state_service.get_deck_size()}")
         logging.debug(f"HANDS AFTER DETERMINIZING")
         logging.debug(f"DISCARD AFTER DETERMINIZING: {game.state_service.state.discard}") 
