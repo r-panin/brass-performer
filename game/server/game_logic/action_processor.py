@@ -75,5 +75,6 @@ class ActionProcessor():
             awaiting=self.ac_provider.get_expected_params(self.state_service),
             your_color=color,
             your_hand=self.state_service.get_player(color).hand,
-            state=self.state_service.get_exposed_state()
+            state=self.state_service.get_exposed_state(),
+            current_round=self.state_service.get_current_round()
         )

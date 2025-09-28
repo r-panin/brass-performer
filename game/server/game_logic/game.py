@@ -41,31 +41,43 @@ class Game:
         if history:
             state = BoardState.cardless(partial_state.state)
             transient_state_service = BoardStateService(state)
+            transient_state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
+            transient_state_service.round_count = getattr(partial_state, 'current_round', 1)
             initializer = GameInitializer() 
             card_dict = initializer._build_card_dict()
             state_changer = StateChanger(transient_state_service, draw_cards=False)
             for action in history:
                 active_player = transient_state_service.get_active_player()
+
                 if hasattr(action, 'card_id'):
                     if isinstance(action.card_id, int):
                         transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
+                        if action.card_id in partial_state.your_hand:
+                            partial_state.your_hand.pop(action.card_id)
                     elif isinstance(action.card_id, list):
                         for card_id in action.card_id:
                             transient_state_service.give_player_a_card(active_player.color, card_dict[card_id])
+                            if card_id in partial_state.your_hand:
+                                partial_state.your_hand.pop(card_id)
+
                 state_changer.apply_action(action, transient_state_service, active_player)
-                transient_state_service.wipe_hands()
-                hidden_state = transient_state_service.state.hide_state()
-                hidden_state.deck_size = partial_state.state.deck_size
-                for player in hidden_state.players.values():
-                    player.hand_size = partial_state.state.players[player.color].hand_size
+
+            hidden_state = transient_state_service.state.hide_state()
+            hidden_state.deck_size = partial_state.state.deck_size
+            for player in hidden_state.players.values():
+                player.hand_size = partial_state.state.players[player.color].hand_size
             game.state_service = BoardStateService(game._determine_cards(hidden_state, partial_state.your_hand, partial_state.your_color))
 
+            game.state_service.subaction_count = transient_state_service.subaction_count
+            game.state_service.round_count = transient_state_service.round_count
+            logging.debug(f'POST-DETERMINING SUBACTION COUNT IS {game.state_service.subaction_count}')
+            logging.debug(f'transient state subaction count: {transient_state_service.subaction_count}')
         else:
             game.state_service = BoardStateService(game._determine_cards(partial_state.state, partial_state.your_hand, partial_state.your_color))
+            game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
+            game.state_service.round_count = getattr(partial_state, 'current_round', 1)
         
         # Restore transient per-turn fields
-        game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
-        game.state_service.round_count = getattr(partial_state, 'current_round', 1)
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
@@ -76,6 +88,8 @@ class Game:
         logging.debug(f"DISCARD AFTER DETERMINIZING: {game.state_service.state.discard}") 
         for player in game.state_service.get_players().values():
             logging.debug(f'PLAYER COLOR {player.color} has hand size {len(player.hand)}')
+            for card in player.hand.values():
+                logging.debug(card)
         return game
     
     def _determine_cards(self, partial_state:BoardStateExposed, known_hand:Dict[int, Card], known_color:PlayerColor) -> BoardState:
@@ -91,6 +105,7 @@ class Game:
         city_wild = next(card for card in partial_state.wilds if card.card_type is CardType.CITY)
         industry_wild = next(card for card in partial_state.wilds if card.card_type is CardType.INDUSTRY)
 
+        logging.debug(f"Dealing to: {deal_to}")
         for player in deal_to:
             exposed_player = partial_state.players[player]
             if exposed_player.has_city_wild:
@@ -101,6 +116,11 @@ class Game:
             while len(player_hands[player]) < target_hand_size and len(available_deck) > 0:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
+
+        if partial_state.players[known_color].has_city_wild:
+            known_hand[city_wild.id] = city_wild
+        if partial_state.players[known_color].has_industry_wild:
+            known_hand[industry_wild.id] = industry_wild
 
         player_hands[known_color] = known_hand
 
