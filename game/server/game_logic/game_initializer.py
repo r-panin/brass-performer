@@ -104,6 +104,22 @@ class GameInitializer():
         random.shuffle(out)
         return out
 
+    def _build_card_dict(self) -> Dict[int, Card]:
+        out:Dict[Card] = {}
+        with open(self.CARD_LIST_PATH) as cardfile:
+            cards_data = json.load(cardfile)
+        for card_data in cards_data:
+            card = Card(
+                id=card_data["id"],
+                card_type=CardType(card_data["card_type"]),
+                value=card_data["value"]
+            )
+            out[card.id] = card
+        wilds = self._build_wild_deck()
+        for wild in wilds:
+            out[wild.id] = wild
+        return out        
+
     def _build_wild_deck(self) -> List[Card]:
         INDUSTRY_ID = 65
         CITY_ID = 66

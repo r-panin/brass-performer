@@ -10,6 +10,8 @@ from ...schema import (
     RequestType,
     LinkType,
     CardType,
+    Action,
+    BoardStateExposed
 )
 from typing import Dict, List
 import random
@@ -17,12 +19,14 @@ from uuid import uuid4
 import copy
 from .game_initializer import GameInitializer
 from .action_processor import ActionProcessor
+from .state_changer import StateChanger
 from .services.event_bus import EventBus
 from .services.replay_service import ReplayService
 from .services.board_state_service import BoardStateService
 from pathlib import Path
 from collections import defaultdict
 import logging
+from copy import deepcopy
 
 
 
@@ -30,36 +34,61 @@ class Game:
     REPLAYS_PATH = Path(r"game\replays")
 
     @classmethod
-    def from_partial_state(cls, partial_state:PlayerState):
-        logging.debug(f'Received turn order {partial_state.state.turn_order}')
+    def from_partial_state(cls, partial_state:PlayerState, history:List[Action]=[]):
         game = cls()
         game.event_bus = EventBus()
-        game.state_service = BoardStateService(game._determine_cards(partial_state))
+        
+        if history:
+            state = BoardState.cardless(partial_state.state)
+            transient_state_service = BoardStateService(state)
+            initializer = GameInitializer() 
+            card_dict = initializer._build_card_dict()
+            state_changer = StateChanger(transient_state_service, draw_cards=False)
+            for action in history:
+                active_player = transient_state_service.get_active_player()
+                if hasattr(action, 'card_id'):
+                    transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
+                state_changer.apply_action(action, transient_state_service, active_player)
+                transient_state_service.wipe_hands()
+                hidden_state = transient_state_service.state.hide_state()
+                hidden_state.deck_size = partial_state.state.deck_size
+                for player in hidden_state.players.values():
+                    player.hand_size = partial_state.state.players[player.color].hand_size
+            game.state_service = BoardStateService(game._determine_cards(hidden_state, partial_state.your_hand, partial_state.your_color))
+
+        else:
+            game.state_service = BoardStateService(game._determine_cards(partial_state.state, partial_state.your_hand, partial_state.your_color))
+        
         # Restore transient per-turn fields
         game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
         game.state_service.round_count = getattr(partial_state, 'current_round', 1)
-        
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
+
         logging.debug(f'Returned turn order {partial_state.state.turn_order}')
+        logging.debug(f"DECK SIZE AFTER DETERMINIZING: {game.state_service.get_deck_size()}")
+        logging.debug(f"HANDS AFTER DETERMINIZING")
+        logging.debug(f"DISCARD AFTER DETERMINIZING: {game.state_service.state.discard}") 
+        for player in game.state_service.get_players().values():
+            logging.debug(f'PLAYER COLOR {player.color} has hand size {len(player.hand)}')
         return game
     
-    def _determine_cards(self, partial_state:PlayerState) -> BoardState:
+    def _determine_cards(self, partial_state:BoardStateExposed, known_hand:Dict[int, Card], known_color:PlayerColor) -> BoardState:
         # Use a local initializer to avoid relying on instance attribute during reconstruction
         initializer = getattr(self, 'initializer', None) or GameInitializer()
-        full_deck = initializer._build_initial_deck(len(partial_state.state.players))
-        known_card_ids = set([card.id for card in partial_state.state.discard]) | set(partial_state.your_hand)
+        full_deck = initializer._build_initial_deck(len(partial_state.players))
+        known_card_ids = set([card.id for card in partial_state.discard]) | set(known_hand)
         available_deck = [card for card in full_deck if card.id not in known_card_ids]
 
-        deal_to = [player for player in partial_state.state.turn_order if player != partial_state.your_color]
+        deal_to = [player for player in partial_state.turn_order if player != known_color]
         player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
 
-        city_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.CITY)
-        industry_wild = next(card for card in partial_state.state.wilds if card.card_type is CardType.INDUSTRY)
+        city_wild = next(card for card in partial_state.wilds if card.card_type is CardType.CITY)
+        industry_wild = next(card for card in partial_state.wilds if card.card_type is CardType.INDUSTRY)
 
         for player in deal_to:
-            exposed_player = partial_state.state.players[player]
+            exposed_player = partial_state.players[player]
             if exposed_player.has_city_wild:
                 player_hands[player][city_wild.id] = city_wild
             if exposed_player.has_industry_wild:
@@ -69,17 +98,17 @@ class Game:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
 
-        player_hands[partial_state.your_color] = partial_state.your_hand
+        player_hands[known_color] = known_hand
 
         # Do not apply any additional burns here; deck_size already reflects that in the exposed state
-        target_deck_size = partial_state.state.deck_size
+        target_deck_size = partial_state.deck_size
         excess = len(available_deck) - target_deck_size
         for _ in range(max(0, excess)):
             if not available_deck:
                 break
             available_deck.pop()
 
-        return BoardState.determine(partial_state.state, player_hands, available_deck)
+        return BoardState.determine(partial_state, player_hands, available_deck)
             
 
     def __init__(self):
@@ -119,7 +148,7 @@ class Game:
         return process_result
 
     def concluded(self):
-        return self.state_service.get_deck_size() == 0 and all(not player.hand for player in self.state_service.get_players().values())
+        return self.state_service.get_deck_size() == 0 and all(not player.hand for player in self.state_service.get_players().values()) and self.state_service.get_era() is LinkType.RAIL
 
 if __name__ == '__main__':
     game = Game()

@@ -31,6 +31,13 @@ class BoardStateService:
     def get_board_state(self) -> BoardState:
         return self.state
 
+    def wipe_hands(self) -> None:
+        for _, player in self.get_players().items():
+            player.hand = {}
+
+    def give_player_a_card(self, color:PlayerColor, card:Card) -> None:
+        self.get_player(color).hand[card.id] = card
+
     def get_exposed_state(self):
         return self.state.hide_state()
 

@@ -131,13 +131,13 @@ class MCTS:
             depth += 1
         return self._evaluate_state(determinized_state)
 
-    def _determinize_state(self, root_info_set:PlayerState, action_history:tuple[Action]) -> BoardStateService:
+    def _determinize_state(self, root_info_set:PlayerState, action_history:List[Action]) -> BoardStateService:
         initial_state = deepcopy(root_info_set)
-        determined_state: BoardStateService = Game.from_partial_state(initial_state).state_service
+        logging.debug('BEGIN DETERMINIZING STATE')
 
-        for action in action_history:
-            if action is not None:
-                self._apply_action(determined_state, action)
+        determined_state: BoardStateService = Game.from_partial_state(initial_state, history=action_history).state_service # FIXME
+
+        logging.debug('FINISHED DETERMINIZING STATE')
         return determined_state
     
     def _evaluate_state(self, state: BoardStateService) -> dict:
@@ -162,7 +162,7 @@ class MCTS:
         for current in path:
             current.visits += 1
             current.value += reward
-    
+
     def _select_action(self, state:BoardStateService) -> Action:
         legal_actions = self._get_legal_actions(state)
         return self.action_selector.select_action(legal_actions, state)

@@ -116,7 +116,7 @@ class Card(GameEntity):
     card_type: CardType
     value: str
     def __repr__(self) -> str:
-        return f'Card value: {self.value}'
+        return f'Card id: {self.id}, Card value: {self.value}'
 
 class PlayerExposed(BaseModel):
     hand_size: int
@@ -210,7 +210,38 @@ class BoardState(BaseModel):
         del state_data["deck_size"]
         
         return cls(**state_data)
-    
+
+    @classmethod
+    def cardless(cls, exposed_state:BoardStateExposed):
+        players = {}
+        for color, exposed_player in exposed_state.players.items():
+            # Создаем полного игрока, подставляя карты из player_hands
+            player_data = exposed_player.model_dump()
+            player_data.update({
+                "hand": {},
+                "available_buildings": exposed_player.available_buildings,
+                "color": color,
+                "bank": exposed_player.bank,
+                "income": exposed_player.income,
+                "income_points": exposed_player.income_points,
+                "victory_points": exposed_player.victory_points,
+                "money_spent": exposed_player.money_spent
+            })
+            players[color] = Player(**player_data)
+
+        # Создаем данные для BoardState
+        state_data = exposed_state.model_dump()
+        state_data.update({
+            "players": players,
+            "deck": []
+        })
+        
+        # Удаляем поле deck_size, которое есть только в exposed
+        del state_data["deck_size"]
+        
+        return cls(**state_data)
+
+
     def hide_state(self) -> BoardStateExposed:
         data = self.model_dump()
         data["players"] = {color: player.hide_hand() for color, player in self.players.items()}

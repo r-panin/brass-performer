@@ -1,18 +1,29 @@
 from ...schema import BoardState, LinkType, ActionContext
 import random
-from copy import deepcopy
-from deepdiff import DeepDiff
-from .services.event_bus import EventBus, InterturnEvent
+from .services.event_bus import EventBus
 from .game_initializer import GameInitializer
 from ...server.game_logic.services.board_state_service import BoardStateService
 import logging
 
 
 class TurnManager:
-    def __init__(self, starting_state:BoardState, event_bus:EventBus):
+    ERA_CHANGE = {
+        4: 8,
+        3: 9,
+        2: 10
+    }
+    GAME_END = {
+        4: 16,
+        3: 18,
+        2: 20
+    }
+    def __init__(self, starting_state:BoardState, event_bus:EventBus, draw_cards=True):
         self.concluded = False
         self.event_bus = event_bus
         self.previous_turn_order = starting_state.turn_order 
+        self.draw_cards = draw_cards
+        self.era_change_on = self.ERA_CHANGE[len(starting_state.players)]
+        self.end_game_on = self.GAME_END[len(starting_state.players)]
 
     def prepare_next_turn(self, state_service:BoardStateService) -> BoardStateService:
         state_service.advance_turn_order()
@@ -27,23 +38,25 @@ class TurnManager:
         return state_service
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
+        
         rank = {player_color: idx for idx, player_color in enumerate(self.previous_turn_order)}
         state_service.set_turn_order(sorted(state_service.get_players(), key=lambda k: (state_service.get_players()[k].money_spent, rank.get(k))))
         self.previous_turn_order = state_service.get_turn_order()
 
-        if all(len(p.hand) == 0 for p in state_service.get_players().values()) and state_service.get_deck_size() == 0:
-            if state_service.get_era() == LinkType.CANAL:
-                state_service = self._prepare_next_era(state_service)
-            elif state_service.get_era() == LinkType.RAIL:
-                state_service = self._conclude_game(state_service)
+        if self.era_change_on == state_service.round_count:
+            state_service = self._prepare_next_era(state_service)
+        elif self.end_game_on == state_service.round_count:
+            state_service = self._conclude_game(state_service)
 
         for player in state_service.get_players().values():
             player.bank += player.income
             
-            if state_service.get_deck():
+            if state_service.get_deck() and self.draw_cards:
                 while len(player.hand) < 8 and state_service.get_deck_size() > 0:
                     card = state_service.get_deck().pop()
                     player.hand[card.id] = card
+            
+            player.money_spent = 0
 
         if any(player.bank < 0 for player in state_service.get_players().values()):
             state_service.set_action_context(ActionContext.SHORTFALL)

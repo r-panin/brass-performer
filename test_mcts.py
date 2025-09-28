@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(
     level=logging.DEBUG,  # Уровень логирования
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
-    handlers=[logging.FileHandler(r'G:\brass-performer\brass-performer\game\fuck.log', 'w')]  # Вывод в stdout
+    handlers=[logging.FileHandler(r'G:\brass-performer\brass-performer\game\mcts.log', 'w')]  # Вывод в stdout
 )
 logging.getLogger().setLevel(logging.DEBUG)
 
