@@ -295,6 +295,6 @@ class TestClient:
 
 if __name__ == "__main__":
     import sys
-    num_players = int(sys.argv[1]) if len(sys.argv) > 1 else 2
+    num_players = int(sys.argv[1]) if len(sys.argv) > 1 else 4
     client = TestClient(num_players)
     asyncio.run(client.run())

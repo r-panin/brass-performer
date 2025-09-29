@@ -13,7 +13,7 @@ class StateChanger:
 
     def __init__(self, starting_state:BoardStateService, event_bus:EventBus=None):
         self.event_bus = event_bus
-        self.turn_manager = TurnManager(starting_state.get_board_state(), event_bus)
+        self.turn_manager = TurnManager(starting_state, event_bus)
 
     def apply_action(self, action:Action, state_service:BoardStateService, player:Player):
         # Убираем карту если есть

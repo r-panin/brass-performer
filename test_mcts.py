@@ -13,7 +13,7 @@ logging.basicConfig(
 logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    mcts = MCTS(simulations=1000, depth=10000)
+    mcts = MCTS(simulations=10000, depth=10000)
 
     game = Game()
     colors = list(PlayerColor)

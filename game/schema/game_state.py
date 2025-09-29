@@ -3,8 +3,9 @@ from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, ClassVar, Set, Any
 import json
 import hashlib
-from .common import IndustryType, ResourceType, ResourceAmounts
+from .common import IndustryType, ResourceAmounts
 from functools import lru_cache
+import random
 
 
 class GameEntity(BaseModel):
@@ -117,10 +118,10 @@ class Card(GameEntity):
     value: str
     def __repr__(self) -> str:
         return f'Card id: {self.id}, Card value: {self.value}'
-    
+
     @classmethod
     def mock(cls) -> 'Card':
-        return Card(id=100, card_type=CardType.CITY, value='mock')
+        return Card(id=random.randint(100, 10**6), card_type=CardType.CITY, value='mock')
 
 class PlayerExposed(BaseModel):
     hand_size: int

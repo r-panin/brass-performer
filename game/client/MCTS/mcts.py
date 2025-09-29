@@ -39,7 +39,7 @@ class RandomActionSelector:
             print(f"COULDN'T FIND AN ACTION IN STATE {state.get_board_state().model_dump()}")
 
 class MCTS:
-    def __init__(self, simulations:int, exploration:float=1.41, depth:int=1000):
+    def __init__(self, simulations:int, exploration:float=2.0, depth:int=1000):
         self.simulations = simulations
         self.exploration = exploration
         self.max_depth = depth

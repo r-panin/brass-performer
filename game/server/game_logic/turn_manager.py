@@ -1,4 +1,4 @@
-from ...schema import BoardState, LinkType, ActionContext
+from ...schema import LinkType, ActionContext
 import random
 from .services.event_bus import EventBus
 from .game_initializer import GameInitializer
@@ -17,12 +17,11 @@ class TurnManager:
         3: 18,
         2: 20
     }
-    def __init__(self, starting_state:BoardState, event_bus:EventBus):
+    def __init__(self, starting_service:BoardStateService, event_bus:EventBus):
         self.concluded = False
         self.event_bus = event_bus
-        self.previous_turn_order = starting_state.turn_order 
-        self.era_change_on = self.ERA_CHANGE[len(starting_state.players)]
-        self.end_game_on = self.GAME_END[len(starting_state.players)]
+        self.era_change_on = self.ERA_CHANGE[len(starting_service.get_players())]
+        self.end_game_on = self.GAME_END[len(starting_service.get_players())]
 
     def prepare_next_turn(self, state_service:BoardStateService) -> BoardStateService:
         state_service.advance_turn_order()
@@ -38,10 +37,13 @@ class TurnManager:
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
         
-        rank = {player_color: idx for idx, player_color in enumerate(self.previous_turn_order)}
+        rank = {player_color: idx for idx, player_color in enumerate(state_service.get_previous_turn_order())}
+        logging.debug(f"Rank is: {rank}")
+        logging.debug(f"Previous turn order is: {state_service.get_previous_turn_order()}")
         state_service.set_turn_order(sorted(state_service.get_players(), key=lambda k: (state_service.get_players()[k].money_spent, rank.get(k))))
-        self.previous_turn_order = state_service.get_turn_order()
-
+        state_service.reset_previous_turn_order()
+        logging.debug(f"New turn order: {state_service.get_turn_order()}")
+        logging.debug(f"Round count: {state_service.round_count}")
         if self.era_change_on == state_service.round_count:
             state_service = self._prepare_next_era(state_service)
         elif self.end_game_on == state_service.round_count:
@@ -50,6 +52,8 @@ class TurnManager:
         first_round = state_service.get_current_round() == 1
 
         for player in state_service.get_players().values():
+            logging.debug(f"Amount of money spent by {player.color}: {player.money_spent}")
+            # logging.debug(f"Player {player.color} rank: {rank[player.color]}")
             player.bank += player.income
             
             if state_service.get_deck(): 
@@ -91,6 +95,8 @@ class TurnManager:
                 state_service.get_player(building.owner).victory_points += building.victory_points
             if building.level == 1:
                 state_service.get_building_slot(building.slot_id).building_placed = None
+
+        state_service.clear_discard()
 
         state_service.get_board_state().era = LinkType.RAIL
 
