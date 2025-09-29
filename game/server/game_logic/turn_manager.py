@@ -17,11 +17,10 @@ class TurnManager:
         3: 18,
         2: 20
     }
-    def __init__(self, starting_state:BoardState, event_bus:EventBus, draw_cards=True):
+    def __init__(self, starting_state:BoardState, event_bus:EventBus):
         self.concluded = False
         self.event_bus = event_bus
         self.previous_turn_order = starting_state.turn_order 
-        self.draw_cards = draw_cards
         self.era_change_on = self.ERA_CHANGE[len(starting_state.players)]
         self.end_game_on = self.GAME_END[len(starting_state.players)]
 
@@ -47,14 +46,20 @@ class TurnManager:
             state_service = self._prepare_next_era(state_service)
         elif self.end_game_on == state_service.round_count:
             state_service = self._conclude_game(state_service)
+        
+        first_round = state_service.get_current_round() == 1
 
         for player in state_service.get_players().values():
             player.bank += player.income
             
-            if state_service.get_deck() and self.draw_cards:
-                while len(player.hand) < 8 and state_service.get_deck_size() > 0:
+            if state_service.get_deck(): 
+                card = state_service.get_deck().pop()
+                player.hand[card.id] = card
+                logging.debug(f'Player {player.color} got a card')
+                if not first_round:
                     card = state_service.get_deck().pop()
                     player.hand[card.id] = card
+                    logging.debug(f'Player {player.color} got another card')
             
             player.money_spent = 0
 
@@ -88,6 +93,9 @@ class TurnManager:
                 state_service.get_building_slot(building.slot_id).building_placed = None
 
         state_service.get_board_state().era = LinkType.RAIL
+
+        for player in state_service.get_players().values():
+            player.hand = {card.id: card for card in [state_service.get_deck().pop() for _ in range(6)]}
 
         return state_service
 

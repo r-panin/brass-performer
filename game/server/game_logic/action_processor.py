@@ -32,7 +32,7 @@ class ActionProcessor():
                 your_color=color,
                 your_hand=self.state_service.get_player(color).hand,
                 subaction_count=self.state_service.subaction_count,
-                current_round=self.state_changer.turn_manager.round_count
+                current_round=self.state_service.get_current_round()
             )
         elif request.request is RequestType.REQUEST_ACTIONS:
             actions = self.action_space_generator.get_action_space(self.state_service, color)
@@ -52,7 +52,8 @@ class ActionProcessor():
                 awaiting={},
                 your_hand=self.state_service.get_player(color).hand,
                 your_color=color,
-                state=self.state_service.get_exposed_state()
+                state=self.state_service.get_exposed_state(),
+                current_round=self.state_service.get_current_round()
             )
 
         player = self.state_service.get_player(color)
@@ -65,6 +66,7 @@ class ActionProcessor():
                 your_hand=self.state_service.get_player(color).hand,
                 your_color=color,
                 state=self.state_service.get_exposed_state(),
+                current_round=self.state_service.get_current_round()
             )
         
         # Обрабатываем действие в зависимости от типа

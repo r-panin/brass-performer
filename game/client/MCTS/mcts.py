@@ -18,7 +18,7 @@ class Node:
         self.visits = 0
         self.value = float()
         self.who_moved = who_moved
-        self.untried_actions: List[Action] = []
+        self.untried_actions: List[Action] = None
         if parent is not None and parent.action_history is not None:
             self.action_history = parent.action_history.copy()
         else:
@@ -27,8 +27,9 @@ class Node:
             self.action_history.append(action)
     
     def is_fully_expanded(self, legal_actions = List[Action]) -> bool:
-        expanded_actions = {child.action for child in self.children}
-        return all(action in expanded_actions for action in legal_actions)
+        if self.untried_actions is None:
+            return False
+        return len(self.untried_actions) == 0
 
 class RandomActionSelector:
     def select_action(self, legal_actions:List[Action], state) -> Action:
@@ -51,13 +52,21 @@ class MCTS:
         root_info_set = deepcopy(state)
         if self.root is None:
             self.root = Node(parent=None, action=None, who_moved=None)
+            determinized_state = self._determinize_state(root_info_set, [])
+            legal_actions = self._get_legal_actions(determinized_state)
+            self.root.untried_actions = legal_actions.copy()
+            self.root.active_player = determinized_state.get_active_player().color
 
         for sim_idx in range(self.simulations):
             logging.debug(f"Running simulation #{sim_idx}")
             
             node, path = self._select(self.root)
 
-            node = self._expand(node, root_info_set)
+            if not node.is_fully_expanded():
+                new_node = self._expand(node, root_info_set)
+                if new_node != node:
+                    path.append(new_node)
+                    node = new_node
 
             # Simulation: from the new state, rollout randomly to terminal
             simulation_result = self._simulate(node, root_info_set)
@@ -103,14 +112,19 @@ class MCTS:
         return max(root.children, key=lambda child: child.visits).action
     
     def _expand(self, node: Node, root_info_set: PlayerState) -> Node:
-        if not node.children:
-            determined_state = self._determinize_state(root_info_set, node.action_history)
-            legal_actions = self._get_legal_actions(determined_state)
-            who_moved = determined_state.get_active_player().color
+        determined_state = self._determinize_state(root_info_set, node.action_history)
 
-            for action in legal_actions:
-                child_node = Node(parent=node, action=action, who_moved=who_moved)
-                node.children.append(child_node)
+        if node.untried_actions is None:
+            legal_actions = self._get_legal_actions(determined_state)
+            node.untried_actions = legal_actions.copy()
+            node.active_player = determined_state.get_active_player().color
+
+        if node.untried_actions:
+            action = node.untried_actions.pop()
+            child_node = Node(parent=node, action=action, who_moved=node.active_player)
+            node.children.append(child_node)
+            return child_node
+        
         return node
     
     def _apply_action(self, state:BoardStateService, action:Action):
@@ -133,7 +147,7 @@ class MCTS:
 
     def _determinize_state(self, root_info_set:PlayerState, action_history:List[Action]) -> BoardStateService:
         initial_state = deepcopy(root_info_set)
-        logging.debug('BEGIN DETERMINIZING STATE')
+        logging.debug(f'BEGIN DETERMINIZING STATE from pov: {root_info_set.your_color}')
 
         determined_state: BoardStateService = Game.from_partial_state(initial_state, history=action_history).state_service # FIXME
 

@@ -11,9 +11,9 @@ class StateChanger:
     DOUBLE_ACTION_TYPES = (ActionType.DEVELOP, ActionType.NETWORK)
     MULTIPLE_ACTION_TYPES = (ActionType.SELL, ActionType.SHORTFALL)
 
-    def __init__(self, starting_state:BoardStateService, draw_cards=True, event_bus:EventBus=None):
+    def __init__(self, starting_state:BoardStateService, event_bus:EventBus=None):
         self.event_bus = event_bus
-        self.turn_manager = TurnManager(starting_state.get_board_state(), event_bus, draw_cards=draw_cards)
+        self.turn_manager = TurnManager(starting_state.get_board_state(), event_bus)
 
     def apply_action(self, action:Action, state_service:BoardStateService, player:Player):
         # Убираем карту если есть
@@ -153,6 +153,8 @@ class StateChanger:
 
         if state_service.get_actions_left() == 0:
             state_service = self.turn_manager.prepare_next_turn(state_service)
+
+        logging.debug(f'State changer: subaction count: {state_service.subaction_count}')
         
         return state_service
         

@@ -32,7 +32,7 @@
     {
         "id": 7,
         "cities": ["Derby", "Uttoxeter"],
-        "transport": ["canal", "rail"]
+        "transport": ["rail"]
     },
     {
         "id": 8,

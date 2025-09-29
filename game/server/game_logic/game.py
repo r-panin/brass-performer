@@ -40,12 +40,16 @@ class Game:
         
         if history:
             state = BoardState.cardless(partial_state.state)
+            deck_size = partial_state.state.deck_size
+            state.deck = [Card.mock() for _ in range(deck_size)]
             transient_state_service = BoardStateService(state)
             transient_state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
             transient_state_service.round_count = getattr(partial_state, 'current_round', 1)
             initializer = GameInitializer() 
             card_dict = initializer._build_card_dict()
-            state_changer = StateChanger(transient_state_service, draw_cards=False)
+            state_changer = StateChanger(transient_state_service)
+
+            expected_hand_sizes = {p.color: p.hand_size for p in partial_state.state.players.values()}
             for action in history:
                 active_player = transient_state_service.get_active_player()
 
@@ -54,18 +58,36 @@ class Game:
                         transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
                         if action.card_id in partial_state.your_hand:
                             partial_state.your_hand.pop(action.card_id)
+                        expected_hand_sizes[active_player.color] -= 1
                     elif isinstance(action.card_id, list):
                         for card_id in action.card_id:
                             transient_state_service.give_player_a_card(active_player.color, card_dict[card_id])
                             if card_id in partial_state.your_hand:
                                 partial_state.your_hand.pop(card_id)
+                        expected_hand_sizes[active_player.color] -= 1 # оставляем место под джокеров
+                    logging.debug(f'Reduced player {active_player.color} hand size to {expected_hand_sizes[active_player.color]}')
 
                 state_changer.apply_action(action, transient_state_service, active_player)
+                
+                for player in transient_state_service.get_players().values():
+                    logging.debug(f"Current transient round: {transient_state_service.get_current_round()}")
+                    expected_hand_sizes[player.color] += len(player.hand)
+                    logging.debug(f'Player {player.color} Mock hand size: {len(active_player.hand)}')
+                    logging.debug(f"Increased player{player.color} hand size to {expected_hand_sizes[player.color]}")
+                    
+                transient_state_service.wipe_hands()
+
+                if action.action == 'scout':
+                    logging.debug(f'Player {active_player.color} should have flag city joker set. In reality flag is: {active_player.has_city_wild}')
 
             hidden_state = transient_state_service.state.hide_state()
-            hidden_state.deck_size = partial_state.state.deck_size
+            hidden_state.deck_size = transient_state_service.get_deck_size()
+            logging.debug(f'TRANSIENT SERVICE DECK SIZE: {transient_state_service.get_deck_size()}')
             for player in hidden_state.players.values():
-                player.hand_size = partial_state.state.players[player.color].hand_size
+                transient_player = transient_state_service.get_player(player.color)
+                player.hand_size = expected_hand_sizes[player.color]
+                player.has_city_wild = transient_player.has_city_wild
+                player.has_industry_wild = transient_player.has_industry_wild
             game.state_service = BoardStateService(game._determine_cards(hidden_state, partial_state.your_hand, partial_state.your_color))
 
             game.state_service.subaction_count = transient_state_service.subaction_count
@@ -84,12 +106,14 @@ class Game:
 
         logging.debug(f'Returned turn order {game.state_service.get_turn_order()}')
         logging.debug(f"DECK SIZE AFTER DETERMINIZING: {game.state_service.get_deck_size()}")
+        logging.debug(f"DISCARD AFTER DETERMINIZING: {game.state_service.state.discard},\n DISCARD SIZE: {len(game.state_service.state.discard)}") 
         logging.debug(f"HANDS AFTER DETERMINIZING")
-        logging.debug(f"DISCARD AFTER DETERMINIZING: {game.state_service.state.discard}") 
         for player in game.state_service.get_players().values():
             logging.debug(f'PLAYER COLOR {player.color} has hand size {len(player.hand)}')
             for card in player.hand.values():
                 logging.debug(card)
+            logging.debug(f"Player has city wild: {player.has_city_wild}")
+            logging.debug(f"Player has industry wild: {player.has_industry_wild}")
         return game
     
     def _determine_cards(self, partial_state:BoardStateExposed, known_hand:Dict[int, Card], known_color:PlayerColor) -> BoardState:
@@ -99,11 +123,18 @@ class Game:
         known_card_ids = set([card.id for card in partial_state.discard]) | set(known_hand)
         available_deck = [card for card in full_deck if card.id not in known_card_ids]
 
-        deal_to = [player for player in partial_state.turn_order if player != known_color]
+        deal_to = [player for player in partial_state.players]
         player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
 
         city_wild = next(card for card in partial_state.wilds if card.card_type is CardType.CITY)
         industry_wild = next(card for card in partial_state.wilds if card.card_type is CardType.INDUSTRY)
+
+        if partial_state.players[known_color].has_city_wild:
+            known_hand[city_wild.id] = city_wild
+        if partial_state.players[known_color].has_industry_wild:
+            known_hand[industry_wild.id] = industry_wild
+
+        player_hands[known_color] = known_hand
 
         logging.debug(f"Dealing to: {deal_to}")
         for player in deal_to:
@@ -117,12 +148,7 @@ class Game:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
 
-        if partial_state.players[known_color].has_city_wild:
-            known_hand[city_wild.id] = city_wild
-        if partial_state.players[known_color].has_industry_wild:
-            known_hand[industry_wild.id] = industry_wild
 
-        player_hands[known_color] = known_hand
 
         # Do not apply any additional burns here; deck_size already reflects that in the exposed state
         target_deck_size = partial_state.deck_size

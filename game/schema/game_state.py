@@ -117,6 +117,10 @@ class Card(GameEntity):
     value: str
     def __repr__(self) -> str:
         return f'Card id: {self.id}, Card value: {self.value}'
+    
+    @classmethod
+    def mock(cls) -> 'Card':
+        return Card(id=100, card_type=CardType.CITY, value='mock')
 
 class PlayerExposed(BaseModel):
     hand_size: int

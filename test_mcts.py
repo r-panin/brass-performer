@@ -28,9 +28,7 @@ def main():
         active_player = game.state_service.get_active_player().color
         print(f"Current active player: {active_player}")
 
-        print(f"Main Game id: {id(game)}")        
         test_state = game.get_player_state(active_player)        
-        logging.debug(f"NEW PLAYER STATE: {test_state}")
 
         best_action = mcts.search(test_state)
         print(f"Игрок {active_player} выбирает действие: {best_action}")
@@ -40,8 +38,8 @@ def main():
     for player in game.state_service.state.players.values():
         print(f"Player {player.color} finished with a score {player.victory_points} and income {player.income}")
 
-# cProfile.run('main()', 'mcts_profile')
-# p = pstats.Stats('mcts_profile')
-# p.sort_stats('cumulative').print_stats(20)
-main()
+cProfile.run('main()', 'mcts_profile')
+p = pstats.Stats('mcts_profile')
+p.sort_stats('cumulative').print_stats(20)
+#main()
 
