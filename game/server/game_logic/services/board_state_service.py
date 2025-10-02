@@ -26,8 +26,6 @@ class BoardStateService:
         self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
         self._iron_cache = None
         self.round_count = 1
-        if not hasattr(self, 'previous_turn_order'):
-            self.reset_previous_turn_order()
 
     # --- Encapsulated BoardState accessors/mutators (public API) ---
     def get_board_state(self) -> BoardState:
@@ -58,19 +56,14 @@ class BoardStateService:
     def get_turn_order(self) -> List[PlayerColor]:
         return self.state.turn_order
     
-    def get_previous_turn_order(self) -> List[PlayerColor]:
-        return self.previous_turn_order
-    
-    def reset_previous_turn_order(self) -> None:
-        self.previous_turn_order = self.get_turn_order().copy()
-    
     def set_turn_order(self, new_order: List[PlayerColor]) -> None:
         self.state.turn_order = new_order
 
     def advance_turn_order(self) -> PlayerColor:
         """Remove and return the active player from the front of turn order."""
         logging.debug(f"Turn order before advancing {self.state.turn_order}, removing {self.state.turn_order[0]}")
-        return self.state.turn_order.pop(0)
+        self.state.turn_index += 1
+        return self.state.turn_index
 
     def get_actions_left(self) -> int:
         return self.state.actions_left
@@ -477,9 +470,15 @@ class BoardStateService:
     def is_terminal(self):
         return self.get_deck_size() == 0 and all(not player.hand for player in self.get_players().values()) and self.get_era() is LinkType.RAIL
 
+    def get_turn_index(self) -> int:
+        return self.state.turn_index
+    
+    def reset_turn_index(self) -> None:
+        self.state.turn_index = 0
+
     def get_active_player(self) -> Player:
         if self.get_action_context() is not ActionContext.SHORTFALL:
-            return self.get_player(self.get_turn_order()[0])
+            return self.get_player(self.get_turn_order()[self.get_turn_index()])
         else:
             players_in_shortfall = [player for player in self.get_players().values() if player.bank < 0]
             return players_in_shortfall[0]

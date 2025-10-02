@@ -161,6 +161,7 @@ class BoardStateExposed(BaseModel):
     deck_size: int
     era: LinkType
     turn_order: List[PlayerColor]
+    turn_index: int
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wilds: List[Card]
@@ -175,6 +176,7 @@ class BoardState(BaseModel):
     deck: List[Card]
     era: LinkType
     turn_order: List[PlayerColor]
+    turn_index: int
     actions_left: int = Field(ge=0, le=2)
     discard: List[Card]
     wilds: List[Card]
@@ -200,7 +202,7 @@ class BoardState(BaseModel):
                 "income": exposed_player.income,
                 "income_points": exposed_player.income_points,
                 "victory_points": exposed_player.victory_points,
-                "money_spent": exposed_player.money_spent
+                "money_spent": exposed_player.money_spent,
             })
             players[color] = Player(**player_data)
 

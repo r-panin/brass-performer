@@ -48,7 +48,7 @@ class ActionProcessor():
         if not self.state_service.is_player_to_move(color):
             return ActionProcessResult(
                 processed=False,
-                message=f"Attempted move by {color}, current turn is {self.state_service.get_turn_order()[0]}",
+                message=f"Attempted move by {color}, current turn is {self.state_service.get_active_player().color}",
                 awaiting={},
                 your_hand=self.state_service.get_player(color).hand,
                 your_color=color,

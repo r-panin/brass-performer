@@ -47,7 +47,8 @@ class TestClient:
             self.player_colors[state['your_color']] = ws
             print(f"Player color: {state['your_color']}")
         
-        active_player = state['state']['turn_order'][0]
+        turn_index = state['state']['turn_index']
+        active_player = state['state']['turn_order'][turn_index]
         return active_player
 
     async def game_loop(self, first_active: str):
@@ -208,7 +209,8 @@ class TestClient:
             if 'state' in state_data and 'turn_order' in state_data['state']:
                 print(f"Passing to {state_data['state']['turn_order'][0]}")
                 print(f"Full turn order: {state_data['state']['turn_order']}")
-                return state_data['state']['turn_order'][0]
+                turn_index = state_data['state']['turn_index']
+                return state_data['state']['turn_order'][turn_index]
             else:
                 print(f"Invalid state response: {state_data}")
                 return None
@@ -231,13 +233,14 @@ class TestClient:
             # Извлекаем контекст и порядок ходов
             context = state_data['state']['action_context']
             turn_order = state_data['state']['turn_order']
+            turn_index = state_data['state']['turn_index']
             # Если контекст shortfall, ищем следующего игрока с действиями
             if context == 'shortfall':
                 next_player = await self._get_next_player_shortfall(active_player, turn_order)
-                return next_player if next_player else turn_order[0]
+                return next_player if next_player else turn_order[turn_index]
             else:    
                 # Стандартная логика: первый игрок в turn_order
-                return turn_order[0]
+                return turn_order[turn_index]
                 
         except Exception as e:
             print(f"Error determining next player: {e}")

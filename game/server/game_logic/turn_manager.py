@@ -25,7 +25,7 @@ class TurnManager:
 
     def prepare_next_turn(self, state_service:BoardStateService) -> BoardStateService:
         state_service.advance_turn_order()
-        if not state_service.get_turn_order():
+        if state_service.get_turn_index() >= len(state_service.get_turn_order()):
             state_service = self._prepare_next_round(state_service)
         first_round = state_service.get_current_round() == 1
         if not first_round:
@@ -37,13 +37,14 @@ class TurnManager:
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
         
-        rank = {player_color: idx for idx, player_color in enumerate(state_service.get_previous_turn_order())}
+        rank = {player_color: idx for idx, player_color in enumerate(state_service.get_turn_order())}
         logging.debug(f"Rank is: {rank}")
-        logging.debug(f"Previous turn order is: {state_service.get_previous_turn_order()}")
+        logging.debug(f"Previous turn order is: {state_service.get_turn_order()}")
         state_service.set_turn_order(sorted(state_service.get_players(), key=lambda k: (state_service.get_players()[k].money_spent, rank.get(k))))
-        state_service.reset_previous_turn_order()
+        state_service.reset_turn_index()
         logging.debug(f"New turn order: {state_service.get_turn_order()}")
         logging.debug(f"Round count: {state_service.round_count}")
+
         if self.era_change_on == state_service.round_count:
             state_service = self._prepare_next_era(state_service)
         elif self.end_game_on == state_service.round_count:

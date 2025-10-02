@@ -45,7 +45,7 @@ class GameInitializer():
         for _ in players:
             self.deck.pop()
 
-        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, actions_left=actions_left, discard=discard, wilds=wilds, links=links, action_context=context)
+        return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, turn_index=0, actions_left=actions_left, discard=discard, wilds=wilds, links=links, action_context=context)
     
     def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
         out = {}

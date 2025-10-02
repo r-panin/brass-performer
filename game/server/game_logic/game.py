@@ -92,7 +92,6 @@ class Game:
 
             game.state_service.subaction_count = transient_state_service.subaction_count
             game.state_service.round_count = transient_state_service.round_count
-            game.state_service.previous_turn_order = transient_state_service.previous_turn_order
             logging.debug(f'POST-DETERMINING SUBACTION COUNT IS {game.state_service.subaction_count}')
             logging.debug(f'transient state subaction count: {transient_state_service.subaction_count}')
         else:
