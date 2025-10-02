@@ -4,11 +4,12 @@ from game.schema import PlayerColor
 import cProfile
 import pstats
 import logging
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.DEBUG,  # Уровень логирования
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
-    handlers=[logging.FileHandler(r'G:\brass-performer\brass-performer\game\mcts.log', 'w')]  # Вывод в stdout
+    handlers=[logging.FileHandler(Path(__file__).resolve().parent / 'game/mcts.log')]  # Вывод в stdout
 )
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -42,4 +43,3 @@ cProfile.run('main()', 'mcts_profile')
 p = pstats.Stats('mcts_profile')
 p.sort_stats('cumulative').print_stats(20)
 #main()
-

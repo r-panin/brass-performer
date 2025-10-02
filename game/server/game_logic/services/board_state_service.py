@@ -455,9 +455,7 @@ class BoardStateService:
         return ResourceAmounts(iron=1)
 
     def is_player_to_move(self, color:PlayerColor) -> bool:
-        if not self.get_action_context() is ActionContext.SHORTFALL:
-            return self.get_turn_order()[0] is color
-        return self.get_player(color).bank < 0
+        return self.get_active_player().color is color
 
     def has_subaction(self) -> bool:
         return self.subaction_count > 0
