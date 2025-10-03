@@ -3,7 +3,6 @@ from collections import defaultdict
 from .services.event_bus import EventBus
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
-import logging
 
 class StateChanger:
 
@@ -140,7 +139,6 @@ class StateChanger:
         if action.action is ActionType.COMMIT:
             self._commit_action(state_service)
         
-        logging.debug(f"Player {player.color} executed action {action}")
 
         # определяем actioncontext
         if action.action in self.SINGULAR_ACTION_TYPES:
@@ -154,7 +152,6 @@ class StateChanger:
         if state_service.get_actions_left() == 0:
             state_service = self.turn_manager.prepare_next_turn(state_service)
 
-        logging.debug(f'State changer: subaction count: {state_service.subaction_count}')
         
         return state_service
         
@@ -163,7 +160,6 @@ class StateChanger:
         state_service.set_action_context(ActionContext.MAIN)
         state_service.set_actions_left(state_service.get_actions_left() - 1)
         state_service.subaction_count = 0
-        logging.debug(f"COMMITTING ACTION WITH {state_service.get_actions_left()} ACTIONS LEFT")
 
     def _sell_to_market(self, state_service:BoardStateService, building:Building) -> None:
         if building.industry_type not in (IndustryType.COAL, IndustryType.IRON):

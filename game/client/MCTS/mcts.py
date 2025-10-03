@@ -146,12 +146,9 @@ class MCTS:
         return self._evaluate_state(determinized_state)
 
     def _determinize_state(self, root_info_set:PlayerState, action_history:List[Action]) -> BoardStateService:
-        initial_state = deepcopy(root_info_set)
-        logging.debug(f'BEGIN DETERMINIZING STATE from pov: {root_info_set.your_color}')
 
-        determined_state: BoardStateService = Game.from_partial_state(initial_state, history=action_history).state_service # FIXME
+        determined_state: BoardStateService = Game.from_partial_state(root_info_set, history=action_history).state_service 
 
-        logging.debug('FINISHED DETERMINIZING STATE')
         return determined_state
     
     def _evaluate_state(self, state: BoardStateService) -> dict:

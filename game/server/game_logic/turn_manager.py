@@ -3,7 +3,6 @@ import random
 from .services.event_bus import EventBus
 from .game_initializer import GameInitializer
 from ...server.game_logic.services.board_state_service import BoardStateService
-import logging
 
 
 class TurnManager:
@@ -38,12 +37,8 @@ class TurnManager:
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:
         
         rank = {player_color: idx for idx, player_color in enumerate(state_service.get_turn_order())}
-        logging.debug(f"Rank is: {rank}")
-        logging.debug(f"Previous turn order is: {state_service.get_turn_order()}")
         state_service.set_turn_order(sorted(state_service.get_players(), key=lambda k: (state_service.get_players()[k].money_spent, rank.get(k))))
         state_service.reset_turn_index()
-        logging.debug(f"New turn order: {state_service.get_turn_order()}")
-        logging.debug(f"Round count: {state_service.round_count}")
 
         if self.era_change_on == state_service.round_count:
             state_service = self._prepare_next_era(state_service)
@@ -53,18 +48,14 @@ class TurnManager:
         first_round = state_service.get_current_round() == 1
 
         for player in state_service.get_players().values():
-            logging.debug(f"Amount of money spent by {player.color}: {player.money_spent}")
-            # logging.debug(f"Player {player.color} rank: {rank[player.color]}")
             player.bank += player.income
             
             if state_service.get_deck(): 
                 card = state_service.get_deck().pop()
                 player.hand[card.id] = card
-                logging.debug(f'Player {player.color} got a card')
                 if not first_round:
                     card = state_service.get_deck().pop()
                     player.hand[card.id] = card
-                    logging.debug(f'Player {player.color} got another card')
             
             player.money_spent = 0
 
@@ -72,11 +63,7 @@ class TurnManager:
             state_service.set_action_context(ActionContext.SHORTFALL)
 
         state_service.advance_round_count()
-        logging.debug(f"Round {state_service.get_current_round()}")
-        logging.debug(f"Remaining deck size {state_service.get_deck_size()}")
 
-        for player in state_service.get_players().values():
-            logging.debug(f"Player {player.color} hand size is {len(player.hand)}")
         return state_service
     
     def _prepare_next_era(self, state_service:BoardStateService) -> BoardStateService:

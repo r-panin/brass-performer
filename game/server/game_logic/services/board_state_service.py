@@ -61,7 +61,6 @@ class BoardStateService:
 
     def advance_turn_order(self) -> PlayerColor:
         """Remove and return the active player from the front of turn order."""
-        logging.debug(f"Turn order before advancing {self.state.turn_order}, removing {self.state.turn_order[0]}")
         self.state.turn_index += 1
         return self.state.turn_index
 

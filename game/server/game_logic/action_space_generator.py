@@ -565,7 +565,6 @@ class ActionSpaceGenerator():
         return [PassAction(card_id=card) for card in player.hand]
 
     def get_valid_commit_actions(self, state_service:BoardStateService):
-        logging.debug(f"Current subaction count is {state_service.subaction_count}")
         if state_service.subaction_count > 0:
             return [CommitAction()]
         else:
