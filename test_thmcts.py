@@ -1,4 +1,4 @@
-from game.client.MCTS.mcts import MCTS
+from game.client.MCTS.thmcts import HierarchicalMCTS
 from game.server.game_logic.game import Game
 from game.schema import PlayerColor
 import cProfile
@@ -14,7 +14,7 @@ logging.basicConfig(
 logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    mcts = MCTS(simulations=1000, depth=10000)
+    mcts = HierarchicalMCTS(simulations=1000, depth=10000)
 
     game = Game()
     colors = list(PlayerColor)

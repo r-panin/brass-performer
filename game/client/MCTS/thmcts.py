@@ -69,8 +69,9 @@ class Node:
                 legal_action_hashes = {self._hash_action(a) for a in legal_actions_for_type}
                 return legal_action_hashes.issubset(self.explored_actions)
         
-        # ACTION_PARAM nodes are leaves, always fully expanded
-        return True
+        # ACTION_PARAM nodes can now have children, so check if all legal actions are explored
+        legal_action_types = {action.action for action in legal_actions}
+        return legal_action_types.issubset(self.explored_action_types)
     
     @staticmethod
     def _hash_action(action: Action) -> str:
@@ -222,7 +223,7 @@ class HierarchicalMCTS:
         new_children = []
         
         if node.node_type == NodeType.ACTION_TYPE and node.action_type is None:
-            # This is the root node: expand by creating ACTION_TYPE children
+            # This is the root node or a post-action node: expand by creating ACTION_TYPE children
             legal_action_types = {action.action for action in legal_actions}
             
             for action_type in legal_action_types:
@@ -256,7 +257,27 @@ class HierarchicalMCTS:
                     node.explored_actions.add(action_hash)
                     new_children.append(child_node)
         
-        # ACTION_PARAM nodes are leaves and don't expand
+        elif node.node_type == NodeType.ACTION_PARAM:
+            # ACTION_PARAM nodes can now expand to ACTION_TYPE nodes for the next move
+            # Apply the action to get to the next state
+            temp_state = self._determinize_state(root_info_set, node.action_history)
+            next_legal_actions = self._get_legal_actions(temp_state)
+            
+            if next_legal_actions:
+                legal_action_types = {action.action for action in next_legal_actions}
+                
+                for action_type in legal_action_types:
+                    if action_type not in node.explored_action_types:
+                        child_node = Node(
+                            parent=node,
+                            action=None,
+                            who_moved=temp_state.get_active_player().color,
+                            node_type=NodeType.ACTION_TYPE,
+                            action_type=action_type
+                        )
+                        node.children.append(child_node)
+                        node.explored_action_types.add(action_type)
+                        new_children.append(child_node)
         
         return new_children
     
@@ -277,13 +298,11 @@ class HierarchicalMCTS:
     def _simulate(self, node: Node, root_info_set: PlayerState) -> dict:
         """
         Perform a random rollout from the given node.
-        
-        If at an ACTION_TYPE node (first level), we need to first select and apply
-        a random parameterized action of that type before continuing the rollout.
         """
+        # Start from the state after applying all actions in the node's history
         determinized_state = self._determinize_state(root_info_set, node.action_history)
         
-        # If we're at a first-level ACTION_TYPE node, apply a random action of that type
+        # If we're at an ACTION_TYPE node, we need to apply a random action of that type first
         if node.node_type == NodeType.ACTION_TYPE and node.action_type is not None:
             legal_actions = self._get_legal_actions(determinized_state)
             legal_actions_for_type = [a for a in legal_actions if a.action == node.action_type]
