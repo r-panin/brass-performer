@@ -210,70 +210,70 @@ class BoardState:
     ) -> "BoardState":
         players = {}
         for color, exposed_player in exposed_state.players.items():
-            # Создаем полного игрока, подставляя карты из player_hands
-            player_data = exposed_player.model_dump()
-            player_data.update({
-                "hand": player_hands[color],
-                "available_buildings": exposed_player.available_buildings,
-                "color": color,
-                "bank": exposed_player.bank,
-                "income": exposed_player.income,
-                "income_points": exposed_player.income_points,
-                "victory_points": exposed_player.victory_points,
-                "money_spent": exposed_player.money_spent,
-            })
-            del player_data['hand_size']
-            players[color] = Player(**player_data)
+            players[color] = Player(
+                hand=player_hands[color],
+                available_buildings=exposed_player.available_buildings,
+                color=color,
+                bank=exposed_player.bank,
+                income=exposed_player.income,
+                income_points=exposed_player.income_points,
+                victory_points=exposed_player.victory_points,
+                money_spent=exposed_player.money_spent,
+            )
 
-        # Создаем данные для BoardState
-        state_data = exposed_state.model_dump()
-        state_data.update({
-            "players": players,
-            "deck": deck
-        })
         
-        # Удаляем поле deck_size, которое есть только в exposed
-        del state_data["deck_size"]
-        
-        return cls(**state_data)
+        return cls(
+            cities=exposed_state.cities,
+            links=exposed_state.links,
+            players=players,
+            market=exposed_state.market,
+            deck=deck,
+            era=exposed_state.era,
+            turn_order=exposed_state.turn_order,
+            turn_index=exposed_state.turn_index,
+            actions_left=exposed_state.actions_left,
+            discard=exposed_state.discard,
+            wilds=exposed_state.wilds,
+            action_context=exposed_state.action_context
+        )
 
     @classmethod
-    def cardless(cls, exposed_state:"BoardStateExposed"):
+    def cardless(cls, exposed_state: "BoardStateExposed") -> "BoardState":
         players = {}
         for color, exposed_player in exposed_state.players.items():
-            # Создаем полного игрока, подставляя карты из player_hands
-            player_data = exposed_player.model_dump()
-            player_data.update({
-                "hand": {},
-                "available_buildings": exposed_player.available_buildings,
-                "color": color,
-                "bank": exposed_player.bank,
-                "income": exposed_player.income,
-                "income_points": exposed_player.income_points,
-                "victory_points": exposed_player.victory_points,
-                "money_spent": exposed_player.money_spent
-            })
-            players[color] = Player(**player_data)
+            players[color] = Player(
+                hand={},
+                available_buildings=exposed_player.available_buildings,
+                color=color,
+                bank=exposed_player.bank,
+                income=exposed_player.income,
+                income_points=exposed_player.income_points,
+                victory_points=exposed_player.victory_points,
+                money_spent=exposed_player.money_spent
+            )
 
-        # Создаем данные для BoardState
-        state_data = exposed_state.model_dump()
-        state_data.update({
-            "players": players,
-            "deck": []
-        })
-        
-        # Удаляем поле deck_size, которое есть только в exposed
-        del state_data["deck_size"]
-        
-        return cls(**state_data)
-
+        return cls(
+            cities=exposed_state.cities,
+            links=exposed_state.links,
+            players=players,
+            market=exposed_state.market,
+            deck=[],
+            era=exposed_state.era,
+            turn_order=exposed_state.turn_order,
+            turn_index=exposed_state.turn_index,
+            actions_left=exposed_state.actions_left,
+            discard=exposed_state.discard,
+            wilds=exposed_state.wilds,
+            action_context=exposed_state.action_context
+        )
+    
 class BoardStateExposed(BaseModel):
     cities: Dict[str, City]  
     links: Dict[int, Link]
     players: Dict[PlayerColor, PlayerExposed]
     market: Market
     deck_size: int
-    era: str
+    era: LinkType
     turn_order: List[PlayerColor]
     turn_index: int
     actions_left: int = 0
