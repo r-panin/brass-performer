@@ -1,49 +1,18 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Set, ClassVar
+from typing import Any, List, Optional, Dict, Set, ClassVar
 from enum import StrEnum
 from pydantic import BaseModel
 
 @dataclass(slots=True)
 class GameEntity:
     _excluded_from_hash: ClassVar[Set[str]] = {'type_hash', 'id'}
-    type_hash: str = field(default=None, init=False)
+
+    @property
+    def type_hash(self):
+        pass
     
-    def __post_init__(self):
-        self.type_hash = self._generate_hash()
-    
-    def _generate_hash(self) -> str:
-        # Ручной обход значимых полей вместо model_dump
-        fields_data = []
-        
-        for field_name, field_value in self:
-            if field_name in self._excluded_from_hash:
-                continue
-                
-            if isinstance(field_value, (list, dict, set)):
-                # Для коллекций создаем хешируемое представление
-                fields_data.append((field_name, self._hash_collection(field_value)))
-            else:
-                fields_data.append((field_name, field_value))
-        
-        # Сортируем по имени поля для детерминированности
-        fields_data.sort(key=lambda x: x[0])
-        
-        return str(hash(tuple(fields_data)))
-
-    def _hash_collection(self, obj):
-        if isinstance(obj, dict):
-            return tuple(sorted((k, self._hash_collection(v)) for k, v in obj.items()))
-        elif isinstance(obj, list):
-            return tuple(self._hash_collection(x) for x in obj)
-        elif isinstance(obj, set):
-            return tuple(sorted(self._hash_collection(x) for x in obj))
-        else:
-            return obj
-
-
-# Enum оставляем как есть - они легковесные
 class ActionContext(StrEnum):
-    GLOVCESTER_DEVELOP = 'gloucester_develop'
+    GLOUCESTER_DEVELOP = 'gloucester_develop'
     SHORTFALL = 'shortfall'
     MAIN = 'main'
     SELL = 'sell'
@@ -54,13 +23,35 @@ class IndustryType(StrEnum):
     BOX = "box"
     POTTERY = "pottery"
     COTTON = "cotton"
-    # ... остальные типы
+    IRON = "iron"
+    COAL = "coal"
+    BREWERY = "brewery"
 
 class PlayerColor(StrEnum):
     WHITE = "white"
     PURPLE = "purple"
     YELLOW = "yellow"
     RED = "red"
+
+class LinkType(StrEnum):
+    CANAL = "canal"
+    RAIL = "rail"
+
+class CardType(StrEnum):
+    CITY = "city"
+    INDUSTRY = "industry"
+
+class GameStatus(StrEnum):
+    CREATED = 'created'
+    ONGOING = 'ongoing'
+    COMPLETE = 'complete'
+
+class MerchantType(StrEnum):
+    ANY = 'any'
+    EMPTY = 'empty'
+    BOX = 'box'
+    POTTERY = 'pottery'
+    COTTON = 'cotton'
 
 @dataclass
 class ResourceAmounts:
@@ -73,7 +64,7 @@ class ResourceAmounts:
 class MerchantSlot(GameEntity):
     id: int
     city: str
-    merchant_type: str  
+    merchant_type: MerchantType
     beer_available: bool = True
 
 @dataclass
@@ -84,13 +75,13 @@ class Building(GameEntity):
     owner: PlayerColor
     flipped: bool
     cost: ResourceAmounts
-    resource_count: int = 0
-    victory_points: int = 0
-    sell_cost: Optional[int] = None
-    is_developable: bool = False
-    link_victory_points: int = 0
-    era_exclusion: Optional[str] = None
-    income: int = 0
+    resource_count: int
+    victory_points: int
+    sell_cost: Optional[int]
+    is_developable: bool
+    link_victory_points: int
+    era_exclusion: Optional[str]
+    income: int
     slot_id: Optional[int] = None
     
     def get_cost(self) -> ResourceAmounts:
@@ -109,7 +100,7 @@ class BuildingSlot(GameEntity):
 @dataclass
 class Link(GameEntity):
     id: int
-    type: List[str]  # List[LinkType] как List[str]
+    type: List[LinkType] 
     cities: List[str]
     owner: Optional[str] = None
 
@@ -131,13 +122,13 @@ class Market:
 @dataclass
 class Card(GameEntity):
     id: int
-    card_type: str  
+    card_type: CardType
     value: str
     
     @classmethod
     def mock(cls) -> 'Card':
         import random
-        return Card(id=random.randint(100, 10**6), card_type='city', value='mock')
+        return Card(id=random.randint(100, 10**6), card_type=CardType.CITY, value='mock')
 
 class PlayerExposed(BaseModel):
     hand_size: int
@@ -157,10 +148,10 @@ class Player:
     available_buildings: Dict[int, Building]
     color: PlayerColor
     bank: int
-    income: int = -10
-    income_points: int = -10
-    victory_points: int = 0
-    money_spent: int = 0
+    income: int
+    income_points: int
+    victory_points: int
+    money_spent: int = 0 
     has_city_wild: bool = False
     has_industry_wild: bool = False
     
@@ -185,10 +176,10 @@ class BoardState:
     players: Dict[PlayerColor, Player]
     market: Market
     deck: List[Card]
-    era: str  # LinkType как str
+    era: LinkType
     turn_order: List[PlayerColor]
     turn_index: int
-    actions_left: int = 0
+    actions_left: int
     discard: List[Card] = field(default_factory=list)
     wilds: List[Card] = field(default_factory=list)
     action_context: ActionContext = ActionContext.MAIN
@@ -209,8 +200,73 @@ class BoardState:
             wilds=self.wilds,
             action_context=self.action_context
         )
+    
+    @classmethod
+    def determine(
+        cls,
+        exposed_state: 'BoardStateExposed',
+        player_hands: Dict[PlayerColor, Dict[int, Card]],
+        deck: List[Card]
+    ) -> "BoardState":
+        players = {}
+        for color, exposed_player in exposed_state.players.items():
+            # Создаем полного игрока, подставляя карты из player_hands
+            player_data = exposed_player.model_dump()
+            player_data.update({
+                "hand": player_hands[color],
+                "available_buildings": exposed_player.available_buildings,
+                "color": color,
+                "bank": exposed_player.bank,
+                "income": exposed_player.income,
+                "income_points": exposed_player.income_points,
+                "victory_points": exposed_player.victory_points,
+                "money_spent": exposed_player.money_spent,
+            })
+            del player_data['hand_size']
+            players[color] = Player(**player_data)
 
-# API модели оставляем на Pydantic для валидации
+        # Создаем данные для BoardState
+        state_data = exposed_state.model_dump()
+        state_data.update({
+            "players": players,
+            "deck": deck
+        })
+        
+        # Удаляем поле deck_size, которое есть только в exposed
+        del state_data["deck_size"]
+        
+        return cls(**state_data)
+
+    @classmethod
+    def cardless(cls, exposed_state:"BoardStateExposed"):
+        players = {}
+        for color, exposed_player in exposed_state.players.items():
+            # Создаем полного игрока, подставляя карты из player_hands
+            player_data = exposed_player.model_dump()
+            player_data.update({
+                "hand": {},
+                "available_buildings": exposed_player.available_buildings,
+                "color": color,
+                "bank": exposed_player.bank,
+                "income": exposed_player.income,
+                "income_points": exposed_player.income_points,
+                "victory_points": exposed_player.victory_points,
+                "money_spent": exposed_player.money_spent
+            })
+            players[color] = Player(**player_data)
+
+        # Создаем данные для BoardState
+        state_data = exposed_state.model_dump()
+        state_data.update({
+            "players": players,
+            "deck": []
+        })
+        
+        # Удаляем поле deck_size, которое есть только в exposed
+        del state_data["deck_size"]
+        
+        return cls(**state_data)
+
 class BoardStateExposed(BaseModel):
     cities: Dict[str, City]  
     links: Dict[int, Link]
@@ -224,3 +280,32 @@ class BoardStateExposed(BaseModel):
     discard: List[Card]
     wilds: List[Card]
     action_context: ActionContext
+
+class OutputToPlayer(BaseModel):
+    message: Optional[str] = None
+
+class PlayerState(OutputToPlayer):
+    state: BoardStateExposed
+    your_hand: Dict[int, Card]
+    your_color: PlayerColor
+    subaction_count: int = 0
+    current_round: int
+
+class ValidationResult(OutputToPlayer):
+    is_valid: bool
+
+class ActionProcessResult(PlayerState):
+    processed: bool
+    awaiting: Dict[str, List[str]]
+    end_of_turn: bool = False
+    end_of_game: bool = False
+
+class RequestResult(OutputToPlayer):
+    success: bool
+    result: List[Any]
+
+class StateRequestResult(RequestResult):
+    result: PlayerState
+
+class ActionSpaceRequestResult(RequestResult):
+    result:List = []

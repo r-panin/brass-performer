@@ -63,7 +63,6 @@ class GameInitializer():
                 id=building['id'],
                 industry_type=building['industry'],
                 level=building['level'],
-                city=str(),
                 owner=player_color,
                 flipped=False,
                 cost=cost,

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from .game_state import GameStatus, BoardStateExposed, PlayerColor
+from .game_logic import GameStatus, BoardStateExposed, PlayerColor
 
 class GameResponse(BaseModel):
     id: str
