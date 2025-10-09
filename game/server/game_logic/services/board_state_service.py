@@ -60,7 +60,6 @@ class BoardStateService:
         self.state.turn_order = new_order
 
     def advance_turn_order(self) -> PlayerColor:
-        """Remove and return the active player from the front of turn order."""
         self.state.turn_index += 1
         return self.state.turn_index
 
@@ -97,8 +96,9 @@ class BoardStateService:
     def get_links(self) -> Dict[int, Link]:
         return self.state.links
 
-    def iter_links(self):
-        return self.state.links.values()
+    def iter_links(self) -> Iterator[Link]:
+        for link in self.state.links.values():
+            yield link
 
     def get_link(self, link_id: int) -> Link:
         return self.state.links[link_id]

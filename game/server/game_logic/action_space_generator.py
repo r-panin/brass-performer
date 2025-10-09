@@ -20,12 +20,11 @@ from ...schema import (
     LinkType,
     CommitAction,
 )
-from typing import Dict, List
+from typing import List
 from collections import defaultdict
 import itertools
 from .action_cat_provider import ActionsCatProvider
 from .services.board_state_service import BoardStateService
-import logging
 
 
 class ActionSpaceGenerator():

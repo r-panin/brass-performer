@@ -102,7 +102,7 @@ class Link(GameEntity):
     id: int
     type: List[LinkType] 
     cities: List[str]
-    owner: Optional[str] = None
+    owner: str
 
 @dataclass
 class City(GameEntity):
@@ -158,7 +158,7 @@ class Player:
     def hide_hand(self) -> PlayerExposed:
         return PlayerExposed(
             hand_size=len(self.hand),
-            available_buildings=self.available_buildings,
+            available_buildings=self.available_buildings.copy(),
             color=self.color,
             bank=self.bank,
             income=self.income,
@@ -187,17 +187,17 @@ class BoardState:
     def hide_state(self) -> 'BoardStateExposed':
         players_exposed = {color: player.hide_hand() for color, player in self.players.items()}
         return BoardStateExposed(
-            cities=self.cities,
-            links=self.links,
+            cities=self.cities.copy(),
+            links=self.links.copy(),
             players=players_exposed,
             market=self.market,
             deck_size=len(self.deck),
             era=self.era,
-            turn_order=self.turn_order,
+            turn_order=self.turn_order.copy(),
             turn_index=self.turn_index,
             actions_left=self.actions_left,
-            discard=self.discard,
-            wilds=self.wilds,
+            discard=self.discard.copy(),
+            wilds=self.wilds.copy(),
             action_context=self.action_context
         )
     
@@ -212,7 +212,7 @@ class BoardState:
         for color, exposed_player in exposed_state.players.items():
             players[color] = Player(
                 hand=player_hands[color],
-                available_buildings=exposed_player.available_buildings,
+                available_buildings=exposed_player.available_buildings.copy(),
                 color=color,
                 bank=exposed_player.bank,
                 income=exposed_player.income,
@@ -223,17 +223,17 @@ class BoardState:
 
         
         return cls(
-            cities=exposed_state.cities,
-            links=exposed_state.links,
+            cities=exposed_state.cities.copy(),
+            links=exposed_state.links.copy(),
             players=players,
             market=exposed_state.market,
             deck=deck,
             era=exposed_state.era,
-            turn_order=exposed_state.turn_order,
+            turn_order=exposed_state.turn_order.copy(),
             turn_index=exposed_state.turn_index,
             actions_left=exposed_state.actions_left,
-            discard=exposed_state.discard,
-            wilds=exposed_state.wilds,
+            discard=exposed_state.discard.copy(),
+            wilds=exposed_state.wilds.copy(),
             action_context=exposed_state.action_context
         )
 
@@ -243,7 +243,7 @@ class BoardState:
         for color, exposed_player in exposed_state.players.items():
             players[color] = Player(
                 hand={},
-                available_buildings=exposed_player.available_buildings,
+                available_buildings=exposed_player.available_buildings.copy(),
                 color=color,
                 bank=exposed_player.bank,
                 income=exposed_player.income,
@@ -253,17 +253,17 @@ class BoardState:
             )
 
         return cls(
-            cities=exposed_state.cities,
-            links=exposed_state.links,
-            players=players,
+            cities=exposed_state.cities.copy(),
+            links=exposed_state.links.copy(),
+            players=players.copy(),
             market=exposed_state.market,
             deck=[],
             era=exposed_state.era,
-            turn_order=exposed_state.turn_order,
+            turn_order=exposed_state.turn_order.copy(),
             turn_index=exposed_state.turn_index,
             actions_left=exposed_state.actions_left,
-            discard=exposed_state.discard,
-            wilds=exposed_state.wilds,
+            discard=exposed_state.discard.copy(),
+            wilds=exposed_state.wilds.copy(),
             action_context=exposed_state.action_context
         )
     

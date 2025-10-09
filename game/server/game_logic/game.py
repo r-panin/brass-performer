@@ -25,6 +25,7 @@ from .services.replay_service import ReplayService
 from .services.board_state_service import BoardStateService
 from pathlib import Path
 from collections import defaultdict
+import logging
 
 
 
@@ -51,7 +52,6 @@ class Game:
             expected_hand_sizes = {p.color: p.hand_size for p in partial_state.state.players.values()}
             for action in history:
                 active_player = transient_state_service.get_active_player()
-
                 if hasattr(action, 'card_id'):
                     if isinstance(action.card_id, int):
                         transient_state_service.give_player_a_card(active_player.color, card_dict[action.card_id])
@@ -63,7 +63,7 @@ class Game:
                             transient_state_service.give_player_a_card(active_player.color, card_dict[card_id])
                             if card_id in known_hand:
                                 known_hand.pop(card_id)
-                        expected_hand_sizes[active_player.color] -= 1 # оставляем место под джокеров
+                        expected_hand_sizes[active_player.color] -= len(action.card_id)
 
                 state_changer.apply_action(action, transient_state_service, active_player)
                 
@@ -83,12 +83,20 @@ class Game:
 
             game.state_service.subaction_count = transient_state_service.subaction_count
             game.state_service.round_count = transient_state_service.round_count
+            logging.debug("Finished building state using history")
         else:
             game.state_service = BoardStateService(game._determine_cards(partial_state.state, partial_state.your_hand, partial_state.your_color))
             game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
             game.state_service.round_count = getattr(partial_state, 'current_round', 1)
+            logging.debug("Finished building state without using history")
         
-        # Restore transient per-turn fields
+        logging.debug(f"Finished determinizing state from the pov: {partial_state.your_color}")
+        logging.debug(f"Initializing game starting on turn {game.state_service.round_count} with deck size {game.state_service.get_deck_size()} and discard size {len(game.state_service.state.discard)}")
+        debug_card_count = game.state_service.get_deck_size() + len(game.state_service.state.discard)
+        for player in game.state_service.get_players().values():
+            logging.debug(f"Player {player.color} has hand size {len(player.hand)}")
+            debug_card_count += len(player.hand)
+        logging.debug(f"Total card count: {debug_card_count}")
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
@@ -136,7 +144,10 @@ class Game:
                 break
             available_deck.pop()
 
-        return BoardState.determine(partial_state, player_hands, available_deck)
+        out = BoardState.determine(partial_state, player_hands, available_deck)
+
+        logging.debug(f"Returning determined board state with deck size {len(out.deck)}")
+        return out
             
 
     def __init__(self):

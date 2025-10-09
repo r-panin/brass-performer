@@ -1,8 +1,9 @@
-from ...schema import City, Action, Player, ActionType, ActionContext, CardType, ResourceAction, ResourceAmounts, BuildAction, SellAction, NetworkAction, DevelopAction, IndustryType, Building, ResourceType
+from ...schema import Action, Player, ActionType, ActionContext, CardType, ResourceAction, ResourceAmounts, BuildAction, SellAction, NetworkAction, DevelopAction, IndustryType, Building, ResourceType
 from collections import defaultdict
 from .services.event_bus import EventBus
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
+import logging
 
 class StateChanger:
 
@@ -17,6 +18,7 @@ class StateChanger:
     def apply_action(self, action:Action, state_service:BoardStateService, player:Player):
         # Убираем карту если есть
         if action.card_id is not None and isinstance(action.card_id, int):
+            logging.debug(f'Removing card {action.card_id} from player {player.color} hand due to action {action.action} taken while subaction count is {state_service.subaction_count}')
             try:
                 card = player.hand.pop(action.card_id)
             except KeyError as k:
@@ -72,6 +74,7 @@ class StateChanger:
 
         elif action.action is ActionType.SCOUT:
             for card_id in action.card_id:
+                logging.debug(f'Removing card {card_id} from player {player.color} hand due to action {action.action} taken while subaction count is {state_service.subaction_count}')
                 state_service.append_discard(player.hand[card_id])
                 player.hand.pop(card_id)
             city_joker = next(j for j in state_service.get_wild_cards() if j.card_type == CardType.CITY)

@@ -3,6 +3,7 @@ import random
 from .services.event_bus import EventBus
 from .game_initializer import GameInitializer
 from ...server.game_logic.services.board_state_service import BoardStateService
+import logging
 
 
 class TurnManager:
@@ -50,11 +51,12 @@ class TurnManager:
         for player in state_service.get_players().values():
             player.bank += player.income
             
-            if state_service.get_deck(): 
-                card = state_service.get_deck().pop()
+            deck = state_service.get_deck()
+            if deck: 
+                card = deck.pop()
                 player.hand[card.id] = card
                 if not first_round:
-                    card = state_service.get_deck().pop()
+                    card = deck.pop()
                     player.hand[card.id] = card
             
             player.money_spent = 0
@@ -63,7 +65,9 @@ class TurnManager:
             state_service.set_action_context(ActionContext.SHORTFALL)
 
         state_service.advance_round_count()
-
+        logging.debug(f"Round {state_service.round_count}")
+        for player in state_service.get_players().values():
+            logging.debug(f"Player {player.color} has {len(player.hand)} cards")
         return state_service
     
     def _prepare_next_era(self, state_service:BoardStateService) -> BoardStateService:

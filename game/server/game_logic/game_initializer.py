@@ -181,7 +181,8 @@ class GameInitializer():
             out[link_data["id"]] = Link(
                 id=link_data['id'],
                 type=link_data['transport'],
-                cities=link_data['cities']
+                cities=link_data['cities'],
+                owner=None
             )
         return out
     
