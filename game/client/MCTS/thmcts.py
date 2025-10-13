@@ -119,7 +119,7 @@ class HierarchicalMCTS:
 
             simulation_result = self._simulate(node, root_info_set)
 
-            self._backpropagate(path, simulation_result, root_info_set)
+            self._backpropagate(path, simulation_result, root_info_set.your_color)
         
         best_action = self._get_best_action(self.root)
 
@@ -245,7 +245,7 @@ class HierarchicalMCTS:
                 self._apply_action(determinized_state, action)
                 depth += 1
 
-            return self._evaluate_state(determinized_state)
+        return self._evaluate_state(determinized_state)
         
     def _evaluate_state(self, state:BoardStateService) -> dict:
         if state.is_terminal():
