@@ -105,6 +105,7 @@ class HierarchicalMCTS:
             )
             determinized_state = self._determinize_state(root_info_set, [])
             self.root.active_player = determinized_state.get_active_player().color
+            logging.debug(f'INITIAL LEGAL ACTIONS: {self._get_legal_actions(determinized_state)}')
 
         for sim_idx in range(self.simulations):
             logging.debug(f"Running simulation #{sim_idx}")
