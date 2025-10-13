@@ -25,8 +25,8 @@ def main():
     for slot in game.state_service.iter_merchant_slots():
         print(f"City {slot.city}, buys {slot.merchant_type}")
 
-    while not game.concluded():
-    # for _ in range(1): # placeholder single run
+    # while not game.concluded():
+    for _ in range(1): # placeholder single run
         active_player = game.state_service.get_active_player().color
         print(f"Current active player: {active_player}")
 

@@ -83,20 +83,12 @@ class Game:
 
             game.state_service.subaction_count = transient_state_service.subaction_count
             game.state_service.round_count = transient_state_service.round_count
-            logging.debug("Finished building state using history")
         else:
             game.state_service = BoardStateService(game._determine_cards(partial_state.state, partial_state.your_hand, partial_state.your_color))
             game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
             game.state_service.round_count = getattr(partial_state, 'current_round', 1)
-            logging.debug("Finished building state without using history")
         
-        logging.debug(f"Finished determinizing state from the pov: {partial_state.your_color}")
-        logging.debug(f"Initializing game starting on turn {game.state_service.round_count} with deck size {game.state_service.get_deck_size()} and discard size {len(game.state_service.state.discard)}")
         debug_card_count = game.state_service.get_deck_size() + len(game.state_service.state.discard)
-        for player in game.state_service.get_players().values():
-            logging.debug(f"Player {player.color} has hand size {len(player.hand)}")
-            debug_card_count += len(player.hand)
-        logging.debug(f"Total card count: {debug_card_count}")
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None
@@ -125,8 +117,6 @@ class Game:
 
         for player in deal_to:
             exposed_player = partial_state.players[player]
-            logging.debug(f"Exposed player {exposed_player.color} has city wild flag: {exposed_player.has_city_wild}")
-            logging.debug(f"Exposed player {exposed_player.color} has industry wild flag: {exposed_player.has_industry_wild}")
             if exposed_player.has_city_wild:
                 player_hands[player][city_wild.id] = city_wild
             if exposed_player.has_industry_wild:
@@ -155,7 +145,6 @@ class Game:
             logging.error(f"Known hand provided: {known_hand}")
             raise ValueError
 
-        logging.debug(f"Returning determined board state with deck size {len(out.deck)}")
         return out
             
 

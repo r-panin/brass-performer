@@ -1,7 +1,6 @@
 from typing import Dict, List
 from ..game_logic.game import Game
 from ...schema import PlayerInfo, GameStatus
-import logging
 from uuid import uuid4
 
 class GameManager:

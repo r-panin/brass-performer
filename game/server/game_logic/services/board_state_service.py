@@ -1,9 +1,7 @@
 from collections import deque
 from typing import Callable, Iterator, List, Optional, Dict, Set, Union
 from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext, Card, Link
-import random
 import math
-import logging
 
 class BoardStateService:
     

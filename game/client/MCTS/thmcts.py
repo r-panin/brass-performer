@@ -171,10 +171,16 @@ class HierarchicalMCTS:
         if not root.children:
             return None
         
+        logging.debug(f"Root children: {[f'{child.action_type}: {child.visits}' for child in root.children]}") 
+
         best_action_type_node = max(root.children, key=lambda child: child.visits)
 
+        logging.debug(f"Best action type: {best_action_type_node.action_type} with {best_action_type_node.visits} visits")
+        
         if best_action_type_node.children:
+            logging.debug(f"Available atomic actions: {[f'{child.action}: {child.visits}' for child in best_action_type_node.children]}")
             best_atomic_action_node = max(best_action_type_node.children, key=lambda child: child.visits)
+            logging.debug(f"Selected action: {best_atomic_action_node.action}")
 
             return best_atomic_action_node.action
         
@@ -183,6 +189,7 @@ class HierarchicalMCTS:
     def _expand(self, node: Node, root_info_set: PlayerState) -> List[Node]:
         determinized_state = self._determinize_state(root_info_set, node.action_history)
         legal_actions = self._get_legal_actions(determinized_state)
+        logging.debug(f"Expanding node {node.node_type} with legal actions {legal_actions}")
 
         if not legal_actions:
             return []
@@ -220,6 +227,8 @@ class HierarchicalMCTS:
                     node.children.append(child_node)
                     node.explored_actions.add(action_hash)
                     new_children.append(child_node)
+        
+        return new_children
 
     def _simulate(self, node: Node, root_info_set: PlayerState) -> Dict[PlayerColor, float]:
         determinized_state = self._determinize_state(root_info_set, node.action_history)
@@ -270,6 +279,7 @@ class HierarchicalMCTS:
         """
         Backpropagate the simulation result up the tree.
         """
+        logging.debug(f"Backpropagating path of length {len(path)}")
         for current in path:
             current.visits += 1
             # Add reward from the perspective of the player who acted at this node
@@ -278,3 +288,4 @@ class HierarchicalMCTS:
             reward = results.get(acting_player, 0.0)
             if acting_player == root_player:
                 current.value += reward
+            logging.debug(f"Updated node: {current.node_type}, {current.action_type}, {current.action} visits: {current.visits}")
