@@ -113,8 +113,8 @@ class Game:
         deal_to = [player for player in partial_state.players]
         player_hands:Dict[PlayerColor, Dict[int, Card]] = defaultdict(dict)
 
-        city_wild = next(card for card in partial_state.wilds if card.card_type is CardType.CITY)
-        industry_wild = next(card for card in partial_state.wilds if card.card_type is CardType.INDUSTRY)
+        city_wild = next(card for card in partial_state.wilds if card.card_type == CardType.CITY)
+        industry_wild = next(card for card in partial_state.wilds if card.card_type == CardType.INDUSTRY)
 
         if partial_state.players[known_color].has_city_wild:
             known_hand[city_wild.id] = city_wild

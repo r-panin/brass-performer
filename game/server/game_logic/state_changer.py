@@ -26,9 +26,9 @@ class StateChanger:
             if card.value != 'wild':
                 state_service.append_discard(card)
             else:
-                if card.card_type is CardType.CITY:
+                if card.card_type == CardType.CITY:
                     player.has_city_wild = False
-                elif card.card_type is CardType.INDUSTRY:
+                elif card.card_type == CardType.INDUSTRY:
                     player.has_industry_wild = False
 
         # Обрабатываем выбор ресурсов
@@ -39,9 +39,9 @@ class StateChanger:
                     building = state_service.get_building_slot(resource.building_slot_id).building_placed
                     building.resource_count -= 1
                     if building.resource_count == 0:
-                        if building.industry_type is IndustryType.COAL:
+                        if building.industry_type == IndustryType.COAL:
                             state_service.invalidate_coal_cache()
-                        elif building.industry_type is IndustryType.IRON:
+                        elif building.industry_type == IndustryType.IRON:
                             state_service.invalidate_iron_cache()
                         building.flipped = True
                         owner = state_service.get_player(building.owner)
@@ -116,9 +116,9 @@ class StateChanger:
             state_service.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
             self._sell_to_market(state_service, building)
             state_service.update_lowest_buildings(player.color)
-            if building.industry_type is IndustryType.COAL:
+            if building.industry_type == IndustryType.COAL:
                 state_service.invalidate_coal_cache()
-            elif building.industry_type is IndustryType.IRON:
+            elif building.industry_type == IndustryType.IRON:
                 state_service.invalidate_iron_cache()
             state_service.invalidate_networks_cache()
 
@@ -167,7 +167,7 @@ class StateChanger:
     def _sell_to_market(self, state_service:BoardStateService, building:Building) -> None:
         if building.industry_type not in (IndustryType.COAL, IndustryType.IRON):
             return
-        if building.industry_type is IndustryType.COAL and not state_service.market_access_exists(state_service.get_building_slot(building.slot_id).city):
+        if building.industry_type == IndustryType.COAL and not state_service.market_access_exists(state_service.get_building_slot(building.slot_id).city):
             return
         rt = ResourceType(building.industry_type)
         sold_amount = min(building.resource_count, state_service.sellable_amount(rt))

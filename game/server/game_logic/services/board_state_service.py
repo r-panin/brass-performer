@@ -485,9 +485,9 @@ class BoardStateService:
         self.state.market.iron_cost = self.IRON_MAX_COST - math.ceil(self.get_market_iron_count() / 2)
 
     def sellable_amount(self, resource_type:ResourceType):
-        if resource_type is ResourceType.IRON:
+        if resource_type == ResourceType.IRON:
             return self.IRON_MAX_COUNT - self.get_market_iron_count()
-        elif resource_type is ResourceType.COAL:
+        elif resource_type == ResourceType.COAL:
             return self.COAL_MAX_COST - self.get_market_coal_count()
     
     def _calculate_resource_cost(
@@ -587,15 +587,15 @@ class BoardStateService:
 
     def get_merchant_slot_purchase_options(self, merchant_slot:MerchantSlot) -> List[IndustryType]:
         out = set()
-        if merchant_slot.merchant_type is MerchantType.ANY:
+        if merchant_slot.merchant_type == MerchantType.ANY:
             out.add(IndustryType.BOX)
             out.add(IndustryType.COTTON)
             out.add(IndustryType.POTTERY)
-        elif merchant_slot.merchant_type is MerchantType.POTTERY:
+        elif merchant_slot.merchant_type == MerchantType.POTTERY:
             out.add(IndustryType.POTTERY)
-        elif merchant_slot.merchant_type is MerchantType.BOX:
+        elif merchant_slot.merchant_type == MerchantType.BOX:
             out.add(IndustryType.BOX)
-        elif merchant_slot.merchant_type is MerchantType.COTTON:
+        elif merchant_slot.merchant_type == MerchantType.COTTON:
             out.add(IndustryType.COTTON)
         return list(out)
 

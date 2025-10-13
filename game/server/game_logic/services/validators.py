@@ -147,7 +147,7 @@ class BaseValidator(ActionValidator, ABC):
                 if building.industry_type.value != resource.resource_type.value:
                     return ValidationResult(is_valid=False, message=f"Selected building slot {slot.id} has a building of a mismatched industry type")
 
-            if resource.resource_type is ResourceType.COAL:
+            if resource.resource_type == ResourceType.COAL:
                 if resource.building_slot_id is not None:
                     coal_city = game_state.get_building_slot(resource.building_slot_id).city
                     if isinstance(action, BuildAction):
@@ -248,7 +248,7 @@ class NetworkValidator(BaseValidator):
                 return ValidationResult(is_valid=False, message="Link not in player's network")
 
         for resource in action.resources_used:
-            if resource.resource_type is ResourceType.BEER:
+            if resource.resource_type == ResourceType.BEER:
                 if resource.building_slot_id is None:
                     return ValidationResult(is_valid=False, message="Beer for this action must be sourced from buildings")
                 brewery = game_state.get_building_slot(resource.building_slot_id).building_placed

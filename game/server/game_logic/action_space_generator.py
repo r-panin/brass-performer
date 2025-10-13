@@ -151,7 +151,7 @@ class ActionSpaceGenerator():
         
         allowed_industry_for_card: dict = {}
         for card in cards:
-            if card.card_type is CardType.CITY:
+            if card.card_type == CardType.CITY:
                 allowed_industry_for_card[card.id] = set(IndustryType)
             else:
                 if card.value == 'box-cotton':
@@ -413,7 +413,7 @@ class ActionSpaceGenerator():
                 merchant_sources = []
                 for src in connected_merchant_beer_by_city.get(slot.city, []):
                     s = state_service.get_merchant_slot(src.merchant_slot_id)
-                    if s.merchant_type is MerchantType.ANY or s.merchant_type == MerchantType(slot.building_placed.industry_type):
+                    if s.merchant_type == MerchantType.ANY or s.merchant_type == MerchantType(slot.building_placed.industry_type):
                         merchant_sources.append(src)
                 beer_sources.extend(merchant_sources)
                 beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
