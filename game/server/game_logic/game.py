@@ -125,6 +125,8 @@ class Game:
 
         for player in deal_to:
             exposed_player = partial_state.players[player]
+            logging.debug(f"Exposed player {exposed_player.color} has city wild flag: {exposed_player.has_city_wild}")
+            logging.debug(f"Exposed player {exposed_player.color} has industry wild flag: {exposed_player.has_industry_wild}")
             if exposed_player.has_city_wild:
                 player_hands[player][city_wild.id] = city_wild
             if exposed_player.has_industry_wild:
@@ -133,8 +135,6 @@ class Game:
             while len(player_hands[player]) < target_hand_size and len(available_deck) > 0:
                 card = available_deck.pop()
                 player_hands[player][card.id] = card
-
-
 
         # Do not apply any additional burns here; deck_size already reflects that in the exposed state
         target_deck_size = partial_state.deck_size
@@ -145,6 +145,15 @@ class Game:
             available_deck.pop()
 
         out = BoardState.determine(partial_state, player_hands, available_deck)
+
+        if len(out.deck) != partial_state.deck_size:
+            logging.error(f"DETERMINIZED DECK SIZE DOESN'T MATCH PROVIDED DECK SIZE")
+            logging.error(f"Cards in deck: {out.deck}")
+            logging.error(f"Cards in discard: {out.discard}")
+            for player in out.players.values():
+                logging.error(f"Cards in {player.color}: {list(player.hand)}")
+            logging.error(f"Known hand provided: {known_hand}")
+            raise ValueError
 
         logging.debug(f"Returning determined board state with deck size {len(out.deck)}")
         return out

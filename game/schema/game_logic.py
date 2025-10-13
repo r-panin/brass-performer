@@ -219,6 +219,8 @@ class BoardState:
                 income_points=exposed_player.income_points,
                 victory_points=exposed_player.victory_points,
                 money_spent=exposed_player.money_spent,
+                has_city_wild=exposed_player.has_city_wild,
+                has_industry_wild=exposed_player.has_industry_wild
             )
 
         
@@ -249,7 +251,9 @@ class BoardState:
                 income=exposed_player.income,
                 income_points=exposed_player.income_points,
                 victory_points=exposed_player.victory_points,
-                money_spent=exposed_player.money_spent
+                money_spent=exposed_player.money_spent,
+                has_city_wild=exposed_player.has_city_wild,
+                has_industry_wild=exposed_player.has_industry_wild
             )
 
         return cls(
