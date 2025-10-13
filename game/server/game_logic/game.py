@@ -88,7 +88,6 @@ class Game:
             game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
             game.state_service.round_count = getattr(partial_state, 'current_round', 1)
         
-        debug_card_count = game.state_service.get_deck_size() + len(game.state_service.state.discard)
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
         game.replay_service = None

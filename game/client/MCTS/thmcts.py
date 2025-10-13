@@ -82,7 +82,8 @@ class HierarchicalMCTS:
         self.root: Optional[Node] = None
 
     def _determinize_state(self, state:PlayerState, history:List[Action]=[]) -> BoardStateService:
-        return Game.from_partial_state(state, history).state_service
+        state_copy = deepcopy(state)
+        return Game.from_partial_state(state_copy, history).state_service
 
     def _get_legal_actions(self, state:BoardStateService) -> List[Action]:
         return self.action_space_generator.get_action_space(state, state.get_active_player().color)
@@ -189,6 +190,12 @@ class HierarchicalMCTS:
     def _expand(self, node: Node, root_info_set: PlayerState) -> List[Node]:
         determinized_state = self._determinize_state(root_info_set, node.action_history)
         legal_actions = self._get_legal_actions(determinized_state)
+        logging.debug(f"Root info set player: {root_info_set.your_color}")
+        logging.debug(f"Root info set hand: {sorted(root_info_set.your_hand.keys())}")
+        logging.debug(f"Currently active player: {determinized_state.get_active_player().color}")
+        logging.debug(f"Active player hand: {sorted(determinized_state.get_active_player().hand.keys())}")
+        for player in determinized_state.get_players().values():
+            logging.debug(f"Player {player.color} hand: {sorted(player.hand.keys())}")
         logging.debug(f"Expanding node {node.node_type} with legal actions {legal_actions}")
 
         if not legal_actions:
