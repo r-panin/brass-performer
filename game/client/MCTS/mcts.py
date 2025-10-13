@@ -84,8 +84,12 @@ class MCTS:
             # Selection: traverse tree using UCB until we reach a node that isn't fully expanded
             node, path = self._select(self.root, root_info_set)
 
+            logging.debug(f"Selected node {node.action} with path {len(path)}")
+
             # Expansion: add all unexplored children
             expanded_nodes = self._expand(node, root_info_set)
+
+            logging.debug(f"Expanded nodes: {len(expanded_nodes)}")
             
             # If we expanded, choose one of the new children to simulate from
             if expanded_nodes:
@@ -94,6 +98,8 @@ class MCTS:
 
             # Simulation: rollout from the selected/expanded node
             simulation_result = self._simulate(node, root_info_set)
+
+            logging.debug(f"Simulating out of node {node.action} with path {len(path)}")
 
             # Backpropagation: update all nodes in the path
             self._backpropagate(path, simulation_result, root_info_set.your_color)
@@ -158,6 +164,7 @@ class MCTS:
         """
         if not root.children:
             return None
+        logging.debug(f"Available atomic actions: {[f'{child.action}: {child.visits}' for child in root.children]}")
         return max(root.children, key=lambda child: child.visits).action
     
     def _expand(self, node: Node, root_info_set: PlayerState) -> List[Node]:
@@ -231,7 +238,8 @@ class MCTS:
         """
         Create a determinized version of the game state by sampling hidden information.
         """
-        return Game.from_partial_state(root_info_set, history=action_history).state_service
+        state_copy = deepcopy(root_info_set)
+        return Game.from_partial_state(state_copy, history=action_history).state_service
     
     def _evaluate_state(self, state: BoardStateService) -> dict:
         """
@@ -259,6 +267,7 @@ class MCTS:
         """
         Backpropagate the simulation result up the tree.
         """
+        logging.debug(f"Backpropagating path of length {len(path)}")
         for current in path:
             current.visits += 1
             # Add reward from the perspective of the player who acted at this node
@@ -267,6 +276,7 @@ class MCTS:
             reward = results.get(acting_player, 0.0)
             if acting_player == root_player:
                 current.value += reward
+            logging.debug(f"Updated node: {current.action} visits: {current.visits}")
 
 
 if __name__ == '__main__':

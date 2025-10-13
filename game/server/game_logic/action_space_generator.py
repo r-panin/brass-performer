@@ -372,84 +372,195 @@ class ActionSpaceGenerator():
 
         return True
 
-    def get_valid_sell_actions(self, state_service:BoardStateService, player:Player) -> List[SellAction]:
+    def get_valid_sell_actions(self, state_service: BoardStateService, player: Player) -> List[SellAction]:
         out = []
         cards = player.hand
-        slots = [
-                slot 
-                for city in state_service.get_cities().values() 
-                for slot in city.slots.values() 
-                if slot.building_placed is not None and slot.building_placed.is_sellable() and slot.building_placed.owner == player.color
-            ] 
+        
+        # 1. Предварительная фильтрация слотов - кэшируем города
+        cities = state_service.get_cities()
+        slots = []
+        for city in cities.values():
+            # 2. Проверяем can_sell для города один раз
+            if not any(state_service.can_sell(city.name, industry) 
+                    for industry in {slot.building_placed.industry_type 
+                                    for slot in city.slots.values() 
+                                    if (slot.building_placed is not None and 
+                                        slot.building_placed.is_sellable() and 
+                                        slot.building_placed.owner == player.color)}):
+                continue
+                
+            for slot in city.slots.values():
+                if (slot.building_placed is not None and 
+                    slot.building_placed.is_sellable() and 
+                    slot.building_placed.owner == player.color and
+                    state_service.can_sell(city.name, slot.building_placed.industry_type)):
+                    slots.append(slot)
 
-        # Предрасчет купцов с пивом, доступных из города
-        connected_merchant_beer_by_city: dict[str, list[ResourceSource]] = {}
-        for city in state_service.get_cities().values():
-            city_name = city.name
-            sources: list[ResourceSource] = []
-            for s in state_service.iter_merchant_slots():
+        # 3. Предрасчет купцов с пивом с оптимизацией
+        connected_merchant_beer_by_city = {}
+        merchant_slots = list(state_service.iter_merchant_slots())  # Кэшируем
+        
+        for city_name in cities.keys():
+            sources = []
+            for s in merchant_slots:
                 if not s.beer_available:
                     continue
                 if not state_service.are_connected(city_name, s.city):
                     continue
-                # тип соответствия проверим позже по индустрии строения
                 sources.append(ResourceSource(resource_type=ResourceType.BEER, merchant_slot_id=s.id))
-            connected_merchant_beer_by_city[city_name] = sources
+            if sources:  # Сохраняем только города с доступными купцами
+                connected_merchant_beer_by_city[city_name] = sources
 
+        # 4. Оптимизация для случая без поддействий
+        append_actions = self._append_actions_optimized(out, state_service.subaction_count > 0, cards)
+
+        # 5. Обработка слотов с группировкой по городам
+        city_slots = {}
         for slot in slots:
-            if not state_service.can_sell(slot.city, slot.building_placed.industry_type):
+            if slot.city not in city_slots:
+                city_slots[slot.city] = []
+            city_slots[slot.city].append(slot)
+
+        # 6. Предрасчет источников пива по городам
+        beer_sources_by_city = {}
+        for city_name, city_slots_list in city_slots.items():
+            if not city_slots_list:
+                continue
+                
+            # Общие источники пива для всех слотов города
+            beer_buildings = state_service.get_player_beer_sources(player.color, city_name=city_name)
+            building_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) 
+                            for building in beer_buildings]
+            beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
+            
+            # Купцы для города
+            merchant_sources = []
+            for src in connected_merchant_beer_by_city.get(city_name, []):
+                s = state_service.get_merchant_slot(src.merchant_slot_id)
+                merchant_sources.append(src)
+            
+            beer_sources_by_city[city_name] = (building_sources, merchant_sources, beer_amounts)
+
+        # 7. Основной цикл по слотам
+        for slot in slots:
+            beer_required = slot.building_placed.sell_cost
+            city_name = slot.city
+            
+            building_sources, merchant_sources, beer_amounts = beer_sources_by_city[city_name]
+            
+            # Фильтруем купцов по типу
+            filtered_merchant_sources = [
+                src for src in merchant_sources 
+                if self._is_merchant_valid_for_industry(state_service, src, slot.building_placed.industry_type)
+            ]
+            
+            beer_sources = building_sources + filtered_merchant_sources
+            
+            if not beer_required:
+                # 8. Оптимизация для нулевой стоимости
+                append_actions(slot, ())
                 continue
 
-            beer_required = slot.building_placed.sell_cost
-            if not beer_required:
-                beer_buildings = []
-                beer_sources = []
-                beer_amounts = {}
-                beer_combinations = [()]
-            else:
-                beer_buildings = state_service.get_player_beer_sources(player.color, city_name=slot.city)
-                beer_sources = [ResourceSource(resource_type=ResourceType.BEER, building_slot_id=building.slot_id) for building in beer_buildings]
-                # купцы: тип соответствует индустрии ИЛИ ANY
-                merchant_sources = []
-                for src in connected_merchant_beer_by_city.get(slot.city, []):
-                    s = state_service.get_merchant_slot(src.merchant_slot_id)
-                    if s.merchant_type == MerchantType.ANY or s.merchant_type == MerchantType(slot.building_placed.industry_type):
-                        merchant_sources.append(src)
-                beer_sources.extend(merchant_sources)
-                beer_amounts = {b.slot_id: b.resource_count for b in beer_buildings}
-                beer_combinations = itertools.combinations_with_replacement(beer_sources, beer_required)
+            # 9. Генерация комбинаций с ранним прерыванием
+            beer_combinations = self._generate_valid_beer_combinations(
+                beer_sources, beer_required, beer_amounts
+            )
+            
             for beer_combo in beer_combinations:
-                beer_used = defaultdict(int)
-                merchant_beer_used = False
-                valid = True
-                for resource in beer_combo:
-                    if resource.building_slot_id:
-                        beer_used[resource.building_slot_id] += 1
-                        if beer_used[resource.building_slot_id] > beer_amounts[resource.building_slot_id]:
-                            valid = False
-                            break
-                    else:
-                        if merchant_beer_used:
-                            valid = False
-                            break
-                        merchant_beer_used = True
-                
-                if not valid:
-                    continue
-
-                if state_service.subaction_count > 0:
-                    out.append(SellAction(
-                        slot_id=slot.id,
-                        resources_used=beer_combo))
-                else:
-                    for card in cards:
-                        out.append(SellAction(
-                            slot_id=slot.id,
-                            resources_used=beer_combo,
-                            card_id=card
-                        ))
+                append_actions(slot, beer_combo)
 
         return out
+
+    def _append_actions_optimized(self, out_list, has_subactions, cards):
+        """Оптимизированное добавление действий"""
+        if has_subactions:
+            def append_without_card(slot, beer_combo):
+                out_list.append(SellAction(
+                    slot_id=slot.id,
+                    resources_used=beer_combo
+                ))
+            return append_without_card
+        else:
+            def append_with_card(slot, beer_combo):
+                for card in cards:
+                    out_list.append(SellAction(
+                        slot_id=slot.id,
+                        resources_used=beer_combo,
+                        card_id=card
+                    ))
+            return append_with_card
+
+    def _is_merchant_valid_for_industry(self, state_service, resource_source, industry_type):
+        """Проверка валидности купца для индустрии"""
+        if resource_source.building_slot_id is not None:
+            return True
+        s = state_service.get_merchant_slot(resource_source.merchant_slot_id)
+        return s.merchant_type == MerchantType.ANY or s.merchant_type == MerchantType(industry_type)
+
+    def _generate_valid_beer_combinations(self, beer_sources, beer_required, beer_amounts):
+        """Генерация только валидных комбинаций пива"""
+        if not beer_sources or beer_required == 0:
+            return [()]
+        
+        # Разделяем источники на здания и купцов
+        building_sources = [src for src in beer_sources if src.building_slot_id]
+        merchant_sources = [src for src in beer_sources if not src.building_slot_id]
+        
+        valid_combinations = []
+        
+        # Обрабатываем возможное количество купцов (0 или 1)
+        max_merchants = min(1, len(merchant_sources))
+        
+        for merchant_count in range(max_merchants + 1):
+            building_required = beer_required - merchant_count
+            if building_required < 0:
+                continue
+                
+            if building_required == 0:
+                # Только купцы
+                if merchant_count == 1:
+                    valid_combinations.append((merchant_sources[0],))
+                else:
+                    valid_combinations.append(())
+                continue
+            
+            # Генерируем комбинации для зданий
+            building_combinations = self._generate_building_combinations(
+                building_sources, building_required, beer_amounts
+            )
+            
+            # Комбинируем с купцами
+            for building_combo in building_combinations:
+                combo = list(building_combo)
+                if merchant_count == 1:
+                    combo.append(merchant_sources[0])
+                valid_combinations.append(tuple(combo))
+        
+        return valid_combinations
+
+    def _generate_building_combinations(self, building_sources, building_required, beer_amounts):
+        """Генерация комбинаций для зданий с учетом ограничений"""
+        if building_required == 0:
+            return [()]
+        
+        # Используем combinations_with_replacement но с ранней проверкой
+        valid_combinations = []
+        
+        for combo in itertools.combinations_with_replacement(building_sources, building_required):
+            beer_used = defaultdict(int)
+            valid = True
+            
+            for resource in combo:
+                slot_id = resource.building_slot_id
+                beer_used[slot_id] += 1
+                if beer_used[slot_id] > beer_amounts[slot_id]:
+                    valid = False
+                    break
+            
+            if valid:
+                valid_combinations.append(combo)
+        
+        return valid_combinations
 
     def get_valid_network_actions(self, state_service:BoardStateService, player:Player) -> List[NetworkAction]:
         out = []

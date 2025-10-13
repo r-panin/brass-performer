@@ -49,7 +49,7 @@ class Node:
         if not legal_actions:
             return True
         
-        if self.node_type == NodeType.ACTION_TYPE:
+        if self.node_type == NodeType.ACTION_PARAM:
             legal_action_types = {action.action for action in legal_actions}
             return legal_action_types.issubset(self.explored_action_types)
         else:
@@ -106,18 +106,29 @@ class HierarchicalMCTS:
             )
             determinized_state = self._determinize_state(root_info_set, [])
             self.root.active_player = determinized_state.get_active_player().color
-            logging.debug(f'INITIAL LEGAL ACTIONS: {self._get_legal_actions(determinized_state)}')
 
         for sim_idx in range(self.simulations):
             logging.debug(f"Running simulation #{sim_idx}")
 
             node, path = self._select(self.root, root_info_set)
 
+            if node.node_type == NodeType.ACTION_TYPE:
+                logging.debug(f"Selected node {node.action_type} with path {len(path)}")
+            else:
+                logging.debug(f"Selected node {node.action} with path {len(path)}")
+
             expanded_nodes = self._expand(node, root_info_set)
+
+            logging.debug(f"Expanded nodes: {len(expanded_nodes)}")
 
             if expanded_nodes:
                 node = random.choice(expanded_nodes)
                 path.append(node)
+
+            if node.node_type == NodeType.ACTION_TYPE:
+                logging.debug(f"Simulating out of node {node.action_type} with path {len(path)}")
+            else:
+                logging.debug(f"Simulating out of node {node.action} with path {len(path)}")
 
             simulation_result = self._simulate(node, root_info_set)
 
@@ -137,6 +148,10 @@ class HierarchicalMCTS:
             legal_actions = self._get_legal_actions(determinized_state)
 
             if not node.is_fully_expanded(legal_actions):
+                if node.node_type == NodeType.ACTION_TYPE:
+                    logging.debug(f"Node {node.action_type} with path {len(path)} is not fully expanded")
+                else:
+                    logging.debug(f"Node {node.action} with path {len(path)} is not fully expanded")
                 break
 
             best_child = self._best_child(node)
@@ -190,13 +205,6 @@ class HierarchicalMCTS:
     def _expand(self, node: Node, root_info_set: PlayerState) -> List[Node]:
         determinized_state = self._determinize_state(root_info_set, node.action_history)
         legal_actions = self._get_legal_actions(determinized_state)
-        logging.debug(f"Root info set player: {root_info_set.your_color}")
-        logging.debug(f"Root info set hand: {sorted(root_info_set.your_hand.keys())}")
-        logging.debug(f"Currently active player: {determinized_state.get_active_player().color}")
-        logging.debug(f"Active player hand: {sorted(determinized_state.get_active_player().hand.keys())}")
-        for player in determinized_state.get_players().values():
-            logging.debug(f"Player {player.color} hand: {sorted(player.hand.keys())}")
-        logging.debug(f"Expanding node {node.node_type} with legal actions {legal_actions}")
 
         if not legal_actions:
             return []
@@ -249,18 +257,18 @@ class HierarchicalMCTS:
                 if action:
                     self._apply_action(determinized_state, action)
 
-            depth = 0
-            while depth < self.max_depth and not determinized_state.is_terminal():
-                legal_actions = self._get_legal_actions(determinized_state)
-                if not legal_actions:
-                    break
+        depth = 0
+        while depth < self.max_depth and not determinized_state.is_terminal():
+            legal_actions = self._get_legal_actions(determinized_state)
+            if not legal_actions:
+                break
 
-                action = self.action_selector.select_action(legal_actions, determinized_state)
-                if action is None:
-                    break
+            action = self.action_selector.select_action(legal_actions, determinized_state)
+            if action is None:
+                break
 
-                self._apply_action(determinized_state, action)
-                depth += 1
+            self._apply_action(determinized_state, action)
+            depth += 1
 
         return self._evaluate_state(determinized_state)
         

@@ -9,9 +9,9 @@ from pathlib import Path
 logging.basicConfig(
     level=logging.DEBUG,  # Уровень логирования
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
-    handlers=[logging.FileHandler(Path(__file__).resolve().parent / 'game/mcts.log')]  # Вывод в stdout
+    handlers=[logging.FileHandler(Path(__file__).resolve().parent / 'game/thmcts.log')] 
 )
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.CRITICAL)
 
 def main():
     mcts = HierarchicalMCTS(simulations=1000, depth=10000)
@@ -25,10 +25,13 @@ def main():
     for slot in game.state_service.iter_merchant_slots():
         print(f"City {slot.city}, buys {slot.merchant_type}")
 
-    # while not game.concluded():
-    for _ in range(1): # placeholder single run
+    while not game.concluded():
+    # for _ in range(1): # placeholder single run
         active_player = game.state_service.get_active_player().color
         print(f"Current active player: {active_player}")
+        legal_actions = game.action_processor.action_space_generator.get_action_space(game.state_service, active_player)
+        legal_action_types = {action.action for action in legal_actions}
+        print(legal_action_types)
 
         test_state = game.get_player_state(active_player)        
 
