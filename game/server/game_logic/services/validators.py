@@ -144,7 +144,11 @@ class BaseValidator(ActionValidator, ABC):
                 if slot.building_placed is None:
                     return ValidationResult(is_valid=False, message=f"Selected slot {slot.id} has no building")
                 building = slot.building_placed
-                if building.industry_type.value != resource.resource_type.value:
+                if building.industry_type != IndustryType.BREWERY:
+                    invalid_res_type = building.industry_type != resource.resource_type
+                else:
+                    invalid_res_type = resource.resource_type == ResourceType.BEER
+                if invalid_res_type:
                     return ValidationResult(is_valid=False, message=f"Selected building slot {slot.id} has a building of a mismatched industry type")
 
             if resource.resource_type == ResourceType.COAL:

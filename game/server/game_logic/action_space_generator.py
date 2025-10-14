@@ -44,7 +44,7 @@ class ActionSpaceGenerator():
                 case "NetworkAction":
                     out.extend(self.get_valid_network_actions(state_service, player))
                 case "DevelopAction":
-                    out.extend(self.get_valid_develop_actions(state_service, player, gloucester=state_service.get_action_context() is ActionContext.GLOUCESTER_DEVELOP))
+                    out.extend(self.get_valid_develop_actions(state_service, player, gloucester=state_service.get_action_context() == ActionContext.GLOUCESTER_DEVELOP))
                 case "ScoutAction":
                     out.extend(self.get_valid_scout_actions(player))
                 case "LoanAction":
@@ -139,6 +139,12 @@ class ActionSpaceGenerator():
             
             # min len per industry
             local_min = {}
+            for industry in IndustryType:
+                for slot in slots_by_city.get(city_name, []):
+                    if industry in slot.industry_type_options:
+                        if len(slot.industry_type_options) < local_min.get(industry, 10**9):
+                            local_min[industry] = len(slot.industry_type_options)
+
             # allowed slots set per industry (only slots with minimal options_len for that industry)
             per_industry = {ind: [] for ind in IndustryType}
             for slot in slots_by_city.get(city_name, []):
@@ -321,7 +327,7 @@ class ActionSpaceGenerator():
                     for slot in allowed_slots:
                         # индустрия должна поддерживаться слотом
                         if industry not in slot.industry_type_options:
-                            continue
+                            continue 
 
                         # Комбинации ресурсов и валидация
                         for coal_comb, iron_comb, market_coal_count, market_iron_count in combos:

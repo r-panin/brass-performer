@@ -123,6 +123,10 @@ class StateChanger:
         elif action.action is ActionType.SHORTFALL:
             if action.slot_id:
                 slot = state_service.get_building_slot(action.slot_id)
+                if slot.building_placed.industry_type == IndustryType.COAL:
+                    state_service.invalidate_coal_cache()
+                elif slot.building_placed.industry_type == IndustryType.IRON:
+                    state_service.invalidate_iron_cache()
                 rebate = slot.building_placed.get_cost().money // 2
                 player.bank += rebate
                 slot.building_placed = None

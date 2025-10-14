@@ -11,7 +11,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
     handlers=[logging.FileHandler(Path(__file__).resolve().parent / 'game/mcts.log')]  # Вывод в stdout
 )
-logging.getLogger().setLevel(logging.CRITICAL)
+logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
     mcts = MCTS(simulations=1000, depth=10000)

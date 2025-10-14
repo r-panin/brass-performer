@@ -293,7 +293,7 @@ class BoardStateService:
     def iter_placed_buildings(self) -> Iterator[Building]:
         for city in self.get_cities().values():
             for slot in city.slots.values():
-                if slot.building_placed:
+                if slot.building_placed is not None:
                     yield slot.building_placed
 
     def iter_merchant_slots(self) -> Iterator[MerchantSlot]:
@@ -308,7 +308,7 @@ class BoardStateService:
                 for slot in city.slots.values():
                     yield slot
     
-    def get_player_iron_sources(self) -> List[Building]:
+    def get_player_iron_sources(self) -> Set[Building]:
         if self._iron_cache:
             return self._iron_cache
         out = []
@@ -627,15 +627,15 @@ class BoardStateService:
                 player.income_points = 3 * player.income + (player.income % 10)
 
     def get_lowest_level_building(self, color:PlayerColor, industry:IndustryType) -> Building:
-            if not color in self._lowest_building_cache:
-                self.update_lowest_buildings(color)
-            return self._lowest_building_cache[color][industry]
+        if not color in self._lowest_building_cache:
+            self.update_lowest_buildings(color)
+        return self._lowest_building_cache[color][industry]
 
     def update_lowest_buildings(self, color:PlayerColor):
         player = self.get_player(color)
         self._lowest_building_cache[color] = {}
         for industry in IndustryType:
-            buildings = [b for b in player.available_buildings.values() if b.industry_type is industry]
+            buildings = [b for b in player.available_buildings.values() if b.industry_type == industry]
             self._lowest_building_cache[color][industry] = min(buildings, key=lambda x: x.level, default=None)
 
     def check_wilds(self, color:PlayerColor) -> bool:

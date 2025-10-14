@@ -29,9 +29,6 @@ def main():
     # for _ in range(1): # placeholder single run
         active_player = game.state_service.get_active_player().color
         print(f"Current active player: {active_player}")
-        legal_actions = game.action_processor.action_space_generator.get_action_space(game.state_service, active_player)
-        legal_action_types = {action.action for action in legal_actions}
-        print(legal_action_types)
 
         test_state = game.get_player_state(active_player)        
 

@@ -9,6 +9,8 @@ import math
 import logging
 from copy import deepcopy
 import json
+from pathlib import Path
+from dataclasses import asdict
 
 
 class Node:
@@ -197,9 +199,15 @@ class MCTS:
     
     def _apply_action(self, state: BoardStateService, action: Action):
         """Apply an action to the state."""
-        active_player = state.get_active_player()
-        state_changer = StateChanger(state)
-        state_changer.apply_action(action, state, active_player)
+        try:
+            active_player = state.get_active_player()
+            state_changer = StateChanger(state)
+            state_changer.apply_action(action, state, active_player)
+        except AttributeError as a:
+            logging.critical(f"Attempted to apply action {action} by player {active_player.color}")
+            with open(Path(__file__).resolve().parent / "last_state.json", "w+") as outfile:
+                json.dump(state.get_board_state().hide_state().model_dump(), outfile)
+            raise a
         
     def _get_legal_actions(self, state: BoardStateService) -> List[Action]:
         """Get all legal actions for the active player in the given state."""
