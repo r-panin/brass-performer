@@ -80,7 +80,7 @@ class Building(GameEntity):
     sell_cost: Optional[int]
     is_developable: bool
     link_victory_points: int
-    era_exclusion: Optional[str]
+    era_exclusion: Optional[LinkType]
     income: int
     slot_id: Optional[int] = None
     

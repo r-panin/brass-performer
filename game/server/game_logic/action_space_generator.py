@@ -68,8 +68,12 @@ class ActionSpaceGenerator():
         state = state_service.get_board_state()
         for city in state.cities.values():
             city_slots = city.slots.values()
+            buildings_in_city = [s.building_placed for s in city_slots if s.building_placed is not None]
+            if state_service.get_era() == LinkType.CANAL and any(b.owner == player.color for b in buildings_in_city): # check for 1 building per city per player in canal era
+                slots_by_city[city.name] = []
+                continue
             for slot in city_slots:
-                if slot.building_placed is None or self._overbuildable(slot.building_placed, player, state_service):
+                if (slot.building_placed is None or self._overbuildable(slot.building_placed, player, state_service)):
                     slots_by_city.setdefault(slot.city, []).append(slot)
 
         industries = list(IndustryType)
@@ -288,6 +292,10 @@ class ActionSpaceGenerator():
                 # Текущий нижний уровень здания данной индустрии
                 building = state_service.get_lowest_level_building(player.color, industry)
                 if not building:
+                    continue
+
+                #check era exclusion
+                if building.era_exclusion is not None and building.era_exclusion != state_service.get_era():
                     continue
 
                 cost = building.get_cost()

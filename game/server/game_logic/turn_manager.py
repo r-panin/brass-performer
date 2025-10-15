@@ -88,6 +88,11 @@ class TurnManager:
 
         state_service.get_board_state().era = LinkType.RAIL
 
+        state_service.invalidate_coal_cache()
+        state_service.invalidate_connectivity_cache()
+        state_service.invalidate_iron_cache()
+        state_service.invalidate_networks_cache()
+
         for player in state_service.get_players().values():
             player.hand = {card.id: card for card in [state_service.get_deck().pop() for _ in range(6)]}
 

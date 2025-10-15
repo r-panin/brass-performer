@@ -280,9 +280,11 @@ class BuildValidator(BaseValidator):
     
     @validate_card_in_hand
     @validate_resources
-    def validate(self, action:BuildAction, game_state, player):
+    def validate(self, action:BuildAction, game_state:BoardStateService, player):
         card = player.hand[action.card_id]
         building = game_state.get_lowest_level_building(player.color, action.industry)
+        if building.era_exclusion is not None and building.era_exclusion != game_state.get_era():
+            return ValidationResult(is_valid=False, message=f"Building with era exclusion {building.era_exclusion} cannot be built during {game_state.get_era()} era")
         slot = game_state.get_building_slot(action.slot_id)
         if card.card_type == CardType.INDUSTRY:
             if building.industry_type not in card.value and card.value != 'wild':
@@ -307,7 +309,7 @@ class BuildValidator(BaseValidator):
             if s.building_placed is not None:
                 if s.id == action.slot_id:
                     return ValidationResult(is_valid=False, message=f"Slot {slot.id} already occupied")
-                if s.building_placed.owner == player.color and game_state.era == LinkType.CANAL:
+                if s.building_placed.owner == player.color and game_state.get_era() == LinkType.CANAL:
                     return ValidationResult(is_valid=False, message=f"Can't build two buildings in one city during canal era")
         
         # Overbuilding validation
