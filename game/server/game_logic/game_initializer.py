@@ -47,40 +47,13 @@ class GameInitializer():
 
         return BoardState(cities=cities, players=players, deck=self.deck, market=market, era=LinkType.CANAL, turn_order=turn_order, turn_index=0, actions_left=actions_left, discard=discard, wilds=wilds, links=links, action_context=context)
     
-    def _build_initial_building_roster(self, player_color:PlayerColor) -> Dict[str, Building]:
-        out = {}
-        with open(self.BUILDING_ROSTER_PATH) as openfile:
-            building_json:List[dict] = json.load(openfile)
-        for building in building_json:
-            cost_json = building['cost']
-            cost = ResourceAmounts(
-                iron=cost_json.get('iron', cost_json.get(ResourceType.IRON, 0)),
-                coal=cost_json.get('coal', cost_json.get(ResourceType.COAL, 0)),
-                beer=cost_json.get('beer', cost_json.get(ResourceType.BEER, 0)),
-                money=cost_json.get('money', 0)
-            )
-            b = Building(
-                id=building['id'],
-                industry_type=building['industry'],
-                level=building['level'],
-                owner=player_color,
-                flipped=False,
-                cost=cost,
-                resource_count=building.get('resource_count', 0),
-                victory_points=building['vp'],
-                sell_cost=building.get('sell_cost'),
-                is_developable=building.get('developable', True),
-                link_victory_points=building['conn_vp'],
-                era_exclusion=building.get('era_exclusion'),
-                income=building['income']
-            )
-            out[b.id] = b
-        return out
+    def _build_initial_building_roster(self) -> Dict[IndustryType, int]:
+        return {ind: 0 for ind in IndustryType}
 
     def _create_player(self, color:PlayerColor) -> Player:
         return Player(
             hand={card.id: card for card in [self.deck.pop() for _ in range(8)]},
-            available_buildings=self._build_initial_building_roster(color),
+            available_buildings=self._build_initial_building_roster(),
             color=color,
             bank=17,
             income=0,

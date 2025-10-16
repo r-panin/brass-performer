@@ -112,23 +112,11 @@ class HierarchicalMCTS:
 
             node, path = self._select(self.root, root_info_set)
 
-            if node.node_type == NodeType.ACTION_TYPE:
-                logging.debug(f"Selected node {node.action_type} with path {len(path)}")
-            else:
-                logging.debug(f"Selected node {node.action} with path {len(path)}")
-
             expanded_nodes = self._expand(node, root_info_set)
-
-            logging.debug(f"Expanded nodes: {len(expanded_nodes)}")
 
             if expanded_nodes:
                 node = random.choice(expanded_nodes)
                 path.append(node)
-
-            if node.node_type == NodeType.ACTION_TYPE:
-                logging.debug(f"Simulating out of node {node.action_type} with path {len(path)}")
-            else:
-                logging.debug(f"Simulating out of node {node.action} with path {len(path)}")
 
             simulation_result = self._simulate(node, root_info_set)
 
@@ -148,10 +136,6 @@ class HierarchicalMCTS:
             legal_actions = self._get_legal_actions(determinized_state)
 
             if not node.is_fully_expanded(legal_actions):
-                if node.node_type == NodeType.ACTION_TYPE:
-                    logging.debug(f"Node {node.action_type} with path {len(path)} is not fully expanded")
-                else:
-                    logging.debug(f"Node {node.action} with path {len(path)} is not fully expanded")
                 break
 
             best_child = self._best_child(node)

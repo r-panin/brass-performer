@@ -218,7 +218,9 @@ class DevelopValidator(BaseValidator):
     @validate_card_in_hand
     @validate_resources
     def validate(self, action:DevelopAction, game_state:BoardStateService, player:Player):
-        building = game_state.get_lowest_level_building(player.color, action.industry)
+        building = game_state.get_current_building(player, action.industry)
+        if building is None:
+            return ValidationResult(is_valid=False, message=f"Ran out of buildings")
         if not building.is_developable:
             return ValidationResult(is_valid=False, message=f"Next building in industry {action.industry} is not developable")
         return ValidationResult(is_valid=True)
@@ -282,7 +284,9 @@ class BuildValidator(BaseValidator):
     @validate_resources
     def validate(self, action:BuildAction, game_state:BoardStateService, player):
         card = player.hand[action.card_id]
-        building = game_state.get_lowest_level_building(player.color, action.industry)
+        building = game_state.get_current_building(player, action.industry)
+        if building is None:
+            return ValidationResult(is_valid=False, message=f"Ran out of buildings")
         if building.era_exclusion is not None and building.era_exclusion != game_state.get_era():
             return ValidationResult(is_valid=False, message=f"Building with era exclusion {building.era_exclusion} cannot be built during {game_state.get_era()} era")
         slot = game_state.get_building_slot(action.slot_id)
@@ -343,8 +347,8 @@ class BuildValidator(BaseValidator):
 
         return ValidationResult(is_valid=True)  
 
-    def _validate_base_action_cost(self, action:BuildAction, game_state, player:Player):
-        building = game_state.get_lowest_level_building(player.color, action.industry)
+    def _validate_base_action_cost(self, action:BuildAction, game_state:BoardStateService, player:Player):
+        building = game_state.get_current_building(player, action.industry)
         moneyless_cost = building.get_cost()
         moneyless_cost.money = 0 # Money is calculated within game logic and shouldn't be checked here or pass within action
         if moneyless_cost != action.get_resource_amounts():
@@ -352,7 +356,7 @@ class BuildValidator(BaseValidator):
         return ValidationResult(is_valid=True)
 
     def _get_base_money_cost(self, action, game_state, player) -> int:
-        building = game_state.get_lowest_level_building(player.color, action.industry)
+        building = game_state.get_current_building(player, action.industry)
         return building.get_cost().money
 
 class SellValidator(BaseValidator):

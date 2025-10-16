@@ -1,6 +1,7 @@
 from collections import deque
 from typing import Callable, Iterator, List, Optional, Dict, Set, Union
 from ....schema import BoardState, City, Building, MerchantSlot, BuildingSlot,  IndustryType, Player, PlayerColor, ResourceType, LinkType, ResourceAmounts, MerchantType, ActionContext, Card, Link
+from .building_provider import BuildingProvider
 import math
 
 class BoardStateService:
@@ -21,9 +22,10 @@ class BoardStateService:
         self._coal_cities_cache = None
         self._merchant_cities_cache = None
         self._networks_cache = None
-        self._lowest_building_cache:Dict[PlayerColor, Dict[IndustryType, Building]] = {}
         self._iron_cache = None
         self.round_count = 1
+        
+        self.building_provider = BuildingProvider()
 
     # --- Encapsulated BoardState accessors/mutators (public API) ---
     def get_board_state(self) -> BoardState:
@@ -626,18 +628,6 @@ class BoardStateService:
             else:
                 player.income_points = 3 * player.income + (player.income % 10)
 
-    def get_lowest_level_building(self, color:PlayerColor, industry:IndustryType) -> Building:
-        if not color in self._lowest_building_cache:
-            self.update_lowest_buildings(color)
-        return self._lowest_building_cache[color][industry]
-
-    def update_lowest_buildings(self, color:PlayerColor):
-        player = self.get_player(color)
-        self._lowest_building_cache[color] = {}
-        for industry in IndustryType:
-            buildings = [b for b in player.available_buildings.values() if b.industry_type == industry]
-            self._lowest_building_cache[color][industry] = min(buildings, key=lambda x: x.level, default=None)
-
     def check_wilds(self, color:PlayerColor) -> bool:
         player = self.get_player(color)
         if any(card.value == 'wild' for card in player.hand.values()):
@@ -649,3 +639,9 @@ class BoardStateService:
     
     def advance_round_count(self):
         self.round_count += 1
+
+    def get_current_building(self, player:Player, industry:IndustryType):
+        return self.building_provider.get_building(industry, player.available_buildings[industry])
+
+    def advance_building_index(self, player:Player, industry:IndustryType):
+        player.available_buildings[industry] += 1

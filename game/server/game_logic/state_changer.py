@@ -3,6 +3,7 @@ from collections import defaultdict
 from .services.event_bus import EventBus
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
+from copy import deepcopy
 
 class StateChanger:
 
@@ -84,10 +85,8 @@ class StateChanger:
             player.has_industry_wild = True
         
         elif action.action is ActionType.DEVELOP:
-            building = state_service.get_lowest_level_building(player.color, action.industry)
-            player.available_buildings.pop(building.id)
+            state_service.advance_building_index(player, action.industry)
             state_service.set_action_context(ActionContext.DEVELOP)
-            state_service.update_lowest_buildings(player.color)
 
         elif action.action is ActionType.NETWORK:
             state_service.set_link_owner(action.link_id, player.color)
@@ -109,11 +108,11 @@ class StateChanger:
             state_service.set_action_context(ActionContext.SELL)
 
         elif action.action is ActionType.BUILD:
-            building = state_service.get_lowest_level_building(player.color, action.industry)
+            building = deepcopy(state_service.get_current_building(player, action.industry))
+            building.owner = player.color
             building.slot_id = action.slot_id
-            state_service.get_building_slot(action.slot_id).building_placed = player.available_buildings.pop(building.id)
+            state_service.get_building_slot(action.slot_id).building_placed = building
             self._sell_to_market(state_service, building)
-            state_service.update_lowest_buildings(player.color)
             if building.industry_type == IndustryType.COAL:
                 state_service.invalidate_coal_cache()
             elif building.industry_type == IndustryType.IRON:
@@ -195,7 +194,7 @@ class StateChanger:
     
     def _get_resource_amounts(self, state_service:BoardStateService, action:ResourceAction, player:Player) -> ResourceAmounts:
         if isinstance(action, BuildAction):
-            building = state_service.get_lowest_level_building(player.color, action.industry)
+            building = state_service.get_current_building(player, action.industry)
             return building.get_cost()
         elif isinstance(action, SellAction):
             building = state_service.get_building_slot(action.slot_id).building_placed

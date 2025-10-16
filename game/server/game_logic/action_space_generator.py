@@ -290,7 +290,7 @@ class ActionSpaceGenerator():
                 if not industry in allowed_industry_for_card[card.id]:
                     continue
                 # Текущий нижний уровень здания данной индустрии
-                building = state_service.get_lowest_level_building(player.color, industry)
+                building = state_service.get_current_building(player, industry)
                 if not building:
                     continue
 
@@ -365,7 +365,7 @@ class ActionSpaceGenerator():
         # Проверяем уровень здания
         if to_overbuild is None:
             return True
-        overbuild_with = state_service.get_lowest_level_building(player.color, to_overbuild.industry_type)
+        overbuild_with = state_service.get_current_building(player, to_overbuild.industry_type)
         if overbuild_with is None:
             return False
         if overbuild_with.level <= to_overbuild.level:
@@ -655,7 +655,7 @@ class ActionSpaceGenerator():
         
         industries = []
         for industry in IndustryType:
-            building = state_service.get_lowest_level_building(player.color, industry)
+            building = state_service.get_current_building(player, industry)
             if building and building.is_developable:
                 industries.append(industry)
 

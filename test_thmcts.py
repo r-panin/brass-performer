@@ -11,10 +11,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Формат сообщений
     handlers=[logging.FileHandler(Path(__file__).resolve().parent / 'game/thmcts.log')] 
 )
-logging.getLogger().setLevel(logging.CRITICAL)
+logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    mcts = HierarchicalMCTS(simulations=1000, depth=10000)
+    mcts = HierarchicalMCTS(simulations=10000, depth=10000)
 
     game = Game()
     colors = list(PlayerColor)

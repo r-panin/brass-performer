@@ -132,7 +132,7 @@ class Card(GameEntity):
 
 class PlayerExposed(BaseModel):
     hand_size: int
-    available_buildings: Dict[int, Building]  
+    available_buildings: Dict[IndustryType, int]  
     color: PlayerColor
     bank: int
     income: int
@@ -145,7 +145,7 @@ class PlayerExposed(BaseModel):
 @dataclass
 class Player:
     hand: Dict[int, Card]
-    available_buildings: Dict[int, Building]
+    available_buildings: Dict[IndustryType, int]
     color: PlayerColor
     bank: int
     income: int
