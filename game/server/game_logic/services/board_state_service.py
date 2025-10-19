@@ -640,7 +640,7 @@ class BoardStateService:
     def advance_round_count(self):
         self.round_count += 1
 
-    def get_current_building(self, player:Player, industry:IndustryType):
+    def get_current_building(self, player:Player, industry:IndustryType) -> Building:
         return self.building_provider.get_building(industry, player.available_buildings[industry])
 
     def advance_building_index(self, player:Player, industry:IndustryType):

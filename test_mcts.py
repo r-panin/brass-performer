@@ -14,7 +14,7 @@ logging.basicConfig(
 logging.getLogger().setLevel(logging.DEBUG)
 
 def main():
-    mcts = MCTS(simulations=2000, depth=10000)
+    mcts = MCTS(simulations=5000, depth=10000)
 
     game = Game()
     colors = list(PlayerColor)
@@ -28,6 +28,7 @@ def main():
 
         while not game.concluded():
         # for _ in range(1): # placeholder single run
+            print(f"Current round: {game.state_service.round_count}")
             active_player = game.state_service.get_active_player().color
             outpath.write(f"Current active player: {active_player}\n")
 

@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from ....schema import BoardState, CardType, PassAction, LoanAction, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
+from ....schema import CardType, PassAction, LoanAction, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
 from typing import List
 from collections import defaultdict
 from .board_state_service import BoardStateService
+from copy import copy
 
 
 class ActionValidator(ABC):
@@ -147,7 +148,7 @@ class BaseValidator(ActionValidator, ABC):
                 if building.industry_type != IndustryType.BREWERY:
                     invalid_res_type = building.industry_type != resource.resource_type
                 else:
-                    invalid_res_type = resource.resource_type == ResourceType.BEER
+                    invalid_res_type = resource.resource_type != ResourceType.BEER
                 if invalid_res_type:
                     return ValidationResult(is_valid=False, message=f"Selected building slot {slot.id} has a building of a mismatched industry type")
 
@@ -349,7 +350,7 @@ class BuildValidator(BaseValidator):
 
     def _validate_base_action_cost(self, action:BuildAction, game_state:BoardStateService, player:Player):
         building = game_state.get_current_building(player, action.industry)
-        moneyless_cost = building.get_cost()
+        moneyless_cost = copy(building.get_cost())
         moneyless_cost.money = 0 # Money is calculated within game logic and shouldn't be checked here or pass within action
         if moneyless_cost != action.get_resource_amounts():
             return ValidationResult(is_valid=False, message="Building base cost doens't match resource selecion")

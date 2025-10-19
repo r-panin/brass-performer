@@ -3,6 +3,7 @@ import random
 from .services.event_bus import EventBus
 from .game_initializer import GameInitializer
 from ...server.game_logic.services.board_state_service import BoardStateService
+import logging
 
 
 class TurnManager:

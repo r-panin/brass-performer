@@ -4,6 +4,7 @@ from .services.event_bus import EventBus
 from .turn_manager import TurnManager
 from .services.board_state_service import BoardStateService
 from copy import deepcopy
+import logging
 
 class StateChanger:
 
@@ -21,7 +22,7 @@ class StateChanger:
             try:
                 card = player.hand.pop(action.card_id)
             except KeyError as k:
-                print(f"ATTEMPTED TO ACCESS CARD {k}, ACTIVE PLAYER HAND HAS: {sorted(state_service.get_active_player().hand.keys())}")
+                logging.critical(f"ATTEMPTED TO ACCESS CARD {k}, ACTIVE PLAYER HAND HAS: {sorted(state_service.get_active_player().hand.keys())}")
                 raise
             if card.value != 'wild':
                 state_service.append_discard(card)

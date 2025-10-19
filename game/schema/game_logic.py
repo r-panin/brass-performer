@@ -53,7 +53,7 @@ class MerchantType(StrEnum):
     POTTERY = 'pottery'
     COTTON = 'cotton'
 
-@dataclass
+@dataclass(frozen=True)
 class ResourceAmounts:
     coal: int = 0
     iron: int = 0

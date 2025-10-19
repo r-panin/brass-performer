@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Dict, List
 from ....schema import Building, ResourceType, ResourceAmounts, IndustryType
 from collections import defaultdict
-import logging
 
 
 class BuildingProvider:
@@ -28,10 +27,10 @@ class BuildingProvider:
         for building in building_json:
             cost_json = building['cost']
             cost = ResourceAmounts(
-                iron=cost_json.get('iron', cost_json.get(ResourceType.IRON, 0)),
-                coal=cost_json.get('coal', cost_json.get(ResourceType.COAL, 0)),
-                beer=cost_json.get('beer', cost_json.get(ResourceType.BEER, 0)),
-                money=cost_json.get('money', 0)
+                iron=int(cost_json.get('iron', cost_json.get(ResourceType.IRON, 0))),
+                coal=int(cost_json.get('coal', cost_json.get(ResourceType.COAL, 0))),
+                beer=int(cost_json.get('beer', cost_json.get(ResourceType.BEER, 0))),
+                money=int(cost_json.get('money', 0))
             )
             b = Building(
                 id=building['id'],
