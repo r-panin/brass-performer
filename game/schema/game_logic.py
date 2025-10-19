@@ -183,6 +183,8 @@ class BoardState:
     discard: List[Card] = field(default_factory=list)
     wilds: List[Card] = field(default_factory=list)
     action_context: ActionContext = ActionContext.MAIN
+    subaction_count: int = 0
+    round_count: int = 1
     
     def hide_state(self) -> 'BoardStateExposed':
         players_exposed = {color: player.hide_hand() for color, player in self.players.items()}
@@ -198,7 +200,9 @@ class BoardState:
             actions_left=self.actions_left,
             discard=self.discard.copy(),
             wilds=self.wilds.copy(),
-            action_context=self.action_context
+            action_context=self.action_context,
+            subaction_count=self.subaction_count,
+            round_count=self.round_count
         )
     
     @classmethod
@@ -236,7 +240,9 @@ class BoardState:
             actions_left=exposed_state.actions_left,
             discard=exposed_state.discard.copy(),
             wilds=exposed_state.wilds.copy(),
-            action_context=exposed_state.action_context
+            action_context=exposed_state.action_context,
+            subaction_count=exposed_state.subaction_count,
+            round_count=exposed_state.round_count
         )
 
     @classmethod
@@ -268,7 +274,9 @@ class BoardState:
             actions_left=exposed_state.actions_left,
             discard=exposed_state.discard.copy(),
             wilds=exposed_state.wilds.copy(),
-            action_context=exposed_state.action_context
+            action_context=exposed_state.action_context,
+            subaction_count=exposed_state.subaction_count,
+            round_count=exposed_state.round_count
         )
     
 class BoardStateExposed(BaseModel):
@@ -284,6 +292,8 @@ class BoardStateExposed(BaseModel):
     discard: List[Card]
     wilds: List[Card]
     action_context: ActionContext
+    subaction_count: int
+    round_count: int
 
 class OutputToPlayer(BaseModel):
     message: Optional[str] = None
@@ -292,8 +302,6 @@ class PlayerState(OutputToPlayer):
     state: BoardStateExposed
     your_hand: Dict[int, Card]
     your_color: PlayerColor
-    subaction_count: int = 0
-    current_round: int
 
 class ValidationResult(OutputToPlayer):
     is_valid: bool

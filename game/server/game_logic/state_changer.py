@@ -65,15 +65,15 @@ class StateChanger:
             player.money_spent += spent
 
         # Изменения специфичные для действий
-        if action.action is ActionType.PASS:
+        if action.action == ActionType.PASS:
             pass # lmao
 
-        elif action.action is ActionType.LOAN:
+        elif action.action == ActionType.LOAN:
             player.income -= 3
             player.bank += 30
             state_service.recalculate_income(player, keep_points=False)
 
-        elif action.action is ActionType.SCOUT:
+        elif action.action == ActionType.SCOUT:
             for card_id in action.card_id:
                 state_service.append_discard(player.hand[card_id])
                 player.hand.pop(card_id)
@@ -85,17 +85,17 @@ class StateChanger:
             player.has_city_wild = True
             player.has_industry_wild = True
         
-        elif action.action is ActionType.DEVELOP:
+        elif action.action == ActionType.DEVELOP:
             state_service.advance_building_index(player, action.industry)
             state_service.set_action_context(ActionContext.DEVELOP)
 
-        elif action.action is ActionType.NETWORK:
+        elif action.action == ActionType.NETWORK:
             state_service.set_link_owner(action.link_id, player.color)
             state_service.set_action_context(ActionContext.NETWORK)
             state_service.invalidate_connectivity_cache()
             state_service.invalidate_networks_cache()
 
-        elif action.action is ActionType.SELL:
+        elif action.action == ActionType.SELL:
             building = state_service.get_building_slot(action.slot_id).building_placed
             building.flipped = True
             owner = state_service.get_player(building.owner)
@@ -108,7 +108,7 @@ class StateChanger:
             state_service.recalculate_income(player)
             state_service.set_action_context(ActionContext.SELL)
 
-        elif action.action is ActionType.BUILD:
+        elif action.action == ActionType.BUILD:
             building = deepcopy(state_service.get_current_building(player, action.industry))
             building.owner = player.color
             building.slot_id = action.slot_id
@@ -120,7 +120,7 @@ class StateChanger:
                 state_service.invalidate_iron_cache()
             state_service.invalidate_networks_cache()
 
-        elif action.action is ActionType.SHORTFALL:
+        elif action.action == ActionType.SHORTFALL:
             if action.slot_id:
                 slot = state_service.get_building_slot(action.slot_id)
                 if slot.building_placed.industry_type == IndustryType.COAL:
@@ -138,10 +138,10 @@ class StateChanger:
             else:
                 state_service.set_action_context(ActionContext.MAIN)
             
-        if not action.action is ActionType.SHORTFALL:
-            state_service.subaction_count += 1
+        if not action.action == ActionType.SHORTFALL:
+            state_service.increase_subaction_count()
         
-        if action.action is ActionType.COMMIT:
+        if action.action == ActionType.COMMIT:
             self._commit_action(state_service)
         
 
@@ -149,7 +149,7 @@ class StateChanger:
         if action.action in self.SINGULAR_ACTION_TYPES:
             self._commit_action(state_service)
         elif action.action in self.DOUBLE_ACTION_TYPES and state_service.subaction_count > 1:
-            if state_service.get_action_context() is ActionContext.GLOUCESTER_DEVELOP:
+            if state_service.get_action_context() == ActionContext.GLOUCESTER_DEVELOP:
                 state_service.set_action_context(ActionContext.SELL)
             else:
                 self._commit_action(state_service)
@@ -164,7 +164,7 @@ class StateChanger:
     def _commit_action(self, state_service:BoardStateService):
         state_service.set_action_context(ActionContext.MAIN)
         state_service.set_actions_left(state_service.get_actions_left() - 1)
-        state_service.subaction_count = 0
+        state_service.reset_subaction_count()
 
     def _sell_to_market(self, state_service:BoardStateService, building:Building) -> None:
         if building.industry_type not in (IndustryType.COAL, IndustryType.IRON):

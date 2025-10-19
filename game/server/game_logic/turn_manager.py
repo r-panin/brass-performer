@@ -32,7 +32,7 @@ class TurnManager:
             state_service.set_actions_left(2)
         else:
             state_service.set_actions_left(1)
-        state_service.subaction_count = 0
+        state_service.reset_subaction_count()
         return state_service
 
     def _prepare_next_round(self, state_service:BoardStateService) -> BoardStateService:

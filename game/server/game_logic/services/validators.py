@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ....schema import CardType, PassAction, LoanAction, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
+from ....schema import CardType, ActionContext, PassAction, LoanAction, ResourceAmounts, MetaAction, Player, ValidationResult, ResourceSource, LinkType, ResourceType, IndustryType, ResourceAction, ScoutAction, DevelopAction, NetworkAction, SellAction, BuildAction
 from typing import List
 from collections import defaultdict
 from .board_state_service import BoardStateService
@@ -227,7 +227,7 @@ class DevelopValidator(BaseValidator):
         return ValidationResult(is_valid=True)
     
     def _validate_base_action_cost(self, action:DevelopAction, game_state:BoardStateService, player):
-        if game_state.gloucester_develop:
+        if game_state.get_action_context() == ActionContext.GLOUCESTER_DEVELOP:
             target_cost = game_state.get_develop_cost(glousecter=True)
         else:
             target_cost = game_state.get_develop_cost(glousecter=False)

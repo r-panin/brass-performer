@@ -14,9 +14,6 @@ class BoardStateService:
     def __init__(self, board_state: BoardState):
         self.state = board_state
         self.update_market_costs()
-        # Временные поля для логики хода
-        self.subaction_count: int = 0
-        self.gloucester_develop: bool = False
         self._connectivity_cache = None
         self._graph_cache = None
         self._coal_cities_cache = None
@@ -30,6 +27,16 @@ class BoardStateService:
     # --- Encapsulated BoardState accessors/mutators (public API) ---
     def get_board_state(self) -> BoardState:
         return self.state
+
+    @property
+    def subaction_count(self) -> int:
+        return self.state.subaction_count
+
+    def increase_subaction_count(self) -> None:
+        self.state.subaction_count += 1
+
+    def reset_subaction_count(self) -> None:
+        self.state.subaction_count = 0
 
     def wipe_hands(self) -> None:
         for _, player in self.get_players().items():
@@ -638,7 +645,7 @@ class BoardStateService:
         return self.round_count
     
     def advance_round_count(self):
-        self.round_count += 1
+        self.state.round_count += 1
 
     def get_current_building(self, player:Player, industry:IndustryType) -> Building:
         return self.building_provider.get_building(industry, player.available_buildings[industry])

@@ -43,8 +43,6 @@ class Game:
             deck_size = partial_state.state.deck_size
             state.deck = [Card.mock() for _ in range(deck_size)]
             transient_state_service = BoardStateService(state)
-            transient_state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
-            transient_state_service.round_count = getattr(partial_state, 'current_round', 1)
             initializer = GameInitializer() 
             card_dict = initializer._build_card_dict()
             state_changer = StateChanger(transient_state_service)
@@ -81,12 +79,8 @@ class Game:
                 player.has_industry_wild = transient_player.has_industry_wild
             game.state_service = BoardStateService(game._determine_cards(hidden_state, known_hand, partial_state.your_color))
 
-            game.state_service.subaction_count = transient_state_service.subaction_count
-            game.state_service.round_count = transient_state_service.round_count
         else:
             game.state_service = BoardStateService(game._determine_cards(partial_state.state, partial_state.your_hand, partial_state.your_color))
-            game.state_service.subaction_count = getattr(partial_state, 'subaction_count', 0)
-            game.state_service.round_count = getattr(partial_state, 'current_round', 1)
         
         game.action_processor = ActionProcessor(game.state_service, game.event_bus)
         game.status = GameStatus.ONGOING
@@ -168,9 +162,7 @@ class Game:
         return PlayerState(
             state=state.hide_state(),
             your_color=color,
-            your_hand={card.id: card for card in self.state_service.get_player(color).hand.values()},
-            subaction_count=self.state_service.subaction_count,
-            current_round=self.state_service.get_current_round()
+            your_hand={card.id: card for card in self.state_service.get_player(color).hand.values()}
         )
 
     def process_action(self, action, color) -> ActionProcessResult|RequestResult:
