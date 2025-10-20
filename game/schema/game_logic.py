@@ -102,7 +102,7 @@ class Link(GameEntity):
     id: int
     type: List[LinkType] 
     cities: List[str]
-    owner: str
+    owner: Optional[str]
 
 @dataclass
 class City(GameEntity):

@@ -4,3 +4,11 @@ node_modules/
 replays/
 mcts_profile
 *.log
+*.c
+*.so
+*.pyd
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+dist/

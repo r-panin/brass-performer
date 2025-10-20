@@ -1,7 +1,15 @@
-from setuptools import setup
+from setuptools import setup, Extension
 from Cython.Build import cythonize
+from pathlib import Path
+
+extensions = [
+    Extension(
+        "game.server.game_logic.services.fast_copy",
+        ["game/server/game_logic/services/fast_copy.pyx"],
+    )
+]
 
 setup(
-    name='Hello world app',
-    ext_modules=cythonize("cython_test.pyx"),
+    name='Brass Performer',
+    ext_modules=cythonize(extensions)
 )
